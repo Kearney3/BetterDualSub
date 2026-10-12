@@ -120,13 +120,24 @@ class SubtitleManager: ObservableObject {
         mediaController.onTrackInfoReceived = { [weak self] track in
             DispatchQueue.main.async {
                 guard let self else { return }
-                if let payload = track?.payload, let id = payload.bundleIdentifier, payload.elapsedTimeMicros != nil {
-                    SyncTarget.remember(SyncApp(id: id, name: payload.applicationName ?? id))
+                guard let track else {
+                    self.resetTVClock()
+                    return
+                }
+                let payload = track.payload
+                guard let bundleID = payload.bundleIdentifier else {
+                    self.resetTVClock()
+                    return
+                }
+                if payload.elapsedTimeMicros != nil {
+                    SyncTarget.remember(SyncApp(id: bundleID, name: payload.applicationName ?? bundleID))
                 }
                 let target = SyncTarget.current
-                guard let payload = track?.payload, let bundleID = payload.bundleIdentifier,
-                      target == SyncTarget.anyApp || bundleID == target,
-                      let elapsed = Self.elapsedSeconds(payload), elapsed.isFinite, elapsed >= 0,
+                guard target == SyncTarget.anyApp || bundleID == target else {
+                    self.resetTVClock()
+                    return
+                }
+                guard let elapsed = Self.elapsedSeconds(payload), elapsed.isFinite, elapsed >= 0,
                       elapsed < 36_000_000 else {
                     self.resetTVClock()
                     return
@@ -181,10 +192,21 @@ class SubtitleManager: ObservableObject {
     }
 
     private func resetTVClock() {
+        let now = uptime
+        if activeSource == .tv, tvClock.valid {
+            // Preserve the latest followed-player position before invalidating it; fallback should
+            // not jump to the manual clock's older position (often zero).
+            manualClock = SubtitleClock(positionMs: Double(tvClock.position(at: now)), uptime: now, rate: 0, valid: true)
+            manualPlaying = false
+        }
         tvClock.valid = false
         syncedAppName = nil
         durationMs = documentDurationMs
         updateSub()
+    }
+
+    func syncTargetDidChange() {
+        resetTVClock()
     }
 
     private func updateSub() {

@@ -235,6 +235,9 @@ private struct GeneralSettingsView: View {
         .onChange(of: showStatusBarItem) { _, _ in
             NotificationCenter.default.post(name: .statusBarVisibilityChanged, object: nil)
         }
+        .onChange(of: syncTarget) { _, _ in
+            manager.syncTargetDidChange()
+        }
     }
 
     private func clearCache() {
