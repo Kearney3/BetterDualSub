@@ -8,6 +8,8 @@ A Mac app provides the ability to add external subtitles to the Apple TV app.
 
 ## How to install
 
+Requires macOS 26.0 or later.
+
 1. Download and move BetterDualSub.app to /Applications folder
 
 2. Open terminal and run this code 
@@ -20,9 +22,9 @@ A Mac app provides the ability to add external subtitles to the Apple TV app.
 
 2. For an online movie, open **Movie page**, paste its `https://tv.apple.com/{country}/movie/.../umc.cmc...` URL and click **Find subtitles**. Select the movie version and one or two language tracks, then click **Download and show**. Both tracks follow the TV playback clock. Positive offsets delay subtitles; the secondary track has an additional independent offset.
 
-3. For a downloaded TV episode, open **Local episode** and choose its `.movpkg` package. Select one or two external text tracks and choose either the episode timeline or the full package timeline, then extract and show them. Extracted SRT files are saved under `~/Movies/Subtitles/`.
+3. For a downloaded TV episode, open **Local episode** and choose its `.movpkg` package. Select one or two external text tracks and choose either the episode timeline or the full package timeline, then extract and show them. App-managed SRT files are saved under `~/Library/Application Support/BetterDualSub/Subtitles/Local/`. Use **Export tracks** to save copies in a folder you choose.
 
-4. Play the matching movie or episode in TV.app. Turn off TV.app's own subtitles if they overlap the external subtitles. Online movie downloads are saved separately as SRT under `~/Library/Application Support/BetterDualSub/Subtitles/`.
+4. Play the matching movie or episode in TV.app. Turn off TV.app's own subtitles if they overlap the external subtitles. Online movie downloads are saved separately as SRT under `~/Library/Application Support/BetterDualSub/Subtitles/`. The **General** page can move this app-managed cache to Trash without touching files you exported yourself.
 
 5. Use **Appearance** to preview and tune both subtitle tracks. **General** switches the interface between Simplified Chinese and English, controls the menu-bar icon, and sets the shortcut delay step from 1 to 60,000 ms. You can reset either track to 0 from the movie or episode page, or reset both tracks in **General**. **Keyboard Shortcuts** lets you record custom global shortcuts for moving either track earlier or later and for resetting each track to 0. Defaults are Control-Option-Left/Right for the primary track, Control-Option-Shift-Left/Right for the secondary track, Control-Option-0 to reset the primary delay, and Control-Option-Shift-0 to reset the secondary delay.
 

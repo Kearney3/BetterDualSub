@@ -156,6 +156,9 @@ private struct GeneralSettingsView: View {
     @AppStorage(SyncMode.storageKey) private var syncMode = SyncMode.auto.rawValue
     @AppStorage(SyncTarget.key) private var syncTarget = SyncTarget.tvBundleID
     @EnvironmentObject private var manager: SubtitleManager
+    @State private var showingCacheConfirmation = false
+    @State private var cacheMessage = ""
+    @State private var cacheError = false
 
     var body: some View {
         SettingsPage(descriptionKey: "general.language.description") {
@@ -211,9 +214,45 @@ private struct GeneralSettingsView: View {
                         .labelsHidden().toggleStyle(.switch)
                 }
             }
+            SettingsCard {
+                SettingsRow(symbol: "folder", tint: .indigo, titleKey: "general.cache.title",
+                            subtitleKey: "general.cache.help") {
+                    HStack {
+                        Button("general.cache.open") {
+                            if let folder = try? SubtitleCache.root(), FileManager.default.fileExists(atPath: folder.path) {
+                                NSWorkspace.shared.open(folder)
+                            }
+                        }
+                        Button("general.cache.clear") { showingCacheConfirmation = true }
+                    }
+                }
+                if !cacheMessage.isEmpty { StatusLine(text: cacheMessage, isError: cacheError) }
+            }
+        }
+        .confirmationDialog("general.cache.confirm", isPresented: $showingCacheConfirmation) {
+            Button("general.cache.clear", role: .destructive) { clearCache() }
         }
         .onChange(of: showStatusBarItem) { _, _ in
             NotificationCenter.default.post(name: .statusBarVisibilityChanged, object: nil)
+        }
+    }
+
+    private func clearCache() {
+        Task {
+            do {
+                let removed = try await Task.detached(priority: .userInitiated) {
+                    let folder = try SubtitleCache.root()
+                    guard FileManager.default.fileExists(atPath: folder.path) else { return false }
+                    var trashed: NSURL?
+                    try FileManager.default.trashItem(at: folder, resultingItemURL: &trashed)
+                    return true
+                }.value
+                cacheError = false
+                cacheMessage = AppLocalization.string(removed ? "general.cache.cleared" : "general.cache.empty")
+            } catch {
+                cacheError = true
+                cacheMessage = error.localizedDescription
+            }
         }
     }
 }

@@ -12,6 +12,9 @@ struct MovpkgSubtitleImportView: View {
     @State fileprivate var outputFolder: URL?
     @State fileprivate var status = AppLocalization.string("movpkg.panelMessage")
     @State fileprivate var error = ""
+    @State private var busy = false
+    @State private var operation: Task<Void, Never>?
+    @State private var generation = UUID()
 
     fileprivate var primary: LocalSubtitleTrack? { tracks.first { $0.id == primaryID } }
 
@@ -19,7 +22,7 @@ struct MovpkgSubtitleImportView: View {
         SettingsPage(descriptionKey: "movpkg.description") {
             SettingsCard(titleKey: "movpkg.chooseTitle") {
                 HStack {
-                    Button("movpkg.choose", action: choosePackage)
+                    Button("movpkg.choose", action: choosePackage).disabled(busy)
                     if let packageURL { Text(packageURL.lastPathComponent).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary) }
                 }
                 if tracks.isEmpty { SettingsHint(key: "movpkg.shortcutHint") }
@@ -29,29 +32,36 @@ struct MovpkgSubtitleImportView: View {
                     Text(AppLocalization.format("movpkg.tracksAvailable", tracks.count)).font(.headline)
                     Picker("download.primary", selection: $primaryID) {
                         ForEach(tracks) { Text($0.label).tag($0.id) }
-                    }
+                    }.disabled(busy)
                     Picker("download.secondary", selection: $secondaryID) {
                         Text("download.noSecondary").tag("")
                         ForEach(tracks) { Text($0.label).tag($0.id) }
-                    }
+                    }.disabled(busy)
                     Divider()
                     Picker("movpkg.timeline.section", selection: $usePackageTimeline) {
                         Text("movpkg.timeline.episode").tag(false)
                         Text("movpkg.timeline.package").tag(true)
-                    }.pickerStyle(.segmented)
+                    }.pickerStyle(.segmented).disabled(busy)
                     SettingsHint(key: usePackageTimeline ? "movpkg.timeline.packageHelp" : "movpkg.timeline.episodeHelp")
                     Button("movpkg.extract", action: extract)
                         .buttonStyle(.borderedProminent)
-                        .disabled(primaryID.isEmpty || primaryID == secondaryID)
+                        .disabled(busy || primaryID.isEmpty || primaryID == secondaryID)
                     Divider()
                     HStack {
                         Button("movpkg.exportTracks", action: exportTracks)
-                            .disabled(primaryID.isEmpty || primaryID == secondaryID)
+                            .disabled(busy || primaryID.isEmpty || primaryID == secondaryID)
                     }
                     SettingsHint(key: "movpkg.exportHelp")
                 }
             }
-            if !status.isEmpty { StatusLine(text: status) }
+            if busy {
+                HStack {
+                    ProgressView().controlSize(.small)
+                    Text(status)
+                    Spacer()
+                    Button("common.cancel", action: cancel)
+                }
+            } else if !status.isEmpty { StatusLine(text: status) }
             if !error.isEmpty { StatusLine(text: error, isError: true) }
             LoadedSubtitleCard {
                 if let outputFolder {
@@ -66,6 +76,47 @@ struct MovpkgSubtitleImportView: View {
             status = packageURL == nil
                 ? AppLocalization.string("movpkg.panelMessage")
                 : AppLocalization.format("movpkg.status.read", tracks.count)
+        }
+        .onDisappear(perform: cancel)
+    }
+
+    private func cancel() {
+        if busy { status = AppLocalization.string("download.status.cancelled") }
+        generation = UUID()
+        operation?.cancel()
+        operation = nil
+        busy = false
+    }
+
+    private func run(_ action: @escaping @MainActor () async throws -> Void) {
+        guard !busy else { return }
+        busy = true
+        error = ""
+        let token = UUID()
+        generation = token
+        operation = Task { @MainActor in
+            do { try await action() }
+            catch {
+                guard generation == token else { return }
+                if !Task.isCancelled {
+                    self.error = error.localizedDescription
+                    status = ""
+                }
+            }
+            guard generation == token else { return }
+            busy = false
+            operation = nil
+        }
+    }
+
+    private func background<Result: Sendable>(_ work: @escaping @Sendable () throws -> Result) async throws -> Result {
+        let worker = Task.detached(priority: .userInitiated, operation: work)
+        return try await withTaskCancellationHandler {
+            let value = try await worker.value
+            try Task.checkCancellation()
+            return value
+        } onCancel: {
+            worker.cancel()
         }
     }
 
@@ -88,8 +139,9 @@ struct MovpkgSubtitleImportView: View {
         tracks = []
         primaryID = ""
         secondaryID = ""
-        do {
-            let available = try MovpkgSubtitleExtractor.inspect(url)
+        run {
+            status = AppLocalization.string("movpkg.status.inspecting")
+            let available = try await background { try MovpkgSubtitleExtractor.inspect(url) }
             packageURL = url
             tracks = available
             primaryID = available.first(where: { !$0.forced && !$0.sdh && $0.language.lowercased().hasPrefix("en") })?.id
@@ -101,29 +153,33 @@ struct MovpkgSubtitleImportView: View {
             status = AppLocalization.format("movpkg.status.read", available.count)
             error = ""
             outputFolder = nil
-        } catch {
-            self.error = error.localizedDescription
-            status = AppLocalization.string("movpkg.status.readFailed")
         }
     }
 
     private func extract() {
         guard let packageURL, let primary,
               secondaryID.isEmpty || secondaryID != primaryID else { return }
-        do {
-            let selected = [primary] + tracks.filter { $0.id == secondaryID }
-            let documents = try selected.map { try MovpkgSubtitleExtractor.document(for: $0, packageTimeline: usePackageTimeline) }
-            let folder = try LocalSubtitleCache.save(documents, tracks: selected, package: packageURL,
-                                                     packageTimeline: usePackageTimeline)
+        let selected = [primary] + tracks.filter { $0.id == secondaryID }
+        let packageTimeline = usePackageTimeline
+        run {
+            var documents: [SubtitleDocument] = []
+            for (index, track) in selected.enumerated() {
+                status = AppLocalization.format("movpkg.status.progress", index + 1, selected.count)
+                documents.append(try await background {
+                    try MovpkgSubtitleExtractor.document(for: track, packageTimeline: packageTimeline)
+                })
+            }
+            status = AppLocalization.string("movpkg.status.saving")
+            let savedDocuments = documents
+            let folder = try await background {
+                try LocalSubtitleCache.save(savedDocuments, tracks: selected, package: packageURL,
+                                            packageTimeline: packageTimeline)
+            }
             manager.load(primary: documents[0], secondary: documents.count > 1 ? documents[1] : nil,
                          title: packageURL.deletingPathExtension().lastPathComponent, names: selected.map(\.label))
             outputFolder = folder
             status = AppLocalization.format("movpkg.status.extracted",
                                             documents.map(\.items.count).map(String.init).joined(separator: " + "))
-            error = ""
-        } catch {
-            self.error = error.localizedDescription
-            status = AppLocalization.string("movpkg.status.extractFailed")
         }
     }
 }
@@ -138,25 +194,29 @@ extension MovpkgSubtitleImportView {
         panel.canCreateDirectories = true
         panel.directoryURL = LocalSubtitleCache.defaultFolder
         guard panel.runModal() == .OK, let folder = panel.url else { return }
-        do {
-            let selected = [primary] + tracks.filter { $0.id == secondaryID }
-            let documents = try selected.map { try MovpkgSubtitleExtractor.document(for: $0, packageTimeline: usePackageTimeline) }
-            let base = LocalSubtitleCache.basename(packageURL)
-            for (index, pair) in zip(documents, selected).enumerated() {
-                let name = base + LocalSubtitleCache.suffix(pair.1, index: index, packageTimeline: usePackageTimeline) + ".srt"
-                try pair.0.srt.write(to: folder.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        let selected = [primary] + tracks.filter { $0.id == secondaryID }
+        let packageTimeline = usePackageTimeline
+        run {
+            var documents: [SubtitleDocument] = []
+            for (index, track) in selected.enumerated() {
+                status = AppLocalization.format("movpkg.status.progress", index + 1, selected.count)
+                documents.append(try await background {
+                    try MovpkgSubtitleExtractor.document(for: track, packageTimeline: packageTimeline)
+                })
+            }
+            status = AppLocalization.string("movpkg.status.saving")
+            let exportedDocuments = documents
+            try await background {
+                try LocalSubtitleCache.export(exportedDocuments, tracks: selected, package: packageURL,
+                                              packageTimeline: packageTimeline, to: folder)
             }
             outputFolder = folder
             status = AppLocalization.format("movpkg.status.exported", selected.count)
-            error = ""
-        } catch {
-            self.error = error.localizedDescription
-            status = AppLocalization.string("movpkg.status.exportFailed")
         }
     }
 }
 
-private enum LocalSubtitleCache {
+private nonisolated enum LocalSubtitleCache {
     static var defaultFolder: URL {
         FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Subtitles", isDirectory: true)
     }
@@ -174,17 +234,30 @@ private enum LocalSubtitleCache {
     static func save(_ documents: [SubtitleDocument], tracks: [LocalSubtitleTrack], package: URL,
                      packageTimeline: Bool) throws -> URL {
         let basename = basename(package)
-        let folder = defaultFolder.appendingPathComponent("\(basename)-\(UUID().uuidString)", isDirectory: true)
+        let folder = try SubtitleCache.root().appendingPathComponent("Local/\(basename)-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         do {
             for (index, pair) in zip(documents, tracks).enumerated() {
+                try Task.checkCancellation()
                 try pair.0.srt.write(to: folder.appendingPathComponent(basename + suffix(pair.1, index: index, packageTimeline: packageTimeline) + ".srt"),
                                      atomically: true, encoding: .utf8)
             }
+            try Task.checkCancellation()
         } catch {
             try? FileManager.default.removeItem(at: folder)
             throw error
         }
         return folder
+    }
+
+    static func export(_ documents: [SubtitleDocument], tracks: [LocalSubtitleTrack], package: URL,
+                       packageTimeline: Bool, to folder: URL) throws {
+        let base = basename(package)
+        for (index, pair) in zip(documents, tracks).enumerated() {
+            try Task.checkCancellation()
+            let name = base + suffix(pair.1, index: index, packageTimeline: packageTimeline) + ".srt"
+            try pair.0.srt.write(to: folder.appendingPathComponent(name), atomically: true, encoding: .utf8)
+        }
+        try Task.checkCancellation()
     }
 }

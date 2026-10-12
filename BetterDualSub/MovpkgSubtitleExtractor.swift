@@ -43,18 +43,19 @@ nonisolated enum MovpkgSubtitleExtractor {
             .filter { $0.lastPathComponent.hasPrefix("2-") }
         var localStreams: [String: (URL, XMLTree)] = [:]
         for candidate in streamDirs {
+            try Task.checkCancellation()
             guard let directory = try? containedURL(candidate.lastPathComponent, in: package),
                   (try? directory.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true else { continue }
             let infoURL = directory.appendingPathComponent("StreamInfoBoot.xml")
             guard FileManager.default.fileExists(atPath: infoURL.path) else { continue }
-            let info = try XMLTree.read(infoURL)
+            guard let info = try? XMLTree.read(infoURL) else { continue }
             guard info.descendant("Complete")?.text == "YES",
                   info.descendant("Type")?.text == "Supplemental",
                   info.descendants("MediaType").contains(where: { $0.attributes["type"] == "sbtl" }),
                   let stableID = info.descendant("UniqueIdentifier")?.text,
                   let playlistPath = info.descendant("PathToLocalCopy")?.text else { continue }
-            let playlistURL = try containedURL(playlistPath, in: directory)
-            let playlist = try String(contentsOf: playlistURL, encoding: .utf8)
+            guard let playlistURL = try? containedURL(playlistPath, in: directory),
+                  let playlist = try? String(contentsOf: playlistURL, encoding: .utf8) else { continue }
             guard playlist.hasPrefix("#EXTM3U"), !playlist.contains("#EXT-X-KEY:") else { continue }
             localStreams[stableID] = (directory, info)
         }
@@ -62,10 +63,12 @@ nonisolated enum MovpkgSubtitleExtractor {
         let masterURLs = try FileManager.default.contentsOfDirectory(at: package.appendingPathComponent("Data"), includingPropertiesForKeys: nil)
             .filter { $0.lastPathComponent.hasSuffix("-master.m3u8") }.sorted { $0.lastPathComponent < $1.lastPathComponent }
         for masterURL in masterURLs {
-            let master = try String(contentsOf: masterURL, encoding: .utf8)
+            try Task.checkCancellation()
+            guard let master = try? String(contentsOf: masterURL, encoding: .utf8) else { continue }
             let renditions = master.components(separatedBy: .newlines).filter { $0.hasPrefix("#EXT-X-MEDIA:") }
             var tracks: [LocalSubtitleTrack] = []
             for line in renditions {
+                try Task.checkCancellation()
                 let fields = SubtitlePlaylist.attributes(String(line.dropFirst("#EXT-X-MEDIA:".count)))
                 guard fields["TYPE"] == "SUBTITLES",
                       let stableID = fields["STABLE-RENDITION-ID"],
@@ -73,7 +76,7 @@ nonisolated enum MovpkgSubtitleExtractor {
                       let (directory, info) = localStreams[stableID] else { continue }
                 let xmlSegments = info.descendants("SEG").sorted { (Int($0.attributes["SeqNum"] ?? "0") ?? 0) < (Int($1.attributes["SeqNum"] ?? "0") ?? 0) }
                 guard !xmlSegments.isEmpty else { continue }
-                let segments = try xmlSegments.map { item -> LocalSubtitleSegment in
+                let segments = try? xmlSegments.map { item -> LocalSubtitleSegment in
                     guard let path = item.attributes["PATH"], let offset = Int(item.attributes["Off"] ?? "0"),
                           let length = Int(item.attributes["Len"] ?? "0"),
                           let sequence = Int(item.attributes["SeqNum"] ?? "0"),
@@ -90,7 +93,8 @@ nonisolated enum MovpkgSubtitleExtractor {
                                                 startMs: Int((start * 1000).rounded()), durationMs: Int((duration * 1000).rounded()),
                                                 sequence: sequence)
                 }
-                guard let episodeSegment = segments.indices.max(by: { segments[$0].durationMs < segments[$1].durationMs }) else { continue }
+                guard let segments,
+                      let episodeSegment = segments.indices.max(by: { segments[$0].durationMs < segments[$1].durationMs }) else { continue }
                 tracks.append(LocalSubtitleTrack(id: stableID, language: language,
                                                  name: fields["NAME"] ?? language, forced: fields["FORCED"] == "YES",
                                                  sdh: fields["CHARACTERISTICS"]?.contains("public.accessibility") == true,
@@ -113,6 +117,7 @@ nonisolated enum MovpkgSubtitleExtractor {
         var items: [SubtitleItem] = []
         let selected = packageTimeline ? Array(track.segments.indices) : [track.episodeSegment]
         for index in selected {
+            try Task.checkCancellation()
             let segment = track.segments[index]
             let data = try Data(contentsOf: segment.file, options: .mappedIfSafe)
             let range = segment.offset..<(segment.offset + segment.length)

@@ -215,17 +215,24 @@ struct MovieSubtitleDownloadView: View {
     }
 }
 
-enum SubtitleCache {
+nonisolated enum SubtitleCache {
+    static func root() throws -> URL {
+        let support = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask,
+                                                  appropriateFor: nil, create: true)
+        return support.appendingPathComponent("BetterDualSub/Subtitles", isDirectory: true)
+    }
+
     static func save(_ documents: [SubtitleDocument], tracks: [MovieSubtitleTrack], movie: MovieVersion) throws -> URL {
-        let root = try FileManager.default.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true)
         let safeID = movie.id.filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }.prefix(80)
-        let folder = root.appendingPathComponent("BetterDualSub/Subtitles/\(safeID)/\(UUID().uuidString)", isDirectory: true)
+        let folder = try root().appendingPathComponent("\(safeID)/\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
         do {
             for (index, pair) in zip(documents, tracks).enumerated() {
+                try Task.checkCancellation()
                 let language = pair.1.language.filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }.prefix(40)
                 try pair.0.srt.write(to: folder.appendingPathComponent("\(index + 1)-\(language).srt"), atomically: true, encoding: .utf8)
             }
+            try Task.checkCancellation()
         } catch {
             try? FileManager.default.removeItem(at: folder)
             throw error

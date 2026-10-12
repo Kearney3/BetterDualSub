@@ -1965,6 +1965,120 @@
     "BetterDualSub" : {
       "shouldTranslate" : false
     },
+    "general.cache.clear" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move cache to Trash"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将缓存移到废纸篓"
+          }
+        }
+      }
+    },
+    "general.cache.cleared" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generated cache moved to Trash."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动生成的缓存已移到废纸篓。"
+          }
+        }
+      }
+    },
+    "general.cache.confirm" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Move all generated subtitle cache to Trash?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将所有自动生成的字幕缓存移到废纸篓？"
+          }
+        }
+      }
+    },
+    "general.cache.empty" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No generated cache to clear."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有可清理的自动生成缓存。"
+          }
+        }
+      }
+    },
+    "general.cache.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only app-managed downloads and extractions are cleared. Files exported to a folder you chose are kept."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅清理应用管理的下载和提取文件；保留导出到自选文件夹的字幕。"
+          }
+        }
+      }
+    },
+    "general.cache.open" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open folder"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "打开文件夹"
+          }
+        }
+      }
+    },
+    "general.cache.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Generated subtitle cache"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动生成的字幕缓存"
+          }
+        }
+      }
+    },
     "general.language.description" : {
       "localizations" : {
         "en" : {
@@ -3161,6 +3275,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "提取失败；之前已加载的字幕保持不变。"
+          }
+        }
+      }
+    },
+    "movpkg.status.inspecting" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading subtitle tracks…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在读取字幕轨…"
+          }
+        }
+      }
+    },
+    "movpkg.status.progress" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extracting track %lld of %lld…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在提取第 %lld/%lld 条轨道…"
+          }
+        }
+      }
+    },
+    "movpkg.status.saving" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving subtitles…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在保存字幕…"
           }
         }
       }

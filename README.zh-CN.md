@@ -8,6 +8,8 @@
 
 ## 安装
 
+需要 macOS 26.0 或更高版本。
+
 1. 下载 BetterDualSub.app,并移动到「应用程序」(/Applications)文件夹。
 
 2. 打开终端,运行以下命令:
@@ -20,9 +22,9 @@
 
 2. 在线影片:打开 **影片页面**,粘贴 `https://tv.apple.com/{国家或地区}/movie/.../umc.cmc...` 格式的链接,点击 **查找字幕**。选择影片版本以及一到两条语言轨道,然后点击 **下载并显示**。两条轨道都会跟随 TV 的播放时钟。正偏移表示字幕延后;第二条轨道还有独立的额外偏移。
 
-3. 已下载的剧集:打开 **本地剧集**,选择对应的 `.movpkg` 包。选择一到两条外挂文本轨道,选择使用单集时间线或整个包的时间线,然后提取并显示。提取出的 SRT 文件保存在 `~/Movies/Subtitles/`。
+3. 已下载的剧集:打开 **本地剧集**,选择对应的 `.movpkg` 包。选择一到两条外挂文本轨道,选择使用单集时间线或整个包的时间线,然后提取并显示。应用管理的 SRT 文件保存在 `~/Library/Application Support/BetterDualSub/Subtitles/Local/`；通过 **导出轨道** 可另存到自选文件夹。
 
-4. 在 TV.app 中播放对应的影片或剧集。如果 TV.app 自带字幕与外挂字幕重叠,请关闭 TV.app 自带字幕。在线下载的影片字幕会单独以 SRT 保存在 `~/Library/Application Support/BetterDualSub/Subtitles/`。
+4. 在 TV.app 中播放对应的影片或剧集。如果 TV.app 自带字幕与外挂字幕重叠,请关闭 TV.app 自带字幕。在线下载的影片字幕会单独以 SRT 保存在 `~/Library/Application Support/BetterDualSub/Subtitles/`。可在 **通用** 页面将应用管理的缓存移到废纸篓，不会清理自行导出的文件。
 
 5. 在 **外观** 中预览并调整两条字幕的样式。**通用** 可切换界面语言(简体中文 / English)、控制菜单栏图标,并设置快捷键延迟步进(1 到 60,000 毫秒)。可在影片页面或剧集页面把任一轨道重置为 0,也可在 **通用** 中同时重置两条轨道。**快捷键** 支持录制自定义全局快捷键,用于将任一轨道提前或延后,以及将各轨道重置为 0。默认值:主轨道为 Control-Option-左/右方向键,第二轨道为 Control-Option-Shift-左/右方向键,重置主轨道延迟为 Control-Option-0,重置第二轨道延迟为 Control-Option-Shift-0。
 

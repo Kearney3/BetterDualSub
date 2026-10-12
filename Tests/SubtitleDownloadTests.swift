@@ -2,6 +2,41 @@ import XCTest
 @testable import BetterDualSubCore
 
 final class SubtitleDownloadTests: XCTestCase {
+    func testMovpkgSkipsDamagedTracksAndExtractsRemainingTrack() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("BetterDualSub-\(UUID().uuidString).movpkg")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let good = root.appendingPathComponent("2-good")
+        let damaged = root.appendingPathComponent("2-damaged")
+        let outOfRange = root.appendingPathComponent("2-out-of-range")
+        let data = root.appendingPathComponent("Data")
+        for folder in [good, damaged, outOfRange, data] {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        }
+        try "<HLSMoviePackage/>".write(to: root.appendingPathComponent("boot.xml"), atomically: true, encoding: .utf8)
+        let vtt = "WEBVTT\nX-TIMESTAMP-MAP=LOCAL:00:00:00.000,MPEGTS:900000\n\n00:00:01.000 --> 00:00:02.000\nHello\n"
+        try vtt.write(to: good.appendingPathComponent("segment.frag"), atomically: true, encoding: .utf8)
+        let xml = { (id: String, length: Int) in
+            "<StreamInfoBoot><Complete>YES</Complete><Type>Supplemental</Type><MediaType type=\"sbtl\"/>" +
+            "<UniqueIdentifier>\(id)</UniqueIdentifier><PathToLocalCopy>playlist.m3u8</PathToLocalCopy>" +
+            "<SEG PATH=\"segment.frag\" Off=\"0\" Len=\"\(length)\" SeqNum=\"0\" Tim=\"0\" Dur=\"10\"/></StreamInfoBoot>"
+        }
+        try xml("good", vtt.utf8.count).write(to: good.appendingPathComponent("StreamInfoBoot.xml"), atomically: true, encoding: .utf8)
+        try xml("bad", 9999).write(to: outOfRange.appendingPathComponent("StreamInfoBoot.xml"), atomically: true, encoding: .utf8)
+        try vtt.write(to: outOfRange.appendingPathComponent("segment.frag"), atomically: true, encoding: .utf8)
+        try "<broken".write(to: damaged.appendingPathComponent("StreamInfoBoot.xml"), atomically: true, encoding: .utf8)
+        for folder in [good, outOfRange] {
+            try "#EXTM3U\n".write(to: folder.appendingPathComponent("playlist.m3u8"), atomically: true, encoding: .utf8)
+        }
+        let master = "#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,STABLE-RENDITION-ID=good,LANGUAGE=en,NAME=English\n" +
+            "#EXT-X-MEDIA:TYPE=SUBTITLES,STABLE-RENDITION-ID=bad,LANGUAGE=zh,NAME=Chinese\n"
+        try master.write(to: data.appendingPathComponent("one-master.m3u8"), atomically: true, encoding: .utf8)
+
+        let tracks = try MovpkgSubtitleExtractor.inspect(root)
+        XCTAssertEqual(tracks.map(\.id), ["good"])
+        let document = try MovpkgSubtitleExtractor.document(for: XCTUnwrap(tracks.first), packageTimeline: false)
+        XCTAssertEqual(document.items, [SubtitleItem(startMs: 1000, endMs: 2000, text: "Hello")])
+    }
+
     func testMoviePageValidation() throws {
         let page = try MoviePage("https://tv.apple.com/hk/movie/title/umc.cmc.1vrwat5k1ucm5k42q97ioqyq3?x=1")
         XCTAssertEqual(page.country, "HK")
