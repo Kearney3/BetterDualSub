@@ -23,17 +23,23 @@ jobs:
           xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub \
             -configuration Release -derivedDataPath build \
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
             MACOSX_DEPLOYMENT_TARGET=26.0 CODE_SIGNING_ALLOWED=NO build
 
-      - name: Ad-hoc sign and package
+      - name: Ad-hoc sign and create DMG (arm64)
         run: |
           APP="build/Build/Products/Release/BetterDualSub.app"
+          lipo -archs "$APP/Contents/MacOS/BetterDualSub"
           codesign --force --deep --sign - "$APP"
-          ditto -c -k --keepParent "$APP" "BetterDualSub-${GITHUB_REF_NAME}.zip"
+          mkdir dmg-root
+          cp -R "$APP" dmg-root/
+          ln -s /Applications dmg-root/Applications
+          hdiutil create -volname "BetterDualSub" -srcfolder dmg-root -ov -format UDZO \
+            "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg"
 
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "BetterDualSub-${GITHUB_REF_NAME}.zip" \
+          gh release create "$GITHUB_REF_NAME" "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg" \
             --title "BetterDualSub ${GITHUB_REF_NAME}" --generate-notes --verify-tag
