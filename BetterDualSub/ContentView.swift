@@ -117,9 +117,6 @@ class SubtitleManager: ObservableObject {
     private var uptime: TimeInterval { ProcessInfo.processInfo.systemUptime }
 
     init() {
-        appNapActivityToken = ProcessInfo.processInfo.beginActivity(
-            options: [.userInitiated], reason: "Synchronize subtitles with TV playback."
-        )
         mediaController.onTrackInfoReceived = { [weak self] track in
             DispatchQueue.main.async {
                 guard let self else { return }
@@ -160,7 +157,11 @@ class SubtitleManager: ObservableObject {
             DispatchQueue.main.async { self?.resetTVClock() }
         }
         mediaController.startListening()
-        let timer = Timer(timeInterval: 0.05, repeats: true) { [weak self] _ in
+    }
+
+    private func startSubtitleTimerIfNeeded() {
+        guard internalTimer == nil else { return }
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateSub() }
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -205,6 +206,16 @@ class SubtitleManager: ObservableObject {
         let position = source == .tv ? tvClock.position(at: now) : manualClock.position(at: now)
         let playing = source == .tv ? tvClock.rate > 0 : manualPlaying
         if isPlaying != playing { isPlaying = playing }
+        if playing && !trackNames.isEmpty {
+            if appNapActivityToken == nil {
+                appNapActivityToken = ProcessInfo.processInfo.beginActivity(
+                    options: [.userInitiated], reason: "Synchronize subtitles with playback."
+                )
+            }
+        } else if let token = appNapActivityToken {
+            ProcessInfo.processInfo.endActivity(token)
+            appNapActivityToken = nil
+        }
         if source == .manual, durationMs > 0, position >= durationMs, manualPlaying {
             manualPlaying = false
             manualClock.positionMs = Double(durationMs)
@@ -312,6 +323,7 @@ class SubtitleManager: ObservableObject {
     // MARK: Loading and offsets
 
     func load(primary: SubtitleDocument, secondary: SubtitleDocument? = nil, title: String, names: [String]) {
+        startSubtitleTimerIfNeeded()
         self.primary = primary
         self.secondary = secondary
         loadedTitle = title
@@ -544,6 +556,7 @@ struct ContentView: View {
     @State private var dragTranslation: CGSize = .zero
     @State private var textSize: CGSize = .zero
     @State private var barSize: CGSize = .zero
+    @State private var placementTimer: Timer?
 
     private var primaryDisplayText: String {
         if !subManager.currentText.isEmpty { return subManager.currentText }
@@ -579,6 +592,11 @@ struct ContentView: View {
             overlay.startHitTesting()
             overlay.hitRects = hitRectsInWindow
             overlay.needsDwell = !hasCue
+        }
+        .onDisappear {
+            placementTimer?.invalidate()
+            placementTimer = nil
+            overlay.stopHitTesting()
         }
         .onChange(of: hitRectsInWindow) { _, rects in overlay.hitRects = rects }
         .onChange(of: hasCue) { _, value in overlay.needsDwell = !value }
@@ -733,7 +751,8 @@ struct ContentView: View {
     /// Keeps the subtitle panel over the main screen. It deliberately does not follow the player's window,
     /// so the subtitles stay where the user put them.
     private func startOverlayPlacement() {
-        Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { _ in
+        guard placementTimer == nil else { return }
+        placementTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
             guard let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == OverlayPanel.identifierValue }) else { return }
 
             guard OverlayController.isVisible else {
@@ -751,7 +770,7 @@ struct ContentView: View {
             if window.collectionBehavior != requiredBehavior { window.collectionBehavior = requiredBehavior }
             if window.level != .mainMenu { window.level = .mainMenu }
             if window.frame != targetFrame { window.setFrame(targetFrame, display: true, animate: false) }
-            window.orderFrontRegardless()
+            if !window.isVisible { window.orderFrontRegardless() }
         }
     }
 }
@@ -867,6 +886,15 @@ final class OverlayController: ObservableObject {
         guard timer == nil else { return }
         timer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.updateHitTesting() }
+        }
+    }
+
+    func stopHitTesting() {
+        timer?.invalidate()
+        timer = nil
+        isHovering = false
+        if let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == OverlayPanel.identifierValue }) {
+            window.ignoresMouseEvents = true
         }
     }
 
