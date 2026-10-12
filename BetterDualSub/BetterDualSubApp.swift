@@ -95,6 +95,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var overlayPanel: OverlayPanel?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Each process creates its own always-on-top subtitle panel. A second launch would
+        // leave a stationary copy behind when the user drags the other process's subtitles.
+        if let bundleID = Bundle.main.bundleIdentifier,
+           let existing = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID)
+            .first(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier && !$0.isTerminated }) {
+            existing.activate(options: [.activateAllWindows])
+            NSApp.terminate(nil)
+            return
+        }
+
         AppDelegate.shared = self
         let panel = OverlayPanel()
         panel.orderFrontRegardless()

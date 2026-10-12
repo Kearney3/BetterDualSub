@@ -1,18 +1,159 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
-    "%@%%" : {
-      "shouldTranslate" : false
+    "%@ pt" : {
+
+    },
+    "%@ px" : {
+
     },
     "%lld" : {
       "shouldTranslate" : false
     },
-    "%lld pt" : {},
+    "%lld pt" : {
+
+    },
     "0" : {
       "shouldTranslate" : false
     },
     "250" : {
       "shouldTranslate" : false
+    },
+    "align.apply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Align to current time"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对齐到当前播放时间"
+          }
+        }
+      }
+    },
+    "align.description" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a line from either track and apply it while that line is being spoken; the delay is set automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在某句台词正在播放时，从任一轨道选中同一句字幕并应用，延迟会自动算出。"
+          }
+        }
+      }
+    },
+    "align.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Example: at 10:00 you hear a line that the file shows at 8:00. Select it and apply: the delay becomes +2:00 (if the tracks are linked, both tracks move)."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "例如：播放到 10:00 听到的台词，在字幕文件里出现在 8:00。选中它并应用，延迟就会变为 +2 分钟（两轨同步开启时，两轨一起偏移）。"
+          }
+        }
+      }
+    },
+    "align.now" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Now playing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前播放"
+          }
+        }
+      }
+    },
+    "align.open" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Align by line…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按字幕对齐…"
+          }
+        }
+      }
+    },
+    "align.result" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delay set to %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已将延迟设为 %@"
+          }
+        }
+      }
+    },
+    "align.search" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Search subtitles"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "搜索字幕"
+          }
+        }
+      }
+    },
+    "align.track" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "轨道"
+          }
+        }
+      }
     },
     "appearance.background.color" : {
       "extractionState" : "manual",
@@ -114,6 +255,74 @@
         }
       }
     },
+    "appearance.lineMode" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lines"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "行数"
+          }
+        }
+      }
+    },
+    "appearance.lineMode.double" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Up to two lines"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "双行"
+          }
+        }
+      }
+    },
+    "appearance.lineMode.original" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "As authored"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持原样"
+          }
+        }
+      }
+    },
+    "appearance.lineMode.single" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Single line"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "单行"
+          }
+        }
+      }
+    },
     "appearance.outlineColor" : {
       "localizations" : {
         "en" : {
@@ -135,13 +344,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Outline width"
+            "value" : "Outline size"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "描边粗细"
+            "value" : "轮廓大小"
           }
         }
       }
@@ -232,13 +441,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Size"
+            "value" : "Font size"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "大小"
+            "value" : "字号"
           }
         }
       }
@@ -411,6 +620,40 @@
         }
       }
     },
+    "appearance.window.lock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock subtitle window"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁定字幕窗口"
+          }
+        }
+      }
+    },
+    "appearance.window.lock.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "While locked, the subtitles never respond to the mouse, so apps underneath stay usable."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁定后字幕不再响应鼠标，不会影响下方的其他应用。"
+          }
+        }
+      }
+    },
     "appearance.window.reset" : {
       "localizations" : {
         "en" : {
@@ -458,6 +701,9 @@
           }
         }
       }
+    },
+    "BetterDualSub" : {
+      "shouldTranslate" : false
     },
     "bilingual.description" : {
       "localizations" : {
@@ -634,6 +880,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "毫秒"
+          }
+        }
+      }
+    },
+    "delay.field.primary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 1 delay (ms)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一轨延迟（ms）"
+          }
+        }
+      }
+    },
+    "delay.field.secondary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 2 delay (ms)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨延迟（ms）"
+          }
+        }
+      }
+    },
+    "delay.link" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep Track 2 delay the same as Track 1"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨延迟与第一轨保持同步"
+          }
+        }
+      }
+    },
+    "delay.toast.linked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delay (both tracks): %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延迟（两轨）：%@"
+          }
+        }
+      }
+    },
+    "delay.toast.primary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 1 delay: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一轨延迟：%@"
+          }
+        }
+      }
+    },
+    "delay.toast.secondary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 2 delay: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨延迟：%@"
           }
         }
       }
@@ -1962,9 +2310,6 @@
         }
       }
     },
-    "BetterDualSub" : {
-      "shouldTranslate" : false
-    },
     "general.cache.clear" : {
       "localizations" : {
         "en" : {
@@ -2628,6 +2973,40 @@
         }
       }
     },
+    "manual.offset.both" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Delay"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延迟"
+          }
+        }
+      }
+    },
+    "manual.offset.linkHint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Link Track 2's delay to Track 1"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨延迟与第一轨同步"
+          }
+        }
+      }
+    },
     "manual.offset.primary" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -2981,6 +3360,23 @@
         }
       }
     },
+    "menu.window.lock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock Subtitle Window"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁定字幕窗口"
+          }
+        }
+      }
+    },
     "menu.window.reset" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3313,23 +3709,6 @@
         }
       }
     },
-    "movpkg.status.saving" : {
-      "extractionState" : "stale",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Saving subtitles…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "正在保存字幕…"
-          }
-        }
-      }
-    },
     "movpkg.status.read" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3360,6 +3739,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "读取 movpkg 失败；之前已加载的字幕保持不变。"
+          }
+        }
+      }
+    },
+    "movpkg.status.saving" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Saving subtitles…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在保存字幕…"
           }
         }
       }
@@ -3457,6 +3853,26 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "可用的完整字幕轨：%d"
+          }
+        }
+      }
+    },
+    "ms" : {
+
+    },
+    "nav.align" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Align by Line"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按字幕对齐"
           }
         }
       }
@@ -3712,6 +4128,57 @@
         }
       }
     },
+    "overlay.lock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock Subtitle Window"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁定字幕窗口"
+          }
+        }
+      }
+    },
+    "overlay.locked.toast" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Locked — unlock from the menu bar or with the shortcut"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已锁定，可在状态栏菜单或用快捷键解锁"
+          }
+        }
+      }
+    },
+    "overlay.openAppearance" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtitle Appearance…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕外观设置…"
+          }
+        }
+      }
+    },
     "overlay.placeholder.idle" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3763,7 +4230,25 @@
         }
       }
     },
+    "overlay.unlocked.toast" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unlocked"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已解锁"
+          }
+        }
+      }
+    },
     "overlay.window.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -3928,6 +4413,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重置第二轨延迟为 0"
+          }
+        }
+      }
+    },
+    "shortcuts.action.toggleLock" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lock / unlock subtitle window"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "锁定 / 解锁字幕窗口"
           }
         }
       }
@@ -4215,6 +4717,108 @@
         }
       }
     },
+    "sync.source.any" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Any playing app"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "任意正在播放的应用"
+          }
+        }
+      }
+    },
+    "sync.source.current" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Following: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当前跟随：%@"
+          }
+        }
+      }
+    },
+    "sync.source.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Follow the playback position of Apple TV or any other app that reports Now Playing (browsers, IINA, VLC, QuickTime…). Apps appear in the list after they have played once."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跟随 Apple TV，或任何上报“正在播放”的应用（浏览器、IINA、VLC、QuickTime 等）的播放进度。应用播放过一次后会出现在列表中。"
+          }
+        }
+      }
+    },
+    "sync.source.none" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No playback detected — use the manual progress bar on the subtitles."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "未检测到播放，可使用字幕上的手动进度条。"
+          }
+        }
+      }
+    },
+    "sync.source.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sync source"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同步来源"
+          }
+        }
+      }
+    },
+    "sync.source.tv" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple TV"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apple TV"
+          }
+        }
+      }
+    },
     "track.ccSdh" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4285,601 +4889,6 @@
     },
     "简体中文" : {
       "shouldTranslate" : false
-    },
-    "sync.source.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sync source"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "同步来源"
-          }
-        }
-      }
-    },
-    "sync.source.help" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Follow the playback position of Apple TV or any other app that reports Now Playing (browsers, IINA, VLC, QuickTime…). Apps appear in the list after they have played once."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "跟随 Apple TV，或任何上报“正在播放”的应用（浏览器、IINA、VLC、QuickTime 等）的播放进度。应用播放过一次后会出现在列表中。"
-          }
-        }
-      }
-    },
-    "sync.source.tv" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple TV"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Apple TV"
-          }
-        }
-      }
-    },
-    "sync.source.any" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Any playing app"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "任意正在播放的应用"
-          }
-        }
-      }
-    },
-    "sync.source.current" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Following: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前跟随：%@"
-          }
-        }
-      }
-    },
-    "sync.source.none" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No playback detected — use the manual progress bar on the subtitles."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "未检测到播放，可使用字幕上的手动进度条。"
-          }
-        }
-      }
-    },
-    "overlay.openAppearance" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Subtitle Appearance…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "字幕外观设置…"
-          }
-        }
-      }
-    },
-    "appearance.lineMode" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lines"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "行数"
-          }
-        }
-      }
-    },
-    "appearance.lineMode.original" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "As authored"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "保持原样"
-          }
-        }
-      }
-    },
-    "appearance.lineMode.single" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Single line"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "单行"
-          }
-        }
-      }
-    },
-    "appearance.lineMode.double" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Up to two lines"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "双行"
-          }
-        }
-      }
-    },
-    "delay.toast.primary" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Track 1 delay: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第一轨延迟：%@"
-          }
-        }
-      }
-    },
-    "delay.toast.secondary" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Track 2 delay: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第二轨延迟：%@"
-          }
-        }
-      }
-    },
-    "delay.toast.linked" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delay (both tracks): %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "延迟（两轨）：%@"
-          }
-        }
-      }
-    },
-    "delay.field.primary" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Track 1 delay (ms)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第一轨延迟（ms）"
-          }
-        }
-      }
-    },
-    "delay.field.secondary" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Track 2 delay (ms)"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第二轨延迟（ms）"
-          }
-        }
-      }
-    },
-    "delay.link" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Keep Track 2 delay the same as Track 1"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第二轨延迟与第一轨保持同步"
-          }
-        }
-      }
-    },
-    "manual.offset.both" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delay"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "延迟"
-          }
-        }
-      }
-    },
-    "manual.offset.linkHint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Link Track 2's delay to Track 1"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "第二轨延迟与第一轨同步"
-          }
-        }
-      }
-    },
-    "nav.align" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Align by Line"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按字幕对齐"
-          }
-        }
-      }
-    },
-    "align.description" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pick a line from either track and apply it while that line is being spoken; the delay is set automatically."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "在某句台词正在播放时，从任一轨道选中同一句字幕并应用，延迟会自动算出。"
-          }
-        }
-      }
-    },
-    "align.now" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Now playing"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前播放"
-          }
-        }
-      }
-    },
-    "align.track" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Track"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "轨道"
-          }
-        }
-      }
-    },
-    "align.search" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Search subtitles"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "搜索字幕"
-          }
-        }
-      }
-    },
-    "align.apply" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Align to current time"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "对齐到当前播放时间"
-          }
-        }
-      }
-    },
-    "align.result" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Delay set to %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已将延迟设为 %@"
-          }
-        }
-      }
-    },
-    "align.hint" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Example: at 10:00 you hear a line that the file shows at 8:00. Select it and apply: the delay becomes +2:00 (if the tracks are linked, both tracks move)."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "例如：播放到 10:00 听到的台词，在字幕文件里出现在 8:00。选中它并应用，延迟就会变为 +2 分钟（两轨同步开启时，两轨一起偏移）。"
-          }
-        }
-      }
-    },
-    "align.open" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Align by line…"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按字幕对齐…"
-          }
-        }
-      }
-    },
-    "overlay.lock" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lock Subtitle Window"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "锁定字幕窗口"
-          }
-        }
-      }
-    },
-    "overlay.locked.toast" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Locked — unlock from the menu bar or with the shortcut"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已锁定，可在状态栏菜单或用快捷键解锁"
-          }
-        }
-      }
-    },
-    "overlay.unlocked.toast" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Unlocked"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已解锁"
-          }
-        }
-      }
-    },
-    "menu.window.lock" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lock Subtitle Window"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "锁定字幕窗口"
-          }
-        }
-      }
-    },
-    "appearance.window.lock" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lock subtitle window"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "锁定字幕窗口"
-          }
-        }
-      }
-    },
-    "appearance.window.lock.help" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "While locked, the subtitles never respond to the mouse, so apps underneath stay usable."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "锁定后字幕不再响应鼠标，不会影响下方的其他应用。"
-          }
-        }
-      }
-    },
-    "shortcuts.action.toggleLock" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Lock / unlock subtitle window"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "锁定 / 解锁字幕窗口"
-          }
-        }
-      }
     }
   },
   "version" : "1.3"

@@ -432,6 +432,8 @@ struct HTMLStrokeText: View {
         }
         
         let htmlData = Data(cleanRawText.utf8)
+        // AppKit stores stroke width as a percentage of the font size.
+        let strokePercent = fontSize > 0 ? -100 * style.outlinePixels / fontSize : 0
         if let nsAttributedString = try? NSMutableAttributedString(
             data: htmlData,
             options: [.documentType: NSAttributedString.DocumentType.html,
@@ -445,7 +447,7 @@ struct HTMLStrokeText: View {
                 .font: customNSFont,
                 .foregroundColor: NSColor(hex: style.textColor),
                 .strokeColor: NSColor(hex: style.outlineColor),
-                .strokeWidth: -style.outlineWidth
+                .strokeWidth: strokePercent
             ], range: range)
 
             let paragraphStyle = NSMutableParagraphStyle()
@@ -459,7 +461,7 @@ struct HTMLStrokeText: View {
             .font: customNSFont,
             .foregroundColor: NSColor(hex: style.textColor),
             .strokeColor: NSColor(hex: style.outlineColor),
-            .strokeWidth: -style.outlineWidth
+            .strokeWidth: strokePercent
         ])
     }
     
@@ -529,8 +531,8 @@ private struct OutlinedSubtitleLabel: NSViewRepresentable {
 // MARK: - 3. Transparent SwiftUI overlay
 struct ContentView: View {
     @EnvironmentObject var subManager: SubtitleManager
-    @AppStorage("primaryFontSizeRatio") private var primaryFontSizeRatio = UserDefaults.standard.object(forKey: "fontSizeRatio") as? Double ?? 0.02
-    @AppStorage("secondaryFontSizeRatio") private var secondaryFontSizeRatio = 0.018
+    @AppStorage("primaryFontSize") private var primaryFontSize = SubtitleAppearanceDefaults.fontSize(secondary: false)
+    @AppStorage("secondaryFontSize") private var secondaryFontSize = SubtitleAppearanceDefaults.fontSize(secondary: true)
     @AppStorage("primaryFontFamily") private var primaryFontFamily = UserDefaults.standard.string(forKey: "selectedFontFamily") ?? "Helvetica Neue"
     @AppStorage("secondaryFontFamily") private var secondaryFontFamily = "Helvetica Neue"
     @AppStorage("primaryFontWeight") private var primaryFontWeight = UserDefaults.standard.string(forKey: "selectedFontWeight") ?? "Bold"
@@ -539,8 +541,8 @@ struct ContentView: View {
     @AppStorage("secondaryTextColor") private var secondaryTextColor = "#FFFFFF"
     @AppStorage("primaryOutlineColor") private var primaryOutlineColor = "#000000"
     @AppStorage("secondaryOutlineColor") private var secondaryOutlineColor = "#000000"
-    @AppStorage("primaryOutlineWidth") private var primaryOutlineWidth = 3.5
-    @AppStorage("secondaryOutlineWidth") private var secondaryOutlineWidth = 3.5
+    @AppStorage("primaryOutlinePixels") private var primaryOutlinePixels = SubtitleAppearanceDefaults.outlinePixels(secondary: false)
+    @AppStorage("secondaryOutlinePixels") private var secondaryOutlinePixels = SubtitleAppearanceDefaults.outlinePixels(secondary: true)
     @AppStorage("primaryLineMode") private var primaryLineMode = SubtitleLineMode.defaultValue.rawValue
     @AppStorage("secondaryLineMode") private var secondaryLineMode = SubtitleLineMode.defaultValue.rawValue
     @AppStorage("backgroundStyle") private var backgroundStyle: String = BackgroundStyleOption.transparent.rawValue
@@ -570,10 +572,8 @@ struct ContentView: View {
     private var secondaryDisplayText: String {
         if !subManager.secondaryText.isEmpty { return subManager.secondaryText }
         guard subManager.currentText.isEmpty else { return "" }
-        // Show the second track's style too, so both can be adjusted and positioned.
-        if subManager.trackNames.isEmpty {
-            return AppLocalization.string("overlay.placeholder.secondary")
-        }
+        // Keep the empty overlay as one draggable preview. Both styles remain visible on the Appearance page.
+        if subManager.trackNames.isEmpty { return "" }
         if subManager.trackNames.count > 1 && !subManager.isPlaying { return AppLocalization.string("overlay.placeholder.secondary") }
         return ""
     }
@@ -668,18 +668,18 @@ struct ContentView: View {
     private var textBubble: some View {
         let hasText = !primaryDisplayText.isEmpty || !secondaryDisplayText.isEmpty
         // With no cue on screen, keep an empty box about the size of the usual subtitle so the background (and hover target) stay put.
-        let primarySize = max(SubtitleAppearanceLimits.minimumFontSize, tvWindowSize.width * primaryFontSizeRatio)
-        let secondarySize = max(SubtitleAppearanceLimits.minimumFontSize, tvWindowSize.width * secondaryFontSizeRatio)
+        let primarySize = max(SubtitleAppearanceLimits.minimumFontSize, primaryFontSize)
+        let secondarySize = max(SubtitleAppearanceLimits.minimumFontSize, secondaryFontSize)
         let emptyHeight = (primarySize + (subManager.trackNames.count > 1 ? secondarySize + 5 : 0)) * 1.4 + 16
         return VStack(spacing: 5) {
             if !primaryDisplayText.isEmpty {
                 HTMLStrokeText(rawText: primaryDisplayText,
-                               fontSize: max(SubtitleAppearanceLimits.minimumFontSize, tvWindowSize.width * primaryFontSizeRatio), style: primaryStyle,
+                               fontSize: primarySize, style: primaryStyle,
                                lineMode: SubtitleLineMode(rawValue: primaryLineMode) ?? .original)
             }
             if !secondaryDisplayText.isEmpty {
                 HTMLStrokeText(rawText: secondaryDisplayText,
-                               fontSize: max(SubtitleAppearanceLimits.minimumFontSize, tvWindowSize.width * secondaryFontSizeRatio), style: secondaryStyle,
+                               fontSize: secondarySize, style: secondaryStyle,
                                lineMode: SubtitleLineMode(rawValue: secondaryLineMode) ?? .original)
             }
         }
@@ -730,12 +730,12 @@ struct ContentView: View {
 
     private var primaryStyle: SubtitleTrackStyle {
         SubtitleTrackStyle(family: primaryFontFamily, weight: primaryFontWeight,
-                           textColor: primaryTextColor, outlineColor: primaryOutlineColor, outlineWidth: primaryOutlineWidth)
+                           textColor: primaryTextColor, outlineColor: primaryOutlineColor, outlinePixels: primaryOutlinePixels)
     }
 
     private var secondaryStyle: SubtitleTrackStyle {
         SubtitleTrackStyle(family: secondaryFontFamily, weight: secondaryFontWeight,
-                           textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlineWidth: secondaryOutlineWidth)
+                           textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlinePixels: secondaryOutlinePixels)
     }
     
     // Helper that checks for full screen

@@ -3,12 +3,29 @@ import AppKit
 
 enum SubtitleAppearanceLimits {
     static let minimumFontSize: CGFloat = 12
-    static let fontSizeRatio: ClosedRange<Double> = 0.008...0.08
-    static let outlineWidth: ClosedRange<Double> = 0...24
+    static let fontSize: ClosedRange<Double> = 12...96
+    static let outlinePixels: ClosedRange<Double> = 0...12
 }
 
 /// Factory defaults for everything on the appearance page, shared by the editors and the reset buttons.
 enum SubtitleAppearanceDefaults {
+    static let referenceWidth = 1600.0
+    static func fontSize(secondary: Bool, defaults: UserDefaults = .standard) -> Double {
+        let prefix = secondary ? "secondary" : "primary"
+        if let size = defaults.object(forKey: prefix + "FontSize") as? Double { return size }
+        let oldRatio = defaults.object(forKey: prefix + "FontSizeRatio") as? Double
+            ?? (secondary ? nil : defaults.object(forKey: "fontSizeRatio") as? Double)
+            ?? (secondary ? 0.018 : 0.02)
+        return max(Double(SubtitleAppearanceLimits.minimumFontSize), oldRatio * referenceWidth)
+    }
+
+    static func outlinePixels(secondary: Bool, defaults: UserDefaults = .standard) -> Double {
+        let prefix = secondary ? "secondary" : "primary"
+        if let pixels = defaults.object(forKey: prefix + "OutlinePixels") as? Double { return pixels }
+        let oldPercent = defaults.object(forKey: prefix + "OutlineWidth") as? Double ?? 3.5
+        return oldPercent * fontSize(secondary: secondary, defaults: defaults) / 100
+    }
+
     static let backgroundColorKey = "customBackgroundColor"
     static let backgroundOpacityKey = "customBackgroundOpacity"
     static let backgroundRadiusKey = "customBackgroundRadius"
@@ -19,8 +36,8 @@ enum SubtitleAppearanceDefaults {
     static func trackValues(secondary: Bool) -> [String: Any] {
         let prefix = secondary ? "secondary" : "primary"
         return [prefix + "FontFamily": "Helvetica Neue", prefix + "FontWeight": secondary ? "Regular" : "Bold",
-                prefix + "FontSizeRatio": secondary ? 0.018 : 0.02, prefix + "TextColor": "#FFFFFF",
-                prefix + "OutlineColor": "#000000", prefix + "OutlineWidth": 3.5,
+                prefix + "FontSize": secondary ? 28.8 : 32.0, prefix + "TextColor": "#FFFFFF",
+                prefix + "OutlineColor": "#000000", prefix + "OutlinePixels": 1.0,
                 prefix + "LineMode": SubtitleLineMode.defaultValue.rawValue]
     }
 
@@ -63,7 +80,7 @@ struct SubtitleTrackStyle {
     let weight: String
     let textColor: String
     let outlineColor: String
-    let outlineWidth: CGFloat
+    let outlinePixels: CGFloat
 }
 
 struct SubtitleAppearanceView: View {
@@ -143,8 +160,8 @@ private struct SubtitleWindowCard: View {
 
 private struct SubtitlePreviewCard: View {
     @AppStorage("showSubtitlePreview") private var showSubtitlePreview = true
-    @AppStorage("primaryFontSizeRatio") private var primaryFontSizeRatio = UserDefaults.standard.object(forKey: "fontSizeRatio") as? Double ?? 0.02
-    @AppStorage("secondaryFontSizeRatio") private var secondaryFontSizeRatio = 0.018
+    @AppStorage("primaryFontSize") private var primaryFontSize = SubtitleAppearanceDefaults.fontSize(secondary: false)
+    @AppStorage("secondaryFontSize") private var secondaryFontSize = SubtitleAppearanceDefaults.fontSize(secondary: true)
     @AppStorage("primaryFontFamily") private var primaryFamily = UserDefaults.standard.string(forKey: "selectedFontFamily") ?? "Helvetica Neue"
     @AppStorage("secondaryFontFamily") private var secondaryFamily = "Helvetica Neue"
     @AppStorage("primaryFontWeight") private var primaryWeight = UserDefaults.standard.string(forKey: "selectedFontWeight") ?? "Bold"
@@ -153,8 +170,8 @@ private struct SubtitlePreviewCard: View {
     @AppStorage("secondaryTextColor") private var secondaryTextColor = "#FFFFFF"
     @AppStorage("primaryOutlineColor") private var primaryOutlineColor = "#000000"
     @AppStorage("secondaryOutlineColor") private var secondaryOutlineColor = "#000000"
-    @AppStorage("primaryOutlineWidth") private var primaryOutlineWidth = 3.5
-    @AppStorage("secondaryOutlineWidth") private var secondaryOutlineWidth = 3.5
+    @AppStorage("primaryOutlinePixels") private var primaryOutlinePixels = SubtitleAppearanceDefaults.outlinePixels(secondary: false)
+    @AppStorage("secondaryOutlinePixels") private var secondaryOutlinePixels = SubtitleAppearanceDefaults.outlinePixels(secondary: true)
     @AppStorage("primaryLineMode") private var primaryLineMode = SubtitleLineMode.defaultValue.rawValue
     @AppStorage("secondaryLineMode") private var secondaryLineMode = SubtitleLineMode.defaultValue.rawValue
     @AppStorage("backgroundStyle") private var backgroundStyle = BackgroundStyleOption.transparent.rawValue
@@ -174,13 +191,13 @@ private struct SubtitlePreviewCard: View {
                     LinearGradient(colors: [Color(white: 0.30), Color(white: 0.16)],
                                    startPoint: .topLeading, endPoint: .bottomTrailing)
                 )
-                GeometryReader { geometry in
+                GeometryReader { _ in
                     VStack(spacing: 12) {
                         HTMLStrokeText(rawText: "A subtitle preview",
-                                       fontSize: max(SubtitleAppearanceLimits.minimumFontSize, geometry.size.width * primaryFontSizeRatio), style: primaryStyle,
+                                       fontSize: max(SubtitleAppearanceLimits.minimumFontSize, primaryFontSize), style: primaryStyle,
                                        lineMode: SubtitleLineMode(rawValue: primaryLineMode) ?? .original)
                         HTMLStrokeText(rawText: AppLocalization.string("overlay.placeholder.secondary"),
-                                       fontSize: max(SubtitleAppearanceLimits.minimumFontSize, geometry.size.width * secondaryFontSizeRatio), style: secondaryStyle,
+                                       fontSize: max(SubtitleAppearanceLimits.minimumFontSize, secondaryFontSize), style: secondaryStyle,
                                        lineMode: SubtitleLineMode(rawValue: secondaryLineMode) ?? .original)
                     }
                     .padding(.horizontal, 16).padding(.vertical, 8)
@@ -208,12 +225,12 @@ private struct SubtitlePreviewCard: View {
 
     private var primaryStyle: SubtitleTrackStyle {
         SubtitleTrackStyle(family: primaryFamily, weight: primaryWeight,
-                           textColor: primaryTextColor, outlineColor: primaryOutlineColor, outlineWidth: primaryOutlineWidth)
+                           textColor: primaryTextColor, outlineColor: primaryOutlineColor, outlinePixels: primaryOutlinePixels)
     }
 
     private var secondaryStyle: SubtitleTrackStyle {
         SubtitleTrackStyle(family: secondaryFamily, weight: secondaryWeight,
-                           textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlineWidth: secondaryOutlineWidth)
+                           textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlinePixels: secondaryOutlinePixels)
     }
 }
 
@@ -228,7 +245,7 @@ private struct SubtitleTrackStyleEditor: View {
     @AppStorage private var size: Double
     @AppStorage private var textHex: String
     @AppStorage private var outlineHex: String
-    @AppStorage private var outlineWidth: Double
+    @AppStorage private var outlinePixels: Double
     @AppStorage private var lineMode: String
 
     init(secondary: Bool) {
@@ -237,10 +254,10 @@ private struct SubtitleTrackStyleEditor: View {
         let defaults = UserDefaults.standard
         _family = AppStorage(wrappedValue: defaults.string(forKey: prefix + "FontFamily") ?? (secondary ? "Helvetica Neue" : defaults.string(forKey: "selectedFontFamily") ?? "Helvetica Neue"), prefix + "FontFamily")
         _weight = AppStorage(wrappedValue: defaults.string(forKey: prefix + "FontWeight") ?? (secondary ? "Regular" : defaults.string(forKey: "selectedFontWeight") ?? "Bold"), prefix + "FontWeight")
-        _size = AppStorage(wrappedValue: defaults.object(forKey: prefix + "FontSizeRatio") as? Double ?? (secondary ? 0.018 : defaults.object(forKey: "fontSizeRatio") as? Double ?? 0.02), prefix + "FontSizeRatio")
+        _size = AppStorage(wrappedValue: SubtitleAppearanceDefaults.fontSize(secondary: secondary), prefix + "FontSize")
         _textHex = AppStorage(wrappedValue: defaults.string(forKey: prefix + "TextColor") ?? "#FFFFFF", prefix + "TextColor")
         _outlineHex = AppStorage(wrappedValue: defaults.string(forKey: prefix + "OutlineColor") ?? "#000000", prefix + "OutlineColor")
-        _outlineWidth = AppStorage(wrappedValue: defaults.object(forKey: prefix + "OutlineWidth") as? Double ?? 3.5, prefix + "OutlineWidth")
+        _outlinePixels = AppStorage(wrappedValue: SubtitleAppearanceDefaults.outlinePixels(secondary: secondary), prefix + "OutlinePixels")
         _lineMode = AppStorage(wrappedValue: SubtitleLineMode.defaultValue.rawValue, prefix + "LineMode")
     }
 
@@ -267,8 +284,8 @@ private struct SubtitleTrackStyleEditor: View {
             }
             HStack {
                 Text("appearance.size")
-                Slider(value: $size, in: SubtitleAppearanceLimits.fontSizeRatio, step: 0.001)
-                Text(size.formatted(.percent.precision(.fractionLength(0...1))))
+                Slider(value: $size, in: SubtitleAppearanceLimits.fontSize, step: 1)
+                Text("\(size.formatted(.number.precision(.fractionLength(0...1)))) pt")
                     .monospacedDigit().frame(width: 54, alignment: .trailing)
             }
             Picker("appearance.lineMode", selection: $lineMode) {
@@ -281,8 +298,8 @@ private struct SubtitleTrackStyleEditor: View {
             ColorPicker("appearance.outlineColor", selection: colorBinding($outlineHex), supportsOpacity: false)
             HStack {
                 Text("appearance.outlineWidth")
-                Slider(value: $outlineWidth, in: SubtitleAppearanceLimits.outlineWidth, step: 0.5)
-                Text("\(outlineWidth.formatted(.number.precision(.fractionLength(0...1))))%")
+                Slider(value: $outlinePixels, in: SubtitleAppearanceLimits.outlinePixels, step: 0.5)
+                Text("\(outlinePixels.formatted(.number.precision(.fractionLength(0...1)))) px")
                     .monospacedDigit().frame(width: 60, alignment: .trailing)
             }
         }
