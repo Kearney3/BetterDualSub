@@ -22,4 +22,4 @@ jobs:
       - name: Build app (Debug)
         run: |
           xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub \
-            -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+            -configuration Debug -derivedDataPath build MACOSX_DEPLOYMENT_TARGET=26.0 CODE_SIGNING_ALLOWED=NO build
