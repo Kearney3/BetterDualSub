@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Git writes merge messages itself; the PR check ignores merge commits too.
+if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+  exit 0
+fi
+
+repo_root=$(git rev-parse --show-toplevel)
+"$repo_root/script/check-commit-message.sh" "$1"

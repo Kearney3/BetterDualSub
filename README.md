@@ -38,6 +38,8 @@ Local UTF-8 SRT files remain supported from the menu-bar item **Open subtitle fi
 
 ## Build and verify
 
+For contribution and commit message rules, see [Commit convention](docs/commit-convention.md).
+
 Use the project build-and-run script to build and launch the macOS app:
 
 ```sh

@@ -10,6 +10,23 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  commit-message:
+    name: Commit messages
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check pull request commits
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          while IFS= read -r commit; do
+            git show -s --format=%B "$commit" | ./script/check-commit-message.sh /dev/stdin
+          done < <(git rev-list --no-merges "origin/$BASE_REF"..HEAD)
+
   test:
     name: Test & Build
     runs-on: macos-26
