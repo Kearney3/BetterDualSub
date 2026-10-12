@@ -2034,13 +2034,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Show Apple TV subtitles in a floating overlay that follows TV.app playback. Three steps to get started."
+            "value" : "Load subtitles and show them in a floating window. Playback can sync with TV.app or another selected player."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在浮层中显示 Apple TV 字幕，并跟随 TV.app 的播放进度。三步即可开始。"
+            "value" : "载入字幕并在浮层中显示；播放进度可跟随 TV.app 或所选的其他播放器。"
           }
         }
       }
@@ -2130,13 +2130,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Start the same movie in TV.app. The overlay follows playback automatically; if TV.app shows its own subtitles, turn them off to avoid overlap."
+            "value" : "Play the matching movie in TV.app. To follow another player, select it in General. Turn off the player’s own subtitles to avoid overlap."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在 TV.app 中播放同一部影片，浮层会自动跟随进度；若 TV.app 已显示字幕，请关闭以避免重叠。"
+            "value" : "在 TV.app 中播放对应影片；如需跟随其他播放器，可在“通用”中选择。关闭播放器自带字幕可避免重叠。"
           }
         }
       }
@@ -3437,13 +3437,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Search settings"
+            "value" : "Search pages"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "搜索设置"
+            "value" : "搜索页面"
           }
         }
       }

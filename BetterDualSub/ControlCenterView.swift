@@ -5,6 +5,8 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
     case guide, movie, localPackage, localFile, bilingual, align, appearance, shortcuts, general
 
     var id: String { rawValue }
+    static let subtitlePages: [Self] = [.movie, .localPackage, .localFile, .bilingual, .align]
+    static let settingPages: [Self] = [.appearance, .shortcuts, .general]
 
     var titleKey: String {
         switch self {
@@ -53,36 +55,45 @@ struct ControlCenterView: View {
     @AppStorage(AppLocalization.languagePreferenceKey) private var language = AppLocalization.defaultLanguage
     @SceneStorage("controlCenter.selectedPage") private var selectedPageValue = ControlCenterPage.guide.rawValue
     @State private var searchText = ""
-    @State private var sidebarVisible = true
 
     private var selectedPage: ControlCenterPage {
         ControlCenterPage(rawValue: selectedPageValue) ?? .guide
     }
 
+    private var selection: Binding<ControlCenterPage?> {
+        Binding(
+            get: { selectedPage },
+            set: { if let page = $0 { selectedPageValue = page.rawValue } }
+        )
+    }
+
     var body: some View {
-        GeometryReader { geometry in
-            let sidebarWidth = min(max(geometry.size.width * 0.23, 210), 270)
-
-            HStack(spacing: 0) {
-                if sidebarVisible {
-                    sidebar
-                        .frame(width: sidebarWidth)
-                    Divider()
+        NavigationSplitView {
+            List(selection: selection) {
+                if matches(.guide) {
+                    Section("nav.section.start") { pageRow(.guide) }
                 }
-
-                VStack(spacing: 0) {
-                    detailHeader
-                    activePage
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                if ControlCenterPage.subtitlePages.contains(where: matches) {
+                    Section("nav.section.subtitles") {
+                        ForEach(ControlCenterPage.subtitlePages.filter(matches)) { pageRow($0) }
+                    }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if ControlCenterPage.settingPages.contains(where: matches) {
+                    Section("nav.section.settings") {
+                        ForEach(ControlCenterPage.settingPages.filter(matches)) { pageRow($0) }
+                    }
+                }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(Color(nsColor: .windowBackgroundColor))
+            .listStyle(.sidebar)
+            .navigationSplitViewColumnWidth(min: 210, ideal: 235, max: 280)
+        } detail: {
+            activePage
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .navigationTitle(LocalizedStringKey(selectedPage.titleKey))
         }
+        .searchable(text: $searchText, placement: .sidebar, prompt: "nav.search")
         .frame(minWidth: 920, minHeight: 620)
         .environment(\.locale, Locale(identifier: language))
-        .animation(.easeInOut(duration: 0.18), value: sidebarVisible)
         .onAppear {
             if ControlCenterPage(rawValue: selectedPageValue) == nil {
                 selectedPageValue = ControlCenterPage.guide.rawValue
@@ -101,77 +112,6 @@ struct ControlCenterView: View {
         .onChange(of: language) { _, _ in
             NotificationCenter.default.post(name: .appLanguageChanged, object: nil)
         }
-    }
-
-    private var detailHeader: some View {
-        HStack(spacing: 16) {
-            Button {
-                sidebarVisible.toggle()
-            } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 17, weight: .medium))
-                    .frame(width: 30, height: 30)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(Text(LocalizedStringKey(sidebarVisible ? "nav.hideSidebar" : "nav.showSidebar")))
-
-            Text(LocalizedStringKey(selectedPage.titleKey))
-                .font(.title2.weight(.semibold))
-                .lineLimit(1)
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal, 28)
-        .frame(height: 64)
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Color(nsColor: .separatorColor)).frame(height: 1)
-        }
-    }
-
-    private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 8) {
-                Image(systemName: "magnifyingglass")
-                    .foregroundStyle(.secondary)
-                TextField("nav.search", text: $searchText)
-                    .textFieldStyle(.plain)
-                    .accessibilityLabel(Text("nav.search"))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 10))
-            .padding(.horizontal, 12)
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    if matches(.guide) {
-                        sidebarSection("nav.section.start") {
-                            pageRow(.guide)
-                        }
-                    }
-                    if matches(.movie) || matches(.localPackage) || matches(.localFile) || matches(.bilingual) || matches(.align) {
-                        sidebarSection("nav.section.subtitles") {
-                            pageRow(.movie)
-                            pageRow(.localPackage)
-                            pageRow(.localFile)
-                            pageRow(.bilingual)
-                            pageRow(.align)
-                        }
-                    }
-                    if matches(.appearance) || matches(.shortcuts) || matches(.general) {
-                        sidebarSection("nav.section.settings") {
-                            pageRow(.appearance)
-                            pageRow(.shortcuts)
-                            pageRow(.general)
-                        }
-                    }
-                }
-            }
-            .scrollIndicators(.visible)
-        }
-        .padding(.top, 12)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(nsColor: .controlBackgroundColor))
     }
 
     @ViewBuilder
@@ -198,49 +138,16 @@ struct ControlCenterView: View {
         }
     }
 
-    @ViewBuilder
     private func pageRow(_ page: ControlCenterPage) -> some View {
-        if matches(page) {
-            Button {
-                selectedPageValue = page.rawValue
-            } label: {
-                HStack(spacing: 10) {
-                    IconTile(symbol: page.symbol, tint: page.tint, size: 26)
-                    Text(LocalizedStringKey(page.titleKey))
-                        .fontWeight(selectedPage == page ? .semibold : .regular)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background {
-                    if selectedPage == page {
-                        RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color(nsColor: .selectedContentBackgroundColor).opacity(0.22))
-                    }
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 9))
-            }
-            .buttonStyle(.plain)
+        Label(LocalizedStringKey(page.titleKey), systemImage: page.symbol)
+            .tag(page)
             .help(AppLocalization.string(page.titleKey))
-        }
     }
 
     private func matches(_ page: ControlCenterPage) -> Bool {
         searchText.isEmpty || AppLocalization.string(page.titleKey).localizedCaseInsensitiveContains(searchText)
     }
 
-    private func sidebarSection<Content: View>(_ title: LocalizedStringKey, @ViewBuilder content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 2)
-            content()
-        }
-    }
 }
 
 private struct GeneralSettingsView: View {

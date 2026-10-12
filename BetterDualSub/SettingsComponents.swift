@@ -44,9 +44,9 @@ struct SettingsCard<Content: View>: View {
 
 extension View {
     func settingsCardBackground() -> some View {
-        background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
             .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.5), lineWidth: 1))
+                .strokeBorder(.primary.opacity(0.08), lineWidth: 1))
     }
 }
 
