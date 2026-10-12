@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Build app (Debug)
+        run: |
+          xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub \
+            -configuration Debug -derivedDataPath build CODE_SIGNING_ALLOWED=NO build

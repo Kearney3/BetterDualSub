@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & Publish
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unit tests
+        run: swift test
+
+      - name: Build app (Release)
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub \
+            -configuration Release -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            CODE_SIGNING_ALLOWED=NO build
+
+      - name: Ad-hoc sign and package
+        run: |
+          APP="build/Build/Products/Release/BetterDualSub.app"
+          codesign --force --deep --sign - "$APP"
+          ditto -c -k --keepParent "$APP" "BetterDualSub-${GITHUB_REF_NAME}.zip"
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "BetterDualSub-${GITHUB_REF_NAME}.zip" \
+            --title "BetterDualSub ${GITHUB_REF_NAME}" --generate-notes --verify-tag
