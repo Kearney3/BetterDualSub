@@ -154,7 +154,11 @@ final class SubtitleDownloadTests: XCTestCase {
         do {
             _ = try await MovieSubtitleDownloader(session: session).versions(for: MoviePage("https://tv.apple.com/us/movie/umc.cmc.1vrwat5k1ucm5k42q97ioqyq3"))
             XCTFail("Apple TV+ must not silently produce an empty catalog")
-        } catch { XCTAssertTrue(error.localizedDescription.contains("Apple TV+")) }
+        } catch {
+            // The package test target has no string catalog, so the message may be the raw key.
+            let message = error.localizedDescription
+            XCTAssertTrue(message.contains("Apple TV+") || message.contains("appleTVPlusOnly"), message)
+        }
     }
 
     func testCancellationStopsAnInFlightDownload() async throws {
