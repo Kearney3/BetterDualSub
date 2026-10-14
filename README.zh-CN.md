@@ -8,7 +8,18 @@
 
 ## 安装
 
-需要 macOS 26.0 或更高版本。
+需要搭载 Apple 芯片、macOS 26.0 或更高版本的 Mac。
+
+### 使用 Homebrew
+
+```sh
+brew tap kearney3/betterdualsub https://github.com/Kearney3/BetterDualSub
+brew install --cask betterdualsub
+```
+
+Cask 会自动移除下载隔离属性，无需再执行手动安装中的终端命令。之后可用 `brew upgrade --cask betterdualsub` 升级。
+
+### 手动安装
 
 1. 下载 BetterDualSub.app,并移动到「应用程序」(/Applications)文件夹。
 
@@ -28,7 +39,7 @@
 
 5. 在 **正在播放** 或用全局快捷键调整时间,正数表示字幕延后。**按字幕对齐** 可根据听到的台词设置延迟;在至少 30 秒之后再对齐一句,还能校正帧率不同的字幕文件的速度。时间校准按片名保存,下次加载同一影片时会自动恢复并提示。只有一种语言时,可在 **正在播放** 用 macOS 端侧翻译生成第二轨,字幕内容不会离开这台 Mac。
 
-6. 在 **外观** 中预览并调整两条字幕的样式。**通用** 可选择要跟随的播放器、切换界面语言(简体中文 / English)、控制菜单栏图标,并设置快捷键延迟步进(1 到 60,000 毫秒)。**快捷键** 支持录制自定义全局快捷键,用于将任一轨道提前或延后,以及将各轨道重置为 0。默认值:主轨道为 Control-Option-左/右方向键,第二轨道为 Control-Option-Shift-左/右方向键,重置主轨道延迟为 Control-Option-0,重置第二轨道延迟为 Control-Option-Shift-0。
+6. 在 **外观** 中预览并调整两条字幕的样式。**通用** 可选择要跟随的播放器、切换界面语言(简体中文 / English)、控制菜单栏图标和每日更新检查(只向 GitHub 查询最新版本号),并设置快捷键延迟步进(1 到 60,000 毫秒)。**快捷键** 支持录制自定义全局快捷键,用于将任一轨道提前或延后,以及将各轨道重置为 0。默认值:主轨道为 Control-Option-左/右方向键,第二轨道为 Control-Option-Shift-左/右方向键,重置主轨道延迟为 Control-Option-0,重置第二轨道延迟为 Control-Option-Shift-0。
 
 ### 支持的链接与限制
 

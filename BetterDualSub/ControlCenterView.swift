@@ -159,6 +159,7 @@ private struct GeneralSettingsView: View {
     @AppStorage("showStatusBarItem") private var showStatusBarItem = true
     @AppStorage(SyncMode.storageKey) private var syncMode = SyncMode.auto.rawValue
     @AppStorage(SyncTarget.key) private var syncTarget = SyncTarget.tvBundleID
+    @AppStorage(UpdateChecker.autoCheckKey) private var checkForUpdates = true
     @EnvironmentObject private var manager: SubtitleManager
     @State private var showingCacheConfirmation = false
     @State private var cacheMessage = ""
@@ -228,6 +229,13 @@ private struct GeneralSettingsView: View {
                 }
                 if !cacheMessage.isEmpty { StatusLine(text: cacheMessage, isError: cacheError) }
             }
+            SettingsCard {
+                SettingsRow(symbol: "arrow.down.app", tint: .blue, titleKey: "update.auto", subtitleKey: "update.help") {
+                    Toggle("update.auto", isOn: $checkForUpdates).labelsHidden().toggleStyle(.switch)
+                }
+                Divider()
+                UpdateStatusView()
+            }
         }
         .confirmationDialog("general.cache.confirm", isPresented: $showingCacheConfirmation) {
             Button("general.cache.clear", role: .destructive) { clearCache() }
@@ -259,6 +267,63 @@ private struct GeneralSettingsView: View {
                 cacheError = true
                 cacheMessage = error.localizedDescription
             }
+        }
+    }
+}
+
+/// The running version, the result of the last update check, and how to get a newer version.
+private struct UpdateStatusView: View {
+    @ObservedObject private var updater = UpdateChecker.shared
+
+    private var current: String { UpdateChecker.currentVersion?.description ?? Bundle.main.appVersion }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                status
+                Spacer()
+                Button("update.check") { Task { await updater.check() } }
+                    .disabled(updater.state == .checking)
+            }
+            if let release = updater.available {
+                if UpdateChecker.installedWithHomebrew {
+                    SettingsHint(key: "update.brew.help")
+                    HStack {
+                        Text(verbatim: UpdateChecker.brewCommand)
+                            .font(.system(.callout, design: .monospaced))
+                            .textSelection(.enabled)
+                        Spacer()
+                        Button("update.copy") {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(UpdateChecker.brewCommand, forType: .string)
+                        }
+                        Button("update.notes") { NSWorkspace.shared.open(release.page) }
+                    }
+                    .controlSize(.small)
+                } else {
+                    Button("update.download") { NSWorkspace.shared.open(release.page) }
+                        .buttonStyle(.borderedProminent)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var status: some View {
+        switch updater.state {
+        case .idle:
+            Text(AppLocalization.format("update.current", current)).foregroundStyle(.secondary)
+        case .checking:
+            ProgressView().controlSize(.small)
+            Text("update.checking").foregroundStyle(.secondary)
+        case .upToDate:
+            Text(AppLocalization.format("update.upToDate", current)).foregroundStyle(.secondary)
+        case .available(let release):
+            Label(AppLocalization.format("update.available", release.version.description, current),
+                  systemImage: "arrow.down.circle.fill")
+                .foregroundStyle(.blue)
+        case .failed(let message):
+            StatusLine(text: AppLocalization.format("update.failed", message), isError: true)
         }
     }
 }

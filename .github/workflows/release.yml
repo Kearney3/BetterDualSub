@@ -43,3 +43,19 @@ jobs:
         run: |
           gh release create "$GITHUB_REF_NAME" "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg" \
             --title "BetterDualSub ${GITHUB_REF_NAME}" --generate-notes --verify-tag
+
+      - name: Update Homebrew cask
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          SHA256="$(shasum -a 256 "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg" | cut -d ' ' -f 1)"
+          git fetch --depth=1 origin main
+          git checkout -B main origin/main
+          sed -i '' -E \
+            -e "s/^  version \".*\"$/  version \"${VERSION}\"/" \
+            -e "s/^  sha256 \".*\"$/  sha256 \"${SHA256}\"/" \
+            Casks/betterdualsub.rb
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(release): update Homebrew cask to ${VERSION}"
+          git push origin main

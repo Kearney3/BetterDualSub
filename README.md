@@ -8,7 +8,18 @@ A Mac app provides the ability to add external subtitles to the Apple TV app.
 
 ## How to install
 
-Requires macOS 26.0 or later.
+Requires macOS 26.0 or later on Apple silicon.
+
+### With Homebrew
+
+```sh
+brew tap kearney3/betterdualsub https://github.com/Kearney3/BetterDualSub
+brew install --cask betterdualsub
+```
+
+The cask removes the download quarantine for you, so the Terminal step of the manual install is not needed. Upgrade later with `brew upgrade --cask betterdualsub`.
+
+### Manually
 
 1. Download and move BetterDualSub.app to /Applications folder
 
@@ -28,7 +39,7 @@ Requires macOS 26.0 or later.
 
 5. Adjust timing on **Now Playing** or with global shortcuts. Positive delays show subtitles later. **Align by Line** sets the delay from a line you hear; aligning a second line at least 30 seconds later also corrects the speed of files made for another frame rate. Timing is saved per title and restored, with a notice, the next time the same title is loaded. If only one language is available, **Now Playing** can create Track 2 with on-device macOS translation; subtitle text never leaves the Mac.
 
-6. Use **Appearance** to preview and tune both subtitle tracks. **General** chooses the player to follow, switches the interface between Simplified Chinese and English, controls the menu-bar icon, and sets the shortcut delay step from 1 to 60,000 ms. **Keyboard Shortcuts** lets you record custom global shortcuts for moving either track earlier or later and for resetting each track to 0. Defaults are Control-Option-Left/Right for the primary track, Control-Option-Shift-Left/Right for the secondary track, Control-Option-0 to reset the primary delay, and Control-Option-Shift-0 to reset the secondary delay.
+6. Use **Appearance** to preview and tune both subtitle tracks. **General** chooses the player to follow, switches the interface between Simplified Chinese and English, controls the menu-bar icon and the daily update check (which only asks GitHub for the latest version number), and sets the shortcut delay step from 1 to 60,000 ms. **Keyboard Shortcuts** lets you record custom global shortcuts for moving either track earlier or later and for resetting each track to 0. Defaults are Control-Option-Left/Right for the primary track, Control-Option-Shift-Left/Right for the secondary track, Control-Option-0 to reset the primary delay, and Control-Option-Shift-0 to reset the secondary delay.
 
 ### Supported links and limitations
 

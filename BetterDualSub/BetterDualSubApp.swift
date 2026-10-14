@@ -90,6 +90,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeys: [EventHotKeyRef] = []
     private var observers: [NSObjectProtocol] = []
     private var syncStatusObserver: AnyCancellable?
+    private var updateObserver: AnyCancellable?
     /// `NSApp.delegate` is SwiftUI's wrapper, so `as? AppDelegate` always fails; reach the real instance through this.
     nonisolated(unsafe) static weak var shared: AppDelegate?
     nonisolated(unsafe) static var openControlCenterAction: (() -> Void)?
@@ -129,6 +130,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             .removeDuplicates { $0 == $1 }
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshStatusMenu() }
+        updateObserver = UpdateChecker.shared.$state.removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refreshStatusMenu() }
+        UpdateChecker.shared.checkIfDue()
 
         observers.append(NotificationCenter.default.addObserver(
             forName: .subtitleShortcutsChanged, object: nil, queue: .main
@@ -191,6 +196,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             menu.addItem(reconnect)
         default:
             break
+        }
+        if let release = UpdateChecker.shared.available {
+            let update = NSMenuItem(title: AppLocalization.format("menu.update", release.version.description),
+                                    action: #selector(openSettings), keyEquivalent: "")
+            update.target = self
+            update.image = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
+            menu.addItem(update)
         }
         menu.addItem(.separator())
         menu.addItem(menuItem("menu.openApp", symbol: "macwindow", action: #selector(openControlCenter)))
