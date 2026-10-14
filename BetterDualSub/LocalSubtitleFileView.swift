@@ -92,7 +92,10 @@ struct LocalSubtitleFileView: View {
             manager.load(primary: first, secondary: second,
                          title: primaryURL.deletingPathExtension().lastPathComponent,
                          names: files.map(\.lastPathComponent))
-            manager.applyDelays(primary: primaryDelay, secondaryExtra: secondaryDelay)
+            // Typed delays win; with none, the timing saved for this title (if any) stays restored.
+            if primaryDelay != 0 || secondaryDelay != 0 {
+                manager.applyDelays(primary: primaryDelay, secondaryExtra: secondaryDelay)
+            }
             status = AppLocalization.format("localFile.status.loaded", first.items.count)
         } catch {
             self.error = error.localizedDescription
