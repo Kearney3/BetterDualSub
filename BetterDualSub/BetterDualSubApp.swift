@@ -310,7 +310,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openControlCenter() {
-        showControlCenter(page: "guide")
+        showControlCenter(page: "nowPlaying")
     }
 
     @objc private func openSettings() {

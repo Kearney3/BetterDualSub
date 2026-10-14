@@ -63,11 +63,8 @@ struct MovpkgSubtitleImportView: View {
                 }
             } else if !status.isEmpty { StatusLine(text: status) }
             if !error.isEmpty { StatusLine(text: error, isError: true) }
-            LoadedSubtitleCard {
-                if let outputFolder {
-                    Button("movpkg.openFolder") { NSWorkspace.shared.open(outputFolder) }
-                }
-                SettingsHint(key: "movpkg.shortcutHint")
+            if let outputFolder, !busy {
+                Button("movpkg.openFolder") { NSWorkspace.shared.open(outputFolder) }
             }
         }
         .frame(minWidth: 560)

@@ -47,7 +47,6 @@ struct LocalSubtitleFileView: View {
 
             if !status.isEmpty { StatusLine(text: status) }
             if !error.isEmpty { StatusLine(text: error, isError: true) }
-            LoadedSubtitleCard { EmptyView() }
         }
         .frame(minWidth: 560)
         .onChange(of: primaryURL) { _, url in

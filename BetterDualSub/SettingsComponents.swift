@@ -110,37 +110,38 @@ struct StatusLine: View {
     }
 }
 
-/// "Currently loaded" summary shown on pages that load subtitles.
-struct LoadedSubtitleCard<Extra: View>: View {
+/// Switches the open control center to `page`, a page name it understands (see `ControlCenterPage.resolve`).
+func showControlCenterPage(_ page: String) {
+    NotificationCenter.default.post(name: .navigateToControlCenter, object: nil, userInfo: ["page": page])
+}
+
+/// Delays and linking of the loaded tracks, on Now Playing.
+struct SubtitleTimingCard: View {
     @EnvironmentObject private var manager: SubtitleManager
-    @ViewBuilder var extra: () -> Extra
 
     var body: some View {
-        if !manager.trackNames.isEmpty {
-            SettingsCard {
-                SettingsRow(symbol: "checkmark.circle.fill", tint: .green, titleKey: "common.loaded.title") { EmptyView() }
-                Text(AppLocalization.format("common.currentSubtitles", manager.loadedTitle)).font(.subheadline.weight(.medium))
-                Text(manager.trackNames.joined(separator: "\n")).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Divider()
-                SyncStatusDetail()
-                Divider()
-                HStack(spacing: 10) {
-                    Text("delay.field.primary")
-                    TextField("0", value: $manager.timeOffsetMs, format: .number).frame(width: 80)
+        SettingsCard(titleKey: "timing.title") {
+            HStack(spacing: 10) {
+                Text("delay.field.primary")
+                TextField("0", value: $manager.timeOffsetMs, format: .number).frame(width: 80)
+                if manager.trackNames.count > 1 {
                     Text("delay.field.secondary")
                     TextField("0", value: $manager.secondaryOffsetMs, format: .number).frame(width: 80)
                         .disabled(manager.linkSecondaryDelay)
-                }.textFieldStyle(.roundedBorder)
+                }
+            }.textFieldStyle(.roundedBorder)
+            if manager.trackNames.count > 1 {
                 Toggle("delay.link", isOn: Binding(get: { manager.linkSecondaryDelay }, set: { manager.setLink($0) }))
-                HStack {
-                    Button("download.delay.resetPrimary") { manager.adjustDelay(track: "primary", delta: Int.min) }
+            }
+            HStack {
+                Button("download.delay.resetPrimary") { manager.adjustDelay(track: "primary", delta: Int.min) }
+                if manager.trackNames.count > 1 {
                     Button("download.delay.resetSecondary") { manager.adjustDelay(track: "secondary", delta: Int.min) }
                 }
-                SettingsHint(key: "download.delay.help")
-                extra()
+                Spacer()
+                Button("align.open") { showControlCenterPage("align") }
             }
-            SubtitleTranslationCard()
+            SettingsHint(key: "download.delay.help")
         }
     }
 }

@@ -2,48 +2,43 @@ import SwiftUI
 import AppKit
 
 private enum ControlCenterPage: String, CaseIterable, Identifiable {
-    case guide, movie, localPackage, localFile, bilingual, align, appearance, shortcuts, general
+    case nowPlaying, load, align, bilingual, appearance, shortcuts, general
 
     var id: String { rawValue }
-    static let subtitlePages: [Self] = [.movie, .localPackage, .localFile, .bilingual, .align]
+    static let subtitlePages: [Self] = [.nowPlaying, .load]
+    static let toolPages: [Self] = [.align, .bilingual]
     static let settingPages: [Self] = [.appearance, .shortcuts, .general]
+
+    /// Resolves a page name, including the names of pages that were merged: the guide became Now Playing,
+    /// and the three loading pages became sources of Load Subtitles.
+    static func resolve(_ name: String) -> (page: Self, source: LoadSource?)? {
+        switch name {
+        case "guide": (.nowPlaying, nil)
+        case "movie": (.load, .movie)
+        case "localPackage": (.load, .episode)
+        case "localFile": (.load, .file)
+        default: Self(rawValue: name).map { ($0, nil) }
+        }
+    }
 
     var titleKey: String {
         switch self {
-        case .guide: "nav.guide"
-        case .movie: "nav.movie"
-        case .localPackage: "nav.localPackage"
-        case .localFile: "nav.localFile"
-        case .bilingual: "nav.bilingual"
+        case .nowPlaying: "nav.nowPlaying"
+        case .load: "nav.load"
         case .align: "nav.align"
+        case .bilingual: "nav.bilingual"
         case .appearance: "nav.appearance"
         case .shortcuts: "nav.shortcuts"
         case .general: "nav.general"
         }
     }
 
-    var tint: Color {
-        switch self {
-        case .guide: .orange
-        case .movie: .blue
-        case .localPackage: .indigo
-        case .localFile: .green
-        case .bilingual: .purple
-        case .align: .mint
-        case .appearance: .pink
-        case .shortcuts: .teal
-        case .general: .gray
-        }
-    }
-
     var symbol: String {
         switch self {
-        case .guide: "sparkles"
-        case .movie: "link"
-        case .localPackage: "film.stack"
-        case .localFile: "doc.text"
-        case .bilingual: "character.bubble"
+        case .nowPlaying: "play.rectangle"
+        case .load: "square.and.arrow.down"
         case .align: "scope"
+        case .bilingual: "character.bubble"
         case .appearance: "textformat"
         case .shortcuts: "keyboard"
         case .general: "gearshape"
@@ -53,11 +48,13 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
 
 struct ControlCenterView: View {
     @AppStorage(AppLocalization.languagePreferenceKey) private var language = AppLocalization.defaultLanguage
-    @SceneStorage("controlCenter.selectedPage") private var selectedPageValue = ControlCenterPage.guide.rawValue
+    @SceneStorage("controlCenter.selectedPage") private var selectedPageValue = ControlCenterPage.nowPlaying.rawValue
+    @AppStorage(LoadSource.storageKey) private var loadSource = LoadSource.movie
+    @EnvironmentObject private var manager: SubtitleManager
     @State private var searchText = ""
 
     private var selectedPage: ControlCenterPage {
-        ControlCenterPage(rawValue: selectedPageValue) ?? .guide
+        ControlCenterPage.resolve(selectedPageValue)?.page ?? .nowPlaying
     }
 
     private var selection: Binding<ControlCenterPage?> {
@@ -70,12 +67,14 @@ struct ControlCenterView: View {
     var body: some View {
         NavigationSplitView {
             List(selection: selection) {
-                if matches(.guide) {
-                    Section("nav.section.start") { pageRow(.guide) }
-                }
                 if ControlCenterPage.subtitlePages.contains(where: matches) {
                     Section("nav.section.subtitles") {
                         ForEach(ControlCenterPage.subtitlePages.filter(matches)) { pageRow($0) }
+                    }
+                }
+                if ControlCenterPage.toolPages.contains(where: matches) {
+                    Section("nav.section.tools") {
+                        ForEach(ControlCenterPage.toolPages.filter(matches)) { pageRow($0) }
                     }
                 }
                 if ControlCenterPage.settingPages.contains(where: matches) {
@@ -95,36 +94,41 @@ struct ControlCenterView: View {
         .frame(minWidth: 920, minHeight: 620)
         .environment(\.locale, Locale(identifier: language))
         .onAppear {
-            if ControlCenterPage(rawValue: selectedPageValue) == nil {
-                selectedPageValue = ControlCenterPage.guide.rawValue
-            }
-            if let page = AppDelegate.pendingControlCenterPage, ControlCenterPage(rawValue: page) != nil {
-                selectedPageValue = page
+            navigate(to: selectedPageValue)
+            if let page = AppDelegate.pendingControlCenterPage {
+                navigate(to: page)
                 AppDelegate.pendingControlCenterPage = nil
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .navigateToControlCenter)) { notification in
-            if let page = notification.userInfo?["page"] as? String,
-               ControlCenterPage(rawValue: page) != nil {
-                selectedPageValue = page
-            }
+            if let page = notification.userInfo?["page"] as? String { navigate(to: page) }
+        }
+        .onChange(of: manager.loadID) { _, _ in
+            // Whatever the source, newly loaded subtitles are looked after on Now Playing.
+            if selectedPage == .load { selectedPageValue = ControlCenterPage.nowPlaying.rawValue }
         }
         .onChange(of: language) { _, _ in
             NotificationCenter.default.post(name: .appLanguageChanged, object: nil)
         }
     }
 
+    /// Shows `name` (a page, or a merged page's old name), choosing its loading source if it has one.
+    private func navigate(to name: String) {
+        guard let target = ControlCenterPage.resolve(name) else {
+            selectedPageValue = ControlCenterPage.nowPlaying.rawValue
+            return
+        }
+        if let source = target.source { loadSource = source }
+        selectedPageValue = target.page.rawValue
+    }
+
     @ViewBuilder
     private var activePage: some View {
         switch selectedPage {
-        case .guide:
-            GuideView()
-        case .movie:
-            MovieSubtitleDownloadView()
-        case .localPackage:
-            MovpkgSubtitleImportView()
-        case .localFile:
-            LocalSubtitleFileView()
+        case .nowPlaying:
+            NowPlayingView()
+        case .load:
+            LoadSubtitlesView()
         case .bilingual:
             BilingualExportView()
         case .align:

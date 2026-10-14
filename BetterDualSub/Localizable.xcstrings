@@ -818,23 +818,6 @@
         }
       }
     },
-    "common.currentSubtitles" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Current subtitles: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "当前字幕：%@"
-          }
-        }
-      }
-    },
     "common.loaded.title" : {
       "localizations" : {
         "en" : {
@@ -1521,23 +1504,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "影片版本"
-          }
-        }
-      }
-    },
-    "download.videoTime" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Video time: %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "视频时间：%@"
           }
         }
       }
@@ -2553,38 +2519,6 @@
         }
       }
     },
-    "guide.step1.file" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "From local file"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从本地文件"
-          }
-        }
-      }
-    },
-    "guide.step1.movie" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "From movie link"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "从影片链接"
-          }
-        }
-      }
-    },
     "guide.step1.title" : {
       "localizations" : {
         "en" : {
@@ -2795,6 +2729,57 @@
     },
     "https://tv.apple.com/us/movie/…" : {
       "shouldTranslate" : false
+    },
+    "load.source.episode" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local episode"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地剧集"
+          }
+        }
+      }
+    },
+    "load.source.file" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtitle file"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕文件"
+          }
+        }
+      }
+    },
+    "load.source.movie" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Movie link"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "影片链接"
+          }
+        }
+      }
     },
     "localFile.choose" : {
       "localizations" : {
@@ -3945,23 +3930,6 @@
         }
       }
     },
-    "nav.guide" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Getting Started"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "使用引导"
-          }
-        }
-      }
-    },
     "nav.hideSidebar" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -3979,53 +3947,36 @@
         }
       }
     },
-    "nav.localFile" : {
+    "nav.load" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local File"
+            "value" : "Load Subtitles"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本地文件"
+            "value" : "加载字幕"
           }
         }
       }
     },
-    "nav.localPackage" : {
+    "nav.nowPlaying" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local episode"
+            "value" : "Now Playing"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本地剧集"
-          }
-        }
-      }
-    },
-    "nav.movie" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Movie page"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "影片页面"
+            "value" : "正在播放"
           }
         }
       }
@@ -4062,22 +4013,6 @@
         }
       }
     },
-    "nav.section.start" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "开始"
-          }
-        }
-      }
-    },
     "nav.section.subtitles" : {
       "localizations" : {
         "en" : {
@@ -4090,6 +4025,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "字幕"
+          }
+        }
+      }
+    },
+    "nav.section.tools" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tools"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "工具"
           }
         }
       }
@@ -4124,6 +4076,74 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "显示侧边栏"
+          }
+        }
+      }
+    },
+    "nowPlaying.change" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Change Subtitles…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更换字幕…"
+          }
+        }
+      }
+    },
+    "nowPlaying.track.none" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "None — you can translate one below"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无（可在下方翻译生成）"
+          }
+        }
+      }
+    },
+    "nowPlaying.track.primary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 1"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一轨"
+          }
+        }
+      }
+    },
+    "nowPlaying.track.secondary" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 2"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨"
           }
         }
       }
@@ -5053,6 +5073,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "未检测到 %@ 播放，已改用手动时钟"
+          }
+        }
+      }
+    },
+    "timing.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Timing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "时间校准"
           }
         }
       }

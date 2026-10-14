@@ -11,7 +11,7 @@ let package = Package(
                           "MovpkgSubtitleImportView.swift", "SubtitleAppearanceView.swift",
                           "ControlCenterView.swift", "ShortcutSettingsView.swift", "Localization.swift",
                           "Info.plist", "Localizable.xcstrings", "ThirdPartyNotices.txt",
-                          "BilingualExportView.swift", "GuideView.swift", "LocalSubtitleFileView.swift",
+                          "BilingualExportView.swift", "NowPlayingView.swift", "LoadSubtitlesView.swift", "LocalSubtitleFileView.swift",
                           "ManualControlBar.swift", "SettingsComponents.swift", "SubtitleAlignView.swift",
                           "SyncStatusView.swift", "SubtitleTranslator.swift", "SubtitleTranslationView.swift"],
                 sources: ["SubtitleDocument.swift", "MovieSubtitleDownloader.swift", "MovpkgSubtitleExtractor.swift",

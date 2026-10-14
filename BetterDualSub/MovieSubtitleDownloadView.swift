@@ -75,12 +75,8 @@ struct MovieSubtitleDownloadView: View {
                 }
             } else if !status.isEmpty { StatusLine(text: status) }
             if !failure.isEmpty { StatusLine(text: failure, isError: true) }
-            LoadedSubtitleCard {
-                Text(AppLocalization.format("download.videoTime", manager.debugTimeStr)).monospacedDigit()
-                    .font(.caption).foregroundStyle(.secondary)
-                if let cacheFolder {
-                    Button("download.openFolder") { NSWorkspace.shared.open(cacheFolder) }
-                }
+            if let cacheFolder, !busy {
+                Button("download.openFolder") { NSWorkspace.shared.open(cacheFolder) }
             }
         }
         .frame(minWidth: 560)
