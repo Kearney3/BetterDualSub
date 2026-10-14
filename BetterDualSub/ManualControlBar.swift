@@ -58,6 +58,7 @@ struct ManualControlBar: View {
                 .menuStyle(.borderlessButton).fixedSize()
             }
             HStack(spacing: 14) {
+                SyncStatusIndicator(status: manager.syncStatus)
                 offsetControl(title: hasSecondTrack && manager.linkSecondaryDelay ? "manual.offset.both" : "manual.offset.primary",
                               value: manager.timeOffsetMs, track: "primary")
                 if hasSecondTrack {

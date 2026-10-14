@@ -178,12 +178,8 @@ private struct GeneralSettingsView: View {
                     .pickerStyle(.menu)
                     .fixedSize()
                 }
-                Text(manager.syncedAppName.map {
-                        AppLocalization.format("sync.source.current", $0)
-                            + " · " + manager.debugTimeStr + (manager.isPlaying ? " ▶︎" : " ⏸︎")
-                    }
-                     ?? AppLocalization.string("sync.source.none"))
-                    .font(.caption).foregroundStyle(.secondary)
+                Divider()
+                SyncStatusDetail()
             }
             SettingsCard {
                 SettingsRow(symbol: "timer", tint: .orange, titleKey: "sync.mode.title", subtitleKey: "sync.mode.help") {
@@ -237,6 +233,9 @@ private struct GeneralSettingsView: View {
         }
         .onChange(of: syncTarget) { _, _ in
             manager.syncTargetDidChange()
+        }
+        .onChange(of: syncMode) { _, value in
+            manager.setSyncMode(SyncMode(rawValue: value) ?? .auto)
         }
     }
 

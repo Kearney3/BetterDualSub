@@ -64,6 +64,8 @@ struct GuideView: View {
                         .textSelection(.enabled)
                 }
                 Divider()
+                SyncStatusDetail()
+                Divider()
                 SettingsRow(symbol: "macwindow", tint: .blue, titleKey: "appearance.window.show", subtitleKey: "appearance.window.help") {
                     Toggle("appearance.window.show", isOn: $showWindow).labelsHidden().toggleStyle(.switch)
                 }

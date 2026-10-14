@@ -6,6 +6,7 @@
 import SwiftUI
 import AppKit
 import Carbon.HIToolbox
+import Combine
 
 enum FontWeightOption: String, CaseIterable, Identifiable {
     case regular = "Regular"
@@ -88,6 +89,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyHandler: EventHandlerRef?
     private var hotKeys: [EventHotKeyRef] = []
     private var observers: [NSObjectProtocol] = []
+    private var syncStatusObserver: AnyCancellable?
     /// `NSApp.delegate` is SwiftUI's wrapper, so `as? AppDelegate` always fails; reach the real instance through this.
     nonisolated(unsafe) static weak var shared: AppDelegate?
     nonisolated(unsafe) static var openControlCenterAction: (() -> Void)?
@@ -121,6 +123,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self, !self.hasVisibleControlCenter else { return }
             self.showControlCenter(page: nil)
         }
+
+        let manager = SubtitleManager.shared
+        syncStatusObserver = manager.$syncStatus.combineLatest(manager.$trackNames.map(\.isEmpty))
+            .removeDuplicates { $0 == $1 }
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.refreshStatusMenu() }
 
         observers.append(NotificationCenter.default.addObserver(
             forName: .subtitleShortcutsChanged, object: nil, queue: .main
@@ -157,7 +165,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func refreshStatusMenu() {
+        let manager = SubtitleManager.shared
+        let status = manager.syncStatus
+        statusItem?.button?.image = NSImage(systemSymbolName: Self.statusSymbol(status, loaded: !manager.trackNames.isEmpty),
+                                            accessibilityDescription: "BetterDualSub")
+        statusItem?.button?.toolTip = status.title
+
         let menu = NSMenu()
+        let statusLine = NSMenuItem(title: status.title, action: #selector(openSettings), keyEquivalent: "")
+        statusLine.target = self
+        statusLine.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(.init(paletteColors: [NSColor(status.tint)]).applying(.init(scale: .small)))
+        statusLine.toolTip = status.help
+        menu.addItem(statusLine)
+        switch status {
+        case .waiting(let app?):
+            let follow = NSMenuItem(title: AppLocalization.format("sync.action.follow", app.name), action: #selector(followIgnoredApp), keyEquivalent: "")
+            follow.target = self
+            follow.indentationLevel = 1
+            menu.addItem(follow)
+        case .disconnected:
+            let reconnect = NSMenuItem(title: AppLocalization.string("sync.action.reconnect"), action: #selector(reconnectPlayback), keyEquivalent: "")
+            reconnect.target = self
+            reconnect.indentationLevel = 1
+            menu.addItem(reconnect)
+        default:
+            break
+        }
+        menu.addItem(.separator())
         menu.addItem(menuItem("menu.openApp", symbol: "macwindow", action: #selector(openControlCenter)))
         menu.addItem(.separator())
 
@@ -234,6 +269,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = menu
     }
 
+    /// Menu bar icon: plain until subtitles are loaded, then filled while following a player, or a warning while not.
+    private static func statusSymbol(_ status: SyncStatus, loaded: Bool) -> String {
+        guard loaded else { return "captions.bubble" }
+        switch status {
+        case .following: return "captions.bubble.fill"
+        case .waiting, .disconnected: return "exclamationmark.bubble"
+        case .manual: return "captions.bubble"
+        }
+    }
+
+    @objc private func followIgnoredApp() {
+        if case .waiting(let app?) = SubtitleManager.shared.syncStatus { SubtitleManager.shared.follow(app) }
+    }
+
+    @objc private func reconnectPlayback() {
+        SubtitleManager.shared.reconnect()
+    }
+
     private func updateStatusItemVisibility() {
         let shouldShow = UserDefaults.standard.object(forKey: "showStatusBarItem") as? Bool ?? true
         guard shouldShow else {
@@ -244,9 +297,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         if statusItem == nil {
-            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-            item.button?.image = NSImage(systemSymbolName: "captions.bubble", accessibilityDescription: "BetterDualSub")
-            statusItem = item
+            statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         }
         refreshStatusMenu()
     }

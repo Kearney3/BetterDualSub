@@ -123,6 +123,8 @@ struct LoadedSubtitleCard<Extra: View>: View {
                 Text(manager.trackNames.joined(separator: "\n")).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 Divider()
+                SyncStatusDetail()
+                Divider()
                 HStack(spacing: 10) {
                     Text("delay.field.primary")
                     TextField("0", value: $manager.timeOffsetMs, format: .number).frame(width: 80)
