@@ -20,17 +20,12 @@ enum SyncMode: String, CaseIterable {
 
 enum SyncSource { case tv, manual }
 
-struct SyncApp: Codable, Hashable, Identifiable {
-    let id: String
-    let name: String
-}
-
 /// Which app's Now Playing clock drives the subtitles.
 enum SyncTarget {
     static let key = "syncTargetBundleID"
     static let tvBundleID = "com.apple.TV"
     /// Follow whichever app is currently playing.
-    static let anyApp = "*"
+    static let anyApp = PlaybackTracker.anyApp
     private static let knownKey = "knownSyncApps"
 
     static var current: String { UserDefaults.standard.string(forKey: key) ?? tvBundleID }
@@ -70,19 +65,7 @@ enum SyncTarget {
 
 }
 
-/// What is driving the subtitles right now, as shown by the status indicators.
-enum SyncStatus: Equatable {
-    /// The user chose the manual clock.
-    case manual
-    /// Following a player's Now Playing clock.
-    case following(app: String, playing: Bool)
-    /// Automatic mode, but the chosen player reports no playback; `otherApp` is a player that does.
-    case waiting(otherApp: SyncApp?)
-    /// The system playback listener stopped and is being restarted.
-    case disconnected
-
-    var isFollowing: Bool { if case .following = self { true } else { false } }
-
+extension SyncStatus {
     var title: String {
         switch self {
         case .manual: AppLocalization.string("sync.status.manual")
@@ -175,15 +158,16 @@ class SubtitleManager: ObservableObject {
     /// Brief confirmation shown over the subtitles after an offset change.
     @Published var delayToast: String?
     private var toastTask: Task<Void, Never>?
-    /// A player reporting playback that is not the chosen sync source.
-    private var ignoredApp: SyncApp?
     private var listenerAlive = true
     private var reconnectTask: Task<Void, Never>?
     /// Pending "playback lost" notice; brief gaps (between episodes, a seek) cancel it.
     private var lossTask: Task<Void, Never>?
     private var primary: SubtitleDocument?
     private var secondary: SubtitleDocument?
-    private var tvClock = SubtitleClock()
+    /// The followed player's clock (called the TV clock, as Apple TV is the default player).
+    private var tracker = PlaybackTracker()
+    private var tvClock: SubtitleClock { tracker.clock }
+    private let timingStore = SubtitleTimingStore(defaults: .standard)
     private var manualClock = SubtitleClock(positionMs: 0, uptime: 0, rate: 0, valid: true)
     /// Title the timing is saved under, once loading has restored it.
     private var timingTitle: String?
@@ -209,62 +193,36 @@ class SubtitleManager: ObservableObject {
 
     private func receive(_ track: TrackInfo?) {
         listenerAlive = true
-        guard let track else {
-            ignoredApp = nil
-            resetTVClock()
-            return
+        let report = track.map {
+            NowPlayingReport(bundleID: $0.payload.bundleIdentifier, appName: $0.payload.applicationName,
+                             isPlaying: $0.payload.isPlaying, playbackRate: $0.payload.playbackRate,
+                             elapsedMicros: $0.payload.elapsedTimeMicros, timestampEpochMicros: $0.payload.timestampEpochMicros,
+                             durationMicros: $0.payload.durationMicros)
         }
-        let payload = track.payload
-        guard let bundleID = payload.bundleIdentifier else {
-            ignoredApp = nil
-            resetTVClock()
-            return
-        }
-        let app = SyncApp(id: bundleID, name: payload.applicationName ?? bundleID)
-        if payload.elapsedTimeMicros != nil {
+        if let report, let app = report.app, report.elapsedMicros != nil {
             SyncTarget.remember(app)
         }
-        // Some players omit isPlaying or report a zero rate while playing; trust whichever signal says "playing".
-        let reportedRate = payload.playbackRate ?? 0
-        let playing = payload.isPlaying ?? (reportedRate > 0)
-        let target = SyncTarget.current
-        guard target == SyncTarget.anyApp || bundleID == target else {
-            ignoredApp = playing && payload.elapsedTimeMicros != nil ? app : nil
+        guard tracker.receive(report, target: SyncTarget.current, uptime: uptime, epoch: Date().timeIntervalSince1970) else {
             resetTVClock()
             return
         }
-        ignoredApp = nil
-        guard let elapsed = Self.elapsedSeconds(payload), elapsed.isFinite, elapsed >= 0,
-              elapsed < 36_000_000 else {
-            resetTVClock()
-            return
-        }
-        let rate = reportedRate > 0 ? reportedRate : 1
-        let now = uptime
-        let newRate = playing && rate.isFinite && rate <= 16 ? rate : 0
-        // Small reports are jitter: keep the extrapolated position so subtitles do not flicker. Bigger ones are seeks.
-        let expected = tvClock.valid ? Double(tvClock.position(at: now)) : -.infinity
-        if abs(expected - elapsed * 1000) < 150 && tvClock.rate == newRate {
-            tvClock.positionMs = expected + (elapsed * 1000 - expected) * 0.5
-            tvClock.uptime = now
-        } else {
-            tvClock = SubtitleClock(positionMs: elapsed * 1000, uptime: now, rate: newRate, valid: true)
-        }
-        syncedAppName = app.name
-        durationMs = max(documentDurationMs, Int((payload.durationMicros ?? 0) / 1000))
+        syncedAppName = tracker.followedApp?.name
+        durationMs = max(documentDurationMs, tracker.durationMs ?? 0)
         updateSub()
     }
 
     /// The helper process reading Now Playing exited unexpectedly; restart it after a short pause.
     private func listenerTerminated() {
         listenerAlive = false
-        ignoredApp = nil
+        tracker.clearIgnoredApp()
         resetTVClock()
         reconnectTask?.cancel()
         reconnectTask = Task { [weak self] in
             try? await Task.sleep(for: .seconds(2))
-            guard !Task.isCancelled else { return }
-            self?.reconnect()
+            // MediaRemoteAdapter can report the end of the process it replaces during its own periodic restart.
+            // Reports arriving since then mean a listener is still running, and starting another would duplicate it.
+            guard let self, !Task.isCancelled, !self.listenerAlive else { return }
+            self.reconnect()
         }
     }
 
@@ -301,18 +259,6 @@ class SubtitleManager: ObservableObject {
         internalTimer = timer
     }
 
-    /// Elapsed playback time. Unlike `payload.currentElapsedTime` this also works for apps that report no timestamp.
-    private static func elapsedSeconds(_ payload: TrackInfo.Payload) -> Double? {
-        guard let micros = payload.elapsedTimeMicros else { return nil }
-        var seconds = micros / 1_000_000
-        let reportedRate = payload.playbackRate ?? 0
-        if payload.isPlaying ?? (reportedRate > 0), let stamp = payload.timestampEpochMicros {
-            let age = Date().timeIntervalSince1970 - stamp / 1_000_000
-            if age > 0 && age < 3600 { seconds += age * (reportedRate > 0 ? reportedRate : 1) }
-        }
-        return seconds
-    }
-
     private func resetTVClock() {
         let now = uptime
         if activeSource == .tv, tvClock.valid {
@@ -321,29 +267,22 @@ class SubtitleManager: ObservableObject {
             manualClock = SubtitleClock(positionMs: Double(tvClock.position(at: now)), uptime: now, rate: 0, valid: true)
             manualPlaying = false
         }
-        tvClock.valid = false
+        tracker.invalidate()
         syncedAppName = nil
         durationMs = documentDurationMs
         updateSub()
     }
 
     func syncTargetDidChange() {
-        ignoredApp = nil
+        tracker.clearIgnoredApp()
         resetTVClock()
         refreshNowPlaying()
     }
 
     private func refreshSyncStatus() {
-        let status: SyncStatus
-        if SyncMode.current == .manual {
-            status = .manual
-        } else if !listenerAlive {
-            status = .disconnected
-        } else if activeSource == .tv, let name = syncedAppName {
-            status = .following(app: name, playing: tvClock.rate > 0)
-        } else {
-            status = .waiting(otherApp: ignoredApp)
-        }
+        let status = SyncStatus.current(manualMode: SyncMode.current == .manual, listenerAlive: listenerAlive,
+                                        followedApp: activeSource == .tv ? syncedAppName : nil,
+                                        playing: tvClock.rate > 0, ignoredApp: tracker.ignoredApp)
         guard status != syncStatus else { return }
         let wasFollowing = syncStatus.isFollowing
         syncStatus = status
@@ -475,8 +414,7 @@ class SubtitleManager: ObservableObject {
         let bounded = max(0, durationMs > 0 ? min(durationMs, target) : target)
         mediaController.setTime(seconds: Double(bounded) / 1000)
         // Show the new position right away; the player's next report confirms it.
-        tvClock.positionMs = Double(bounded)
-        tvClock.uptime = uptime
+        tracker.seek(toMs: bounded, uptime: uptime)
         positionMs = bounded
         updateSub()
     }
@@ -549,15 +487,11 @@ class SubtitleManager: ObservableObject {
         manualClock = SubtitleClock(positionMs: 0, uptime: uptime, rate: 0, valid: true)
         manualPlaying = false
         timingTitle = nil
-        // Saved as [A, B, 0]; the older two-value form was [A, extra] with B = A + extra.
-        let saved = title.isEmpty ? nil : UserDefaults.standard.array(forKey: "offsets." + title) as? [Int]
-        let a = saved?.first ?? 0
-        let b = saved.map { $0.count > 2 ? $0[1] : a + ($0.count > 1 ? $0[1] : 0) } ?? a
-        let speeds = title.isEmpty ? nil : UserDefaults.standard.array(forKey: "speeds." + title) as? [Double]
-        timeOffsetMs = a
-        secondaryOffsetMs = linkSecondaryDelay ? a : b
-        primaryScale = speeds?.first ?? 1
-        secondaryScale = linkSecondaryDelay ? primaryScale : (speeds.map { $0.count > 1 ? $0[1] : 1 } ?? 1)
+        let saved = title.isEmpty ? SavedTiming() : timingStore.load(title: title)
+        timeOffsetMs = saved.primaryOffsetMs
+        secondaryOffsetMs = linkSecondaryDelay ? saved.primaryOffsetMs : saved.secondaryOffsetMs
+        primaryScale = saved.primaryScale
+        secondaryScale = linkSecondaryDelay ? primaryScale : saved.secondaryScale
         alignPoints = [:]
         timingTitle = title.isEmpty ? nil : title
         restoredTiming = timeOffsetMs != 0 || secondaryOffsetMs != 0 || primaryScale != 1 || secondaryScale != 1
@@ -593,17 +527,8 @@ class SubtitleManager: ObservableObject {
 
     private func saveOffsets() {
         guard let title = timingTitle else { return }
-        let defaults = UserDefaults.standard
-        if timeOffsetMs == 0 && secondaryOffsetMs == 0 {
-            defaults.removeObject(forKey: "offsets." + title)
-        } else {
-            defaults.set([timeOffsetMs, secondaryOffsetMs, 0], forKey: "offsets." + title)
-        }
-        if primaryScale == 1 && secondaryScale == 1 {
-            defaults.removeObject(forKey: "speeds." + title)
-        } else {
-            defaults.set([primaryScale, secondaryScale], forKey: "speeds." + title)
-        }
+        timingStore.save(SavedTiming(primaryOffsetMs: timeOffsetMs, secondaryOffsetMs: secondaryOffsetMs,
+                                     primaryScale: primaryScale, secondaryScale: secondaryScale), title: title)
     }
 
     func adjustDelay(track: String, delta: Int) {

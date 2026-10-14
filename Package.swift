@@ -15,7 +15,7 @@ let package = Package(
                           "ManualControlBar.swift", "SettingsComponents.swift", "SubtitleAlignView.swift",
                           "SyncStatusView.swift", "SubtitleTranslator.swift", "SubtitleTranslationView.swift"],
                 sources: ["SubtitleDocument.swift", "MovieSubtitleDownloader.swift", "MovpkgSubtitleExtractor.swift",
-                           "SubtitleTranslationPlan.swift"]),
+                           "SubtitleTranslationPlan.swift", "PlaybackTracking.swift"]),
         .testTarget(name: "BetterDualSubCoreTests", dependencies: ["BetterDualSubCore"], path: "Tests")
     ]
 )
