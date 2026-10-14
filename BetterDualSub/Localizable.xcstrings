@@ -3129,13 +3129,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Advance primary subtitles by %d ms"
+            "value" : "Track 1 earlier · %d ms"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "整体字幕提前 %d 毫秒"
+            "value" : "主轨提前 %d 毫秒"
           }
         }
       }
@@ -3146,13 +3146,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delay primary subtitles by %d ms"
+            "value" : "Track 1 later · %d ms"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "整体字幕推迟 %d 毫秒"
+            "value" : "主轨推迟 %d 毫秒"
           }
         }
       }
@@ -3163,13 +3163,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Advance secondary subtitles by %d ms"
+            "value" : "Track 2 earlier · %d ms"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第二轨字幕提前 %d 毫秒"
+            "value" : "副轨提前 %d 毫秒"
           }
         }
       }
@@ -3180,13 +3180,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Delay secondary subtitles by %d ms"
+            "value" : "Track 2 later · %d ms"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "第二轨字幕推迟 %d 毫秒"
+            "value" : "副轨推迟 %d 毫秒"
           }
         }
       }
@@ -3214,13 +3214,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Download from movie page…"
+            "value" : "Get movie subtitles…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从影片页面下载…"
+            "value" : "从影片页面获取字幕…"
           }
         }
       }
@@ -3231,13 +3231,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Extract from local episode…"
+            "value" : "Import episode subtitles…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从本地剧集提取…"
+            "value" : "导入本地剧集字幕…"
           }
         }
       }
@@ -3248,13 +3248,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Open BetterDualSub…"
+            "value" : "Open control center…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "打开 BetterDualSub…"
+            "value" : "打开控制中心…"
           }
         }
       }
@@ -3315,13 +3315,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Subtitles"
+            "value" : "Load subtitles"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "字幕"
+            "value" : "载入字幕"
           }
         }
       }
@@ -3366,13 +3366,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lock Subtitle Window"
+            "value" : "Lock overlay"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "锁定字幕窗口"
+            "value" : "锁定浮层"
           }
         }
       }
@@ -3383,13 +3383,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reset Subtitle Position"
+            "value" : "Reset position"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "重置字幕位置"
+            "value" : "重置位置"
           }
         }
       }
@@ -3400,13 +3400,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Show Subtitle Window"
+            "value" : "Show overlay"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "显示字幕窗口"
+            "value" : "显示浮层"
           }
         }
       }

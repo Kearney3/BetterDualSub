@@ -158,28 +158,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func refreshStatusMenu() {
         let menu = NSMenu()
-        let header = NSMenuItem(title: "  BetterDualSub v\(Bundle.main.appVersion)", action: nil, keyEquivalent: "")
-        header.isEnabled = false
-        if let icon = NSImage(named: "AppIcon") {
-            icon.size = NSSize(width: 18, height: 18)
-            header.image = icon
-        }
-        menu.addItem(header)
-        menu.addItem(.separator())
-
         menu.addItem(menuItem("menu.openApp", symbol: "macwindow", action: #selector(openControlCenter)))
         menu.addItem(.separator())
 
-        menu.addItem(.sectionHeader(title: AppLocalization.string("menu.section.subtitles")))
-        menu.addItem(menuItem("menu.openFile", symbol: "doc.badge.plus", action: #selector(openSRT)))
-        menu.addItem(menuItem("menu.downloadFromPage", symbol: "arrow.down.circle", action: #selector(openMoviePage)))
-        menu.addItem(menuItem("menu.extractFromEpisode", symbol: "film.stack", action: #selector(openLocalPackage)))
+        let loadMenu = NSMenu()
+        loadMenu.addItem(menuItem("menu.openFile", symbol: "doc.badge.plus", action: #selector(openSRT)))
+        loadMenu.addItem(menuItem("menu.downloadFromPage", symbol: "arrow.down.circle", action: #selector(openMoviePage)))
+        loadMenu.addItem(menuItem("menu.extractFromEpisode", symbol: "film.stack", action: #selector(openLocalPackage)))
+        let loadItem = NSMenuItem(title: AppLocalization.string("menu.section.subtitles"), action: nil, keyEquivalent: "")
+        loadItem.image = NSImage(systemSymbolName: "captions.bubble", accessibilityDescription: nil)
+        loadItem.submenu = loadMenu
+        menu.addItem(loadItem)
 
-        menu.addItem(.sectionHeader(title: AppLocalization.string("menu.section.timing")))
         let delayMenu = NSMenu()
         let actions: [SubtitleShortcutAction] = [.primaryEarlier, .primaryLater, .primaryReset,
                                                 .secondaryEarlier, .secondaryLater, .secondaryReset]
-        for action in actions {
+        for (index, action) in actions.enumerated() {
+            if index == 3 { delayMenu.addItem(.separator()) }
             let title: String
             let symbol: String
             switch action {
@@ -190,25 +185,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             case .primaryReset, .secondaryReset: title = AppLocalization.string(action.titleKey); symbol = "arrow.counterclockwise"
             case .manualPlayPause, .manualBack, .manualForward, .toggleLock: continue
             }
-            let shortcut = "  \(SubtitleShortcutPreferences.chord(for: action.id).displayName)"
             let command = NSMenuItem(
-                title: title + shortcut,
+                title: title,
                 action: #selector(adjustDelay(_:)),
                 keyEquivalent: ""
             )
             command.target = self
             command.image = NSImage(systemSymbolName: symbol, accessibilityDescription: nil)
             command.representedObject = ["track": action.track, "delta": action.delta] as [String: Any]
-            if action == .primaryReset { delayMenu.addItem(.separator()) }
             delayMenu.addItem(command)
-            if action == .primaryReset { delayMenu.addItem(.separator()) }
         }
         let delayItem = NSMenuItem(title: AppLocalization.string("menu.delay.title"), action: nil, keyEquivalent: "")
         delayItem.image = NSImage(systemSymbolName: "timer", accessibilityDescription: nil)
         delayItem.submenu = delayMenu
         menu.addItem(delayItem)
 
-        menu.addItem(.sectionHeader(title: AppLocalization.string("menu.section.display")))
+        let displayMenu = NSMenu()
+        let windowItem = menuItem("menu.window.show", symbol: "macwindow.badge.plus", action: #selector(toggleSubtitleWindow))
+        windowItem.state = OverlayController.isVisible ? .on : .off
+        displayMenu.addItem(windowItem)
+        let lockItem = menuItem("menu.window.lock", symbol: "lock", action: #selector(toggleOverlayLock))
+        lockItem.state = OverlayController.isLocked ? .on : .off
+        displayMenu.addItem(lockItem)
+        displayMenu.addItem(menuItem("menu.window.reset", symbol: "arrow.up.left.and.down.right.magnifyingglass", action: #selector(resetSubtitlePosition)))
+        displayMenu.addItem(.separator())
+
         let backgroundMenu = NSMenu()
         let selectedBackground = UserDefaults.standard.string(forKey: "backgroundStyle") ?? BackgroundStyleOption.transparent.rawValue
         for option in BackgroundStyleOption.allCases {
@@ -221,15 +222,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let backgroundItem = NSMenuItem(title: AppLocalization.string("menu.background.title"), action: nil, keyEquivalent: "")
         backgroundItem.image = NSImage(systemSymbolName: "rectangle.dashed", accessibilityDescription: nil)
         backgroundItem.submenu = backgroundMenu
-        menu.addItem(backgroundItem)
-
-        let windowItem = menuItem("menu.window.show", symbol: "macwindow.badge.plus", action: #selector(toggleSubtitleWindow))
-        windowItem.state = OverlayController.isVisible ? .on : .off
-        menu.addItem(windowItem)
-        let lockItem = menuItem("menu.window.lock", symbol: "lock", action: #selector(toggleOverlayLock))
-        lockItem.state = OverlayController.isLocked ? .on : .off
-        menu.addItem(lockItem)
-        menu.addItem(menuItem("menu.window.reset", symbol: "arrow.up.left.and.down.right.magnifyingglass", action: #selector(resetSubtitlePosition)))
+        displayMenu.addItem(backgroundItem)
+        let displayItem = NSMenuItem(title: AppLocalization.string("menu.section.display"), action: nil, keyEquivalent: "")
+        displayItem.image = NSImage(systemSymbolName: "rectangle.on.rectangle", accessibilityDescription: nil)
+        displayItem.submenu = displayMenu
+        menu.addItem(displayItem)
 
         menu.addItem(.separator())
         menu.addItem(menuItem("menu.settings", symbol: "gearshape", action: #selector(openSettings), key: ","))
