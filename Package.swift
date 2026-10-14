@@ -13,8 +13,9 @@ let package = Package(
                           "Info.plist", "Localizable.xcstrings", "ThirdPartyNotices.txt",
                           "BilingualExportView.swift", "GuideView.swift", "LocalSubtitleFileView.swift",
                           "ManualControlBar.swift", "SettingsComponents.swift", "SubtitleAlignView.swift",
-                          "SyncStatusView.swift"],
-                sources: ["SubtitleDocument.swift", "MovieSubtitleDownloader.swift", "MovpkgSubtitleExtractor.swift"]),
+                          "SyncStatusView.swift", "SubtitleTranslator.swift", "SubtitleTranslationView.swift"],
+                sources: ["SubtitleDocument.swift", "MovieSubtitleDownloader.swift", "MovpkgSubtitleExtractor.swift",
+                           "SubtitleTranslationPlan.swift"]),
         .testTarget(name: "BetterDualSubCoreTests", dependencies: ["BetterDualSubCore"], path: "Tests")
     ]
 )

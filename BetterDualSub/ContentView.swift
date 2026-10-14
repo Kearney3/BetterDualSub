@@ -147,6 +147,8 @@ class SubtitleManager: ObservableObject {
     /// Name of the app whose clock is currently followed, if any.
     @Published var syncedAppName: String?
     @Published private(set) var syncStatus: SyncStatus = .waiting(otherApp: nil)
+    /// Changes on every load, so work started for one set of subtitles is not applied to the next.
+    @Published private(set) var loadID = UUID()
     /// Brief confirmation shown over the subtitles after an offset change.
     @Published var delayToast: String?
     private var toastTask: Task<Void, Never>?
@@ -478,6 +480,7 @@ class SubtitleManager: ObservableObject {
         startSubtitleTimerIfNeeded()
         self.primary = primary
         self.secondary = secondary
+        loadID = UUID()
         loadedTitle = title
         trackNames = names
         currentText = ""
@@ -495,6 +498,19 @@ class SubtitleManager: ObservableObject {
         offsetsKey = title.isEmpty ? nil : "offsets." + title
         // Loading subtitles means the user wants to see them, even if the window was hidden earlier.
         if !OverlayController.isVisible { OverlayController.setVisible(true) }
+        updateSub()
+    }
+
+    /// The loaded Track 1, as the source for a translated Track 2.
+    var primaryDocument: SubtitleDocument? { primary }
+
+    /// Replaces Track 2 with `document`, which has Track 1's timing (a translation of it), so it also takes Track 1's delay.
+    func setSecondary(_ document: SubtitleDocument, name: String) {
+        guard !trackNames.isEmpty else { return }
+        secondary = document
+        trackNames = [trackNames[0], name]
+        durationMs = max(durationMs, documentDurationMs)
+        secondaryOffsetMs = timeOffsetMs
         updateSub()
     }
 

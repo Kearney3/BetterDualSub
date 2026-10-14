@@ -140,6 +140,7 @@ struct LoadedSubtitleCard<Extra: View>: View {
                 SettingsHint(key: "download.delay.help")
                 extra()
             }
+            SubtitleTranslationCard()
         }
     }
 }
