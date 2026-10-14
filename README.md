@@ -1,83 +1,229 @@
 <p align="center"><img src="docs/images/icon.png" width="128" alt="BetterDualSub icon"></p>
 
-# BetterDualSub - External Subtitle for Apple TV app on MacOS
+<h1 align="center">BetterDualSub</h1>
 
-**English** | [简体中文](README.zh-CN.md)
+<p align="center">Bilingual external subtitles for the Apple TV app on macOS.</p>
 
-A Mac app provides the ability to add external subtitles to the Apple TV app.
+<p align="center"><strong>English</strong> | <a href="README.zh-CN.md">简体中文</a></p>
 
-## How to install
+The Apple TV app on the Mac shows one subtitle language at a time and cannot load your own subtitle files. BetterDualSub shows one or two subtitle tracks in a floating overlay above the video and keeps them in step with the playing movie, so you can watch with, for example, English and Chinese at once.
 
-Requires macOS 26.0 or later on Apple silicon.
+## Features
 
-### With Homebrew
+- **Three subtitle sources**: download tracks from an Apple TV movie link, extract them from an episode downloaded in the TV app (`.movpkg`), or open your own `.srt`, `.vtt`, `.ass` or `.ssa` files.
+- **Two tracks at once**, each with its own font, color, outline and line layout.
+- **Follows playback** of the Apple TV app, or of any other player that reports Now Playing (IINA, VLC, QuickTime Player, browsers…), including pauses, seeks and playback speed. A manual clock takes over when nothing is playing.
+- **Visible sync status** in the menu bar, on the overlay and in the app, with a one-click fix when subtitles are not following the right player.
+- **Timing tools**: per-track delays, global shortcuts, alignment by picking the line you hear, and automatic speed correction for files made for another frame rate. Timing is remembered per title.
+- **On-device translation**: create a second language from the first with macOS translation. Subtitle text never leaves your Mac.
+- **Bilingual export**: merge two subtitle files into one bilingual SRT.
+- Interface in English and Simplified Chinese.
+
+## Requirements
+
+- A Mac with Apple silicon running macOS 26 or later.
+- The Apple TV app, or another player that reports Now Playing information.
+
+## Install
+
+### Homebrew (recommended)
 
 ```sh
 brew tap kearney3/betterdualsub https://github.com/Kearney3/BetterDualSub
 brew install --cask betterdualsub
 ```
 
-The cask removes the download quarantine for you, so the Terminal step of the manual install is not needed. Upgrade later with `brew upgrade --cask betterdualsub`.
+Upgrade with `brew upgrade --cask betterdualsub`. The app also tells you when a new version is out.
 
-### Manually
+### Manual
 
-1. Download and move BetterDualSub.app to /Applications folder
+1. Download the DMG from [Releases](https://github.com/Kearney3/BetterDualSub/releases) and drag BetterDualSub to Applications.
+2. BetterDualSub is not notarized by Apple, so macOS blocks it until you run this once in Terminal:
 
-2. Open terminal and run this code 
+   ```sh
+   xattr -cr /Applications/BetterDualSub.app && codesign --force --deep --sign - /Applications/BetterDualSub.app
+   ```
 
-`xattr -cr /Applications/BetterDualSub.app && codesign --force --deep --sign - /Applications/BetterDualSub.app`
+The Homebrew cask does the equivalent for you.
 
-## How to use
+## Quick start
 
-1. Open BetterDualSub to see the control window. **Now Playing** is the home page: before anything is loaded it shows how to get started; afterwards it shows the loaded tracks, the sync status, timing and translation in one place. **Load Subtitles** is the single place to load subtitles, with three sources: **Movie link**, **Local episode** and **Subtitle file**. After a successful load the window returns to **Now Playing**. **Tools** holds **Align by Line** and **Bilingual Export**; **Settings** holds **Appearance**, **Keyboard Shortcuts** and **General**.
+1. Open BetterDualSub and choose **Load Subtitles** › **Movie link**.
+2. Paste the movie's Apple TV page link, such as `https://tv.apple.com/us/movie/…/umc.cmc.…`, and click **Find subtitles**.
+3. Pick a version, a first language and optionally a second one, then click **Download and show**.
+4. Play the same movie in the TV app and turn off its own subtitles. The overlay follows playback.
+5. If the subtitles are early or late, press Control-Option-← or → (250 ms per press), or use **Align by Line**.
 
-2. For an online movie, choose **Movie link**, paste its `https://tv.apple.com/{country}/movie/.../umc.cmc...` URL and click **Find subtitles**. Select the movie version and one or two language tracks, then click **Download and show**. Online movie downloads are saved as SRT under `~/Library/Application Support/BetterDualSub/Subtitles/`.
+## Using BetterDualSub
 
-3. For a downloaded TV episode, choose **Local episode** and select its `.movpkg` package. Select one or two external text tracks and choose either the episode timeline or the full package timeline, then extract and show them. App-managed SRT files are saved under `~/Library/Application Support/BetterDualSub/Subtitles/Local/`. Use **Export tracks** to save copies in a folder you choose. Your own UTF-8 or legacy-encoded `.srt` / `.vtt` / `.ass` / `.ssa` files load from **Subtitle file**; for ASS/SSA only the text and timing are used, not their styling. The **General** page can move the app-managed cache to Trash without touching files you exported yourself.
+The control window has three groups:
 
-4. Play the matching movie or episode in TV.app, and turn off TV.app's own subtitles if they overlap. The sync status on **Now Playing**, in the menu bar and on the overlay's control bar shows whether subtitles follow a player, are waiting for one, use the manual clock or lost the playback connection, and offers the matching fix (for example, following the app that is actually playing).
+| Group | Pages |
+| --- | --- |
+| Subtitles | **Now Playing**: tracks, sync status, timing and translation for what is loaded. **Load Subtitles**: every way to load subtitles. |
+| Tools | **Align by Line**, **Bilingual Export** |
+| Settings | **Appearance**, **Keyboard Shortcuts**, **General** |
 
-5. Adjust timing on **Now Playing** or with global shortcuts. Positive delays show subtitles later. **Align by Line** sets the delay from a line you hear; aligning a second line at least 30 seconds later also corrects the speed of files made for another frame rate. Timing is saved per title and restored, with a notice, the next time the same title is loaded. If only one language is available, **Now Playing** can create Track 2 with on-device macOS translation; subtitle text never leaves the Mac.
+The menu bar icon offers the same loading, timing and display commands.
 
-6. Use **Appearance** to preview and tune both subtitle tracks. **General** chooses the player to follow, switches the interface between Simplified Chinese and English, controls the menu-bar icon and the daily update check (which only asks GitHub for the latest version number), and sets the shortcut delay step from 1 to 60,000 ms. **Keyboard Shortcuts** lets you record custom global shortcuts for moving either track earlier or later and for resetting each track to 0. Defaults are Control-Option-Left/Right for the primary track, Control-Option-Shift-Left/Right for the secondary track, Control-Option-0 to reset the primary delay, and Control-Option-Shift-0 to reset the secondary delay.
+### Loading subtitles
 
-### Supported links and limitations
+| Source | What you provide | Notes |
+| --- | --- | --- |
+| Movie link | An Apple TV movie page link | Lists the subtitle tracks of the chosen version. **Download only…** saves SRT files without showing them. |
+| Local episode | A `.movpkg` package downloaded by the TV app, usually in `~/Movies/Videos/Media.localized/TV Shows` | Choose the episode timeline or the whole package's. **Export SRT files…** saves copies without showing them. |
+| Subtitle file | One or two `.srt`, `.vtt`, `.ass` or `.ssa` files | UTF-8, UTF-16 and common legacy encodings (GB18030, Big5, Shift JIS, EUC-KR) are detected. ASS/SSA styling is ignored. A file name ending in `(-1500ms)` sets the delay. |
 
-- Online downloading supports Apple TV **movie pages with iTunes movie offers**. Apple TV+ subscription-only titles and show, season or episode page links are not supported by the online downloader. Local `.movpkg` extraction supports downloaded episodes when they contain complete external text subtitle tracks.
-- Available languages depend on the page's country and film version. Only external HLS text subtitle tracks are listed. Embedded video closed captions cannot be downloaded through this path. Forced tracks usually contain only selected dialogue.
-- Requests are anonymous first. The optional DSID field is used only after an eligible iTunes playlist request fails and is kept only in memory. It does not provide a general account login or guarantee access to a purchased/rented title.
-- Complete, unencrypted WebVTT playlists are supported. Encrypted, discontinuous, byte-range and initialization-map subtitle playlists are rejected with an error.
-- Subtitle segments are merged with their WebVTT timestamp maps. Film-version differences can still require a manual offset; the application does not automatically identify the page for the currently playing film.
+After a successful load the window switches to **Now Playing**.
 
-## Build and verify
+### Sync status
 
-For contribution and commit message rules, see [Commit convention](docs/commit-convention.md).
+| Status | Meaning |
+| --- | --- |
+| Following · Playing / Paused | Subtitles follow the chosen player. |
+| Waiting for … to play | The chosen player reports no playback; the manual clock is used meanwhile. If another app is playing, you can follow it with one click. |
+| Manual clock | You chose manual timing; use the progress bar shown when hovering over the subtitles. |
+| Playback connection lost | Reading system playback information stopped; BetterDualSub reconnects automatically. |
 
-Use the project build-and-run script to build and launch the macOS app:
+Choose which player to follow under **General** › **Sync source**.
+
+### Timing
+
+- **Delay**: positive values show subtitles later. Set them on **Now Playing**, on the overlay's control bar or with shortcuts. Track 2 follows Track 1 unless you unlink them.
+- **Align by Line**: while a line is being spoken, select it in the list and click **Align to current time**; the delay is calculated for you.
+- **Speed correction**: if subtitles drift further off as the movie plays, align a second line at least 30 seconds after the first. BetterDualSub then corrects the speed as well, for example ×1.0427 for a 23.976 fps file played at 25 fps.
+- Delays and speed are saved per title and restored, with a notice, the next time you load it.
+
+### Translating a second language
+
+On **Now Playing**, **Translate Track 2** creates a second track from Track 1 with the macOS on-device translator. The source language is detected automatically. Languages that are not installed yet are offered as a system download. The result keeps every line's timing and can be exported as SRT.
+
+### Overlay
+
+Drag the subtitles anywhere on screen. Hovering shows a control bar with playback, delay and alignment controls; right-click for appearance, lock, hide and reset. While locked, the overlay ignores the mouse so the apps underneath stay usable. **Appearance** sets fonts, colors, outlines, background and whether lines are kept as authored, joined into one or balanced over two.
+
+### Keyboard shortcuts
+
+These work in any app and can be changed under **Keyboard Shortcuts**, along with the delay step (1–60,000 ms, default 250 ms).
+
+| Action | Default |
+| --- | --- |
+| Track 1 earlier / later | Control-Option-← / → |
+| Track 2 earlier / later | Control-Option-Shift-← / → |
+| Reset Track 1 / Track 2 delay | Control-Option-0 / Control-Option-Shift-0 |
+| Play / pause | Control-Option-Command-Space |
+| Back / forward 10 seconds | Control-Option-Command-← / → |
+| Lock / unlock overlay | Control-Option-L |
+
+Play, pause and seeking control the followed player, or the manual clock when nothing is followed.
+
+## Limitations
+
+- Online downloading supports Apple TV **movie pages with iTunes offers**. Apple TV+ subscription titles and show, season or episode links are not supported; for episodes downloaded in the TV app, use **Local episode**.
+- Available languages depend on the page's country and the movie version. Only external text subtitle tracks are listed; captions embedded in the video cannot be downloaded. Forced tracks usually contain only selected dialogue.
+- Encrypted, discontinuous, byte-range and initialization-map subtitle playlists are rejected with an error.
+- BetterDualSub does not identify the movie that is playing; load subtitles for the same title and version. A different version may still need a delay.
+
+## Privacy
+
+- **Network**: BetterDualSub contacts Apple's TV website only when you look up or download subtitles, and GitHub at most once a day for the latest version number (turn this off under **General**). Nothing else is sent.
+- **Account**: requests are anonymous. The optional DSID field is used only after an eligible request fails and is kept in memory only.
+- **Translation** runs on device.
+- **Files**: downloaded and extracted subtitles are kept in `~/Library/Application Support/BetterDualSub/Subtitles/`; **General** can move this folder to the Trash. Files you export yourself are never touched. Settings and per-title timing are stored in the app's preferences.
+
+To remove everything installed with Homebrew, run `brew uninstall --zap --cask betterdualsub`.
+
+## Troubleshooting
+
+<details>
+<summary>macOS says BetterDualSub is damaged or can't be opened</summary>
+
+The app is not notarized. Install it with Homebrew, or run the Terminal command from [Manual](#manual) once.
+</details>
+
+<details>
+<summary>The subtitles stay still while the movie plays</summary>
+
+Check the sync status on **Now Playing** or in the menu bar. If it names another app that is playing, choose **Follow** for it, or pick the player under **General** › **Sync source**. If it shows **Manual clock**, switch back to automatic.
+</details>
+
+<details>
+<summary>The subtitles get further off as the movie goes on</summary>
+
+The file was made for another frame rate. Use **Align by Line** on one line near the start and another much later; the speed is corrected automatically.
+</details>
+
+<details>
+<summary>No subtitle tracks are found for a movie link</summary>
+
+See [Limitations](#limitations). Apple TV+ titles and TV show links are not supported, and the page's country decides which languages exist. Try the link of another country's store.
+</details>
+
+<details>
+<summary>Translation asks for a download or fails</summary>
+
+macOS needs the language pair installed. Accept the download offer, or manage languages in System Settings › General › Language & Region › Translation Languages.
+</details>
+
+## Development
+
+Open `BetterDualSub.xcodeproj` in Xcode 26, or build and launch from the command line:
 
 ```sh
 ./script/build_and_run.sh
 ```
 
-Or open `BetterDualSub.xcodeproj` in Xcode. A Release build can also be created with:
+A Release build:
 
 ```sh
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub -configuration Release build
+xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub -configuration Release build
 ```
 
-The parser, playback-clock calculations and downloader can be tested without starting TV.app:
+### Tests
+
+Parsing, timing, translation planning, playback tracking and downloading logic live in the `BetterDualSubCore` Swift package and run without the TV app:
 
 ```sh
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+swift test
 ```
 
-An optional live test downloads English and Chinese subtitles from a supplied supported movie link:
+An optional live test downloads English and Chinese subtitles from a real movie link:
 
 ```sh
 BETTERDUALSUB_LIVE_MOVIE_URL='https://tv.apple.com/hk/movie/spider-man-into-the-spider-verse/umc.cmc.4a2ypxddplsdsahwxrc5fkz4x' \
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
   swift test --filter testLiveAppleMovieLinkWhenRequested
 ```
 
-The Apple movie API discovery follows [iSubRip](https://github.com/MichaelYochpaz/iSubRip); this application uses a native Swift implementation and does not require Python or iSubRip to be installed. See `BetterDualSub/ThirdPartyNotices.txt` and `docs/isubrip-download-research.md` for attribution and source analysis.
+If more than one Xcode is installed, prefix the commands with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+
+### Project layout
+
+| Path | Contents |
+| --- | --- |
+| `BetterDualSub/SubtitleDocument.swift` | Subtitle model, SRT/WebVTT/ASS parsing, timing math |
+| `BetterDualSub/PlaybackTracking.swift` | Now Playing tracking, sync status, saved timing |
+| `BetterDualSub/MovieSubtitleDownloader.swift`, `MovpkgSubtitleExtractor.swift` | Apple TV download and `.movpkg` extraction |
+| `BetterDualSub/ContentView.swift` | `SubtitleManager` and the subtitle overlay |
+| `BetterDualSub/*View.swift` | Control window pages |
+| `Tests/` | Unit tests for the core package |
+| `Casks/betterdualsub.rb` | Homebrew cask |
+| `docs/` | Research notes and the commit convention |
+
+### Contributing
+
+Commits follow [Conventional Commits](docs/commit-convention.md). Enable the message check once per clone:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+### Releasing
+
+Push a `v*` tag, such as `v1.1.0`. The release workflow runs the tests, builds an arm64 DMG, publishes the GitHub release and updates the version and checksum in the Homebrew cask.
+
+## Acknowledgments
+
+- The Apple TV movie API discovery follows [iSubRip](https://github.com/MichaelYochpaz/iSubRip) (MIT), reimplemented natively in Swift. See [`ThirdPartyNotices.txt`](BetterDualSub/ThirdPartyNotices.txt) and [`docs/isubrip-download-research.md`](docs/isubrip-download-research.md).
+- Playback information is read with [mediaremote-adapter](https://github.com/ejbills/mediaremote-adapter).
+
+BetterDualSub is not affiliated with or endorsed by Apple. Apple TV is a trademark of Apple Inc.
