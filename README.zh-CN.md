@@ -30,10 +30,11 @@ Mac 上的 Apple TV 应用（TV.app）一次只能显示一种字幕，也不能
 
 ```sh
 brew tap kearney3/betterdualsub https://github.com/Kearney3/BetterDualSub
+brew trust --cask kearney3/betterdualsub/betterdualsub
 brew install --cask betterdualsub
 ```
 
-用 `brew upgrade --cask betterdualsub` 升级。有新版本时，应用也会提示。
+Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行这一个 cask，不会放行该 tap 中的其他内容。用 `brew upgrade --cask betterdualsub` 升级。有新版本时，应用也会提示。
 
 ### 手动安装
 

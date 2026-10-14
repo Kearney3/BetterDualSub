@@ -30,10 +30,11 @@ The Apple TV app on the Mac shows one subtitle language at a time and cannot loa
 
 ```sh
 brew tap kearney3/betterdualsub https://github.com/Kearney3/BetterDualSub
+brew trust --cask kearney3/betterdualsub/betterdualsub
 brew install --cask betterdualsub
 ```
 
-Upgrade with `brew upgrade --cask betterdualsub`. The app also tells you when a new version is out.
+Homebrew only installs casks from third-party taps that you trust; `brew trust` allows this one cask and nothing else from the tap. Upgrade with `brew upgrade --cask betterdualsub`. The app also tells you when a new version is out.
 
 ### Manual
 
