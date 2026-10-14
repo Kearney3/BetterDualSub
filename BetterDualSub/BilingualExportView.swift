@@ -10,7 +10,7 @@ struct BilingualExportView: View {
     @State private var status = ""
     @State private var error = ""
 
-    private static let types: [UTType] = ["srt", "vtt"].compactMap { UTType(filenameExtension: $0) } + [.plainText]
+    private static let types: [UTType] = SubtitleFileReader.fileExtensions.compactMap { UTType(filenameExtension: $0) } + [.plainText]
 
     var body: some View {
         SettingsPage(descriptionKey: "bilingual.description") {

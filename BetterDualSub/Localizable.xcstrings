@@ -880,13 +880,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Merge two subtitle files (.srt / .vtt) into one bilingual SRT: primary lines on top, secondary below. Cue timings that differ slightly are aligned automatically."
+            "value" : "Merge two subtitle files (.srt / .vtt / .ass / .ssa) into one bilingual SRT: primary lines on top, secondary below. Cue timings that differ slightly are aligned automatically."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "把两个字幕文件（.srt / .vtt）合并为一个双语 SRT：主字幕在上，副字幕在下。时间点略有差异的字幕会自动对齐。"
+            "value" : "把两个字幕文件（.srt / .vtt / .ass / .ssa）合并为一个双语 SRT：主字幕在上，副字幕在下。时间点略有差异的字幕会自动对齐。"
           }
         }
       }
@@ -2678,13 +2678,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Download subtitles from an Apple TV movie link, extract them from a .movpkg, or open your own .srt / .vtt file."
+            "value" : "Download subtitles from an Apple TV movie link, extract them from a .movpkg, or open your own .srt / .vtt / .ass / .ssa file."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从 Apple TV 电影链接下载字幕、从 .movpkg 提取，或直接打开你自己的 .srt / .vtt 文件。"
+            "value" : "从 Apple TV 电影链接下载字幕、从 .movpkg 提取，或直接打开你自己的 .srt / .vtt / .ass / .ssa 文件。"
           }
         }
       }
@@ -3020,13 +3020,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Load your own .srt or .vtt subtitle files. Pick two files to show bilingual subtitles."
+            "value" : "Load your own .srt, .vtt, .ass or .ssa subtitle files. Pick two files to show bilingual subtitles."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "加载你自己的 .srt 或 .vtt 字幕文件；选择两个文件即可显示双语字幕。"
+            "value" : "加载你自己的 .srt、.vtt、.ass 或 .ssa 字幕文件；选择两个文件即可显示双语字幕。"
           }
         }
       }
@@ -3036,13 +3036,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Drop a .srt or .vtt file here, or choose a file."
+            "value" : "Drop a .srt, .vtt, .ass or .ssa file here, or choose a file."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "将 .srt 或 .vtt 文件拖到这里，或点击选择文件。"
+            "value" : "将 .srt、.vtt、.ass 或 .ssa 文件拖到这里，或点击选择文件。"
           }
         }
       }

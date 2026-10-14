@@ -55,7 +55,62 @@ nonisolated struct SubtitleDocument: Sendable {
     }
 
     init(text: String) throws {
-        self = try Self.parse(text).document
+        self = try Self.isSubStationAlpha(text) ? Self.parseSubStationAlpha(text) : Self.parse(text).document
+    }
+
+    /// Advanced SubStation Alpha (.ass) and SubStation Alpha (.ssa) files keep their lines in an [Events] section.
+    static func isSubStationAlpha(_ text: String) -> Bool {
+        text.range(of: #"(?im)^[ \t]*\[(Script Info|Events)\][ \t]*$"#, options: .regularExpression) != nil
+    }
+
+    /// Reads the Dialogue lines of an .ass / .ssa file: their timing and text, without styling or positioning.
+    /// Bilingual files that put each language on its own Dialogue line show both lines together.
+    static func parseSubStationAlpha(_ text: String, allowEmpty: Bool = false) throws -> SubtitleDocument {
+        // SSA v4 names its first column Marked instead of Layer; files without a Format line use the ASS default.
+        var columns = ["layer", "start", "end", "style", "name", "marginl", "marginr", "marginv", "effect", "text"]
+        var inEvents = false
+        var items: [SubtitleItem] = []
+        let lines = text.replacingOccurrences(of: "\u{feff}", with: "").components(separatedBy: .newlines)
+        for raw in lines {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line.hasPrefix("[") {
+                inEvents = line.lowercased() == "[events]"
+                continue
+            }
+            guard inEvents, let colon = line.firstIndex(of: ":") else { continue }
+            let kind = line[..<colon].lowercased()
+            let body = line[line.index(after: colon)...]
+            if kind == "format" {
+                columns = body.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+                continue
+            }
+            // Comment lines are disabled dialogue; Picture, Sound and Command events carry no text.
+            guard kind == "dialogue",
+                  let startColumn = columns.firstIndex(of: "start"), let endColumn = columns.firstIndex(of: "end"),
+                  let textColumn = columns.firstIndex(of: "text"), textColumn == columns.count - 1 else { continue }
+            // The text is the last column and may itself contain commas.
+            let values = body.split(separator: ",", maxSplits: columns.count - 1, omittingEmptySubsequences: false)
+            guard values.count == columns.count else { continue }
+            guard let start = time(values[startColumn].trimmingCharacters(in: .whitespaces)),
+                  let end = time(values[endColumn].trimmingCharacters(in: .whitespaces)) else {
+                throw SubtitleError.message("error.subtitle.invalidTime")
+            }
+            let cueText = subStationText(String(values[textColumn]))
+            if end > start, !cueText.isEmpty { items.append(SubtitleItem(startMs: start, endMs: end, text: cueText)) }
+        }
+        return try SubtitleDocument(items: items, allowEmpty: allowEmpty)
+    }
+
+    /// Plain text of a Dialogue line: override blocks such as {\i1} or {\pos(…)} removed, \N as a line break,
+    /// \h as a space. Vector drawings ({\p1}…) are not text and come back empty.
+    static func subStationText(_ text: String) -> String {
+        guard text.range(of: #"\{[^}]*\\p[1-9]"#, options: .regularExpression) == nil else { return "" }
+        let plain = text.replacingOccurrences(of: #"\{[^}]*\}"#, with: "", options: .regularExpression)
+            .replacingOccurrences(of: "\\N", with: "\n")
+            .replacingOccurrences(of: "\\n", with: " ")
+            .replacingOccurrences(of: "\\h", with: " ")
+        return plain.components(separatedBy: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }.joined(separator: "\n")
     }
 
     struct TimestampMap: Sendable {
@@ -329,6 +384,8 @@ nonisolated struct SubtitleClock {
 
 nonisolated enum SubtitleFileReader {
     static let maximumBytes = 20 * 1024 * 1024
+    /// Extensions of the subtitle files that can be opened.
+    static let fileExtensions = ["srt", "vtt", "ass", "ssa"]
 
     /// Reads a local .srt/.vtt file, detecting common encodings (BOM, UTF-8, then legacy CJK code pages).
     static func document(at url: URL) throws -> SubtitleDocument {

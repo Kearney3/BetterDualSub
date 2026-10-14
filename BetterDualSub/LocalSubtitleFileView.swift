@@ -12,7 +12,7 @@ struct LocalSubtitleFileView: View {
     @State private var error = ""
     @State private var targeted = false
 
-    private static let types: [UTType] = ["srt", "vtt"].compactMap { UTType(filenameExtension: $0) } + [.plainText]
+    private static let types: [UTType] = SubtitleFileReader.fileExtensions.compactMap { UTType(filenameExtension: $0) } + [.plainText]
 
     var body: some View {
         SettingsPage(descriptionKey: "localFile.description") {
@@ -70,7 +70,7 @@ struct LocalSubtitleFileView: View {
     }
 
     private nonisolated static func isSubtitle(_ url: URL) -> Bool {
-        ["srt", "vtt", "txt"].contains(url.pathExtension.lowercased())
+        (SubtitleFileReader.fileExtensions + ["txt"]).contains(url.pathExtension.lowercased())
     }
 
     private func pick() -> URL? {
