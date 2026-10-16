@@ -1038,6 +1038,12 @@ final class OverlayController: ObservableObject {
             if isAligning { isAligning = false }
             return
         }
+        // Clicking another app while a bar field has focus leaves its field editor in place, so editing never ends on
+        // its own and the panel (which covers the whole screen) would keep taking every click. Finish the edit instead.
+        if isEditing, !window.isKeyWindow {
+            window.makeFirstResponder(nil)
+            isEditing = false
+        }
         if NSEvent.pressedMouseButtons != 0 { return }
         let mouse = NSEvent.mouseLocation
         let inside = hitRects.contains { rect in
