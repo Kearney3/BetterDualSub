@@ -1,6 +1,6 @@
 cask "betterdualsub" do
-  version "1.1.0"
-  sha256 "aff30c03be87dc504b313ef63792dc8ebbe168b772241e1062dec76e6b7773ce"
+  version "1.2.0"
+  sha256 "3c0ca9105c48a00193cd42ab5300a4f7222e177c9d6de57dca8a933b5301280d"
 
   url "https://github.com/Kearney3/BetterDualSub/releases/download/v#{version}/BetterDualSub-v#{version}-arm64.dmg"
   name "BetterDualSub"
