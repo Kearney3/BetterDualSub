@@ -102,7 +102,8 @@ struct ManualControlBar: View {
         .padding(.horizontal, 12).padding(.vertical, 8)
         // Two unlinked tracks each need their own delay controls.
         .frame(width: hasSecondTrack && !manager.linkSecondaryDelay ? 720 : 560)
-        .background(RoundedRectangle(cornerRadius: 10).fill(.black.opacity(0.72)))
+        // Darkened glass keeps the white controls readable over bright video.
+        .glassEffect(.regular.tint(.black.opacity(0.3)), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         // Above the bar, growing upward from a zero-height strip on its top edge, so it never covers a control.
         .overlay(alignment: .top) {
             Color.clear.frame(height: 0)
@@ -111,7 +112,7 @@ struct ManualControlBar: View {
                         Text(verbatim: tip)
                             .font(.system(size: 11)).foregroundStyle(.white)
                             .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.85)))
+                            .glassEffect(.regular.tint(.black.opacity(0.4)), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
                             .frame(maxWidth: 460)
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.bottom, 6)
@@ -120,6 +121,8 @@ struct ManualControlBar: View {
                 .allowsHitTesting(false)
         }
         .onChange(of: overlay.isHovering) { _, hovering in if !hovering { tip = nil } }
+        // The bar always sits over video, so its glass and menus use the dark variant whatever the system appearance.
+        .environment(\.colorScheme, .dark)
     }
 
     private func offsetControl(title: LocalizedStringKey, value: Int, track: String) -> some View {

@@ -44,9 +44,7 @@ struct SettingsCard<Content: View>: View {
 
 extension View {
     func settingsCardBackground() -> some View {
-        background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .strokeBorder(.primary.opacity(0.08), lineWidth: 1))
+        glassEffect(.regular, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 

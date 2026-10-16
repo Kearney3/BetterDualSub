@@ -775,7 +775,8 @@ struct ContentView: View {
                     .font(.system(size: 14, weight: .semibold)).monospacedDigit()
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Capsule().fill(.black.opacity(0.75)))
+                    .glassEffect(.regular.tint(.black.opacity(0.3)), in: Capsule())
+                    .environment(\.colorScheme, .dark)
                     .fixedSize()
                     .offset(y: -40)
                     .transition(.opacity)
@@ -836,8 +837,11 @@ struct ContentView: View {
         .overlay(alignment: .topTrailing) {
             if overlay.isHovering && !overlay.isDragging {
                 Button { OverlayController.setVisible(false) } label: {
-                    Image(systemName: "xmark.circle.fill").font(.system(size: 18))
-                        .symbolRenderingMode(.palette).foregroundStyle(.white, .black.opacity(0.65))
+                    Image(systemName: "xmark").font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 20, height: 20)
+                        .glassEffect(.regular.tint(.black.opacity(0.3)).interactive(), in: Circle())
+                        .environment(\.colorScheme, .dark)
                 }
                 .buttonStyle(.plain)
                 .offset(x: 8, y: -8)
