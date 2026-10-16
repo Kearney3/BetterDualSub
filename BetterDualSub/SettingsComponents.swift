@@ -115,15 +115,9 @@ func showControlCenterPage(_ page: String) {
     NotificationCenter.default.post(name: .navigateToControlCenter, object: nil, userInfo: ["page": page])
 }
 
-/// Delay, speed and linking of the loaded tracks, on Now Playing.
+/// Delay and linking of the loaded tracks, on Now Playing.
 struct SubtitleTimingCard: View {
     @EnvironmentObject private var manager: SubtitleManager
-
-    private var speedText: String {
-        let first = String(format: "×%.4f", manager.primaryScale)
-        guard manager.trackNames.count > 1, manager.secondaryScale != manager.primaryScale else { return first }
-        return first + " / " + String(format: "×%.4f", manager.secondaryScale)
-    }
 
     var body: some View {
         SettingsCard(titleKey: "timing.title") {
@@ -142,17 +136,6 @@ struct SubtitleTimingCard: View {
             }.textFieldStyle(.roundedBorder)
             if manager.trackNames.count > 1 {
                 Toggle("delay.link", isOn: Binding(get: { manager.linkSecondaryDelay }, set: { manager.setLink($0) }))
-            }
-            if manager.primaryScale != 1 || manager.secondaryScale != 1 {
-                HStack {
-                    Text(AppLocalization.format("timing.speed", speedText)).monospacedDigit()
-                    Spacer()
-                    Button("align.speed.reset") {
-                        manager.setSpeed(track: "primary", 1)
-                        manager.setSpeed(track: "secondary", 1)
-                    }
-                    .controlSize(.small)
-                }
             }
             HStack {
                 Button("download.delay.resetPrimary") { manager.adjustDelay(track: "primary", delta: Int.min) }

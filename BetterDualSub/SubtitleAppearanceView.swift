@@ -85,17 +85,26 @@ struct SubtitleTrackStyle {
 
 struct SubtitleAppearanceView: View {
     var body: some View {
-        SettingsPage(descriptionKey: "appearance.description") {
+        // The preview stays pinned above the scrolling settings, so every change shows while it is being made.
+        VStack(spacing: 0) {
             SubtitlePreviewCard()
-            SubtitleWindowCard()
-            SubtitleTrackStyleEditor(secondary: false)
-            SubtitleTrackStyleEditor(secondary: true)
-            HStack {
-                Spacer()
-                Button("appearance.resetAll") {
-                    SubtitleAppearanceDefaults.apply(SubtitleAppearanceDefaults.trackValues(secondary: false)
-                        .merging(SubtitleAppearanceDefaults.trackValues(secondary: true)) { $1 }
-                        .merging(SubtitleAppearanceDefaults.backgroundValues) { $1 })
+                .padding(.horizontal, 28)
+                .padding(.vertical, 16)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+            Divider()
+            SettingsPage(descriptionKey: "appearance.description") {
+                SubtitlePreviewOptionsCard()
+                SubtitleWindowCard()
+                SubtitleTrackStyleEditor(secondary: false)
+                SubtitleTrackStyleEditor(secondary: true)
+                HStack {
+                    Spacer()
+                    Button("appearance.resetAll") {
+                        SubtitleAppearanceDefaults.apply(SubtitleAppearanceDefaults.trackValues(secondary: false)
+                            .merging(SubtitleAppearanceDefaults.trackValues(secondary: true)) { $1 }
+                            .merging(SubtitleAppearanceDefaults.backgroundValues) { $1 })
+                    }
                 }
             }
         }
@@ -158,8 +167,25 @@ private struct SubtitleWindowCard: View {
     }
 }
 
-private struct SubtitlePreviewCard: View {
+/// Whether the overlay shows the sample while no subtitles are loaded.
+private struct SubtitlePreviewOptionsCard: View {
     @AppStorage("showSubtitlePreview") private var showSubtitlePreview = true
+
+    var body: some View {
+        SettingsCard {
+            Toggle("appearance.preview.showWhenEmpty", isOn: $showSubtitlePreview)
+            HStack(alignment: .center) {
+                Text("appearance.preview.hint")
+                    .font(.caption).foregroundStyle(.secondary)
+                Spacer(minLength: 8)
+                Button("menu.openFile") { showControlCenterPage("localFile") }
+            }
+        }
+    }
+}
+
+/// Sample lines of both tracks in the current style, kept in view at the top of the Appearance page.
+private struct SubtitlePreviewCard: View {
     @AppStorage("primaryFontSize") private var primaryFontSize = SubtitleAppearanceDefaults.fontSize(secondary: false)
     @AppStorage("secondaryFontSize") private var secondaryFontSize = SubtitleAppearanceDefaults.fontSize(secondary: true)
     @AppStorage("primaryFontFamily") private var primaryFamily = UserDefaults.standard.string(forKey: "selectedFontFamily") ?? "Helvetica Neue"
@@ -207,16 +233,9 @@ private struct SubtitlePreviewCard: View {
                     .padding(20)
                 }
             }
-            .frame(height: 190)
-            Toggle("appearance.preview.showWhenEmpty", isOn: $showSubtitlePreview)
-            HStack(alignment: .center) {
-                Text("appearance.preview.hint")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                Button("menu.openFile") {
-                    NotificationCenter.default.post(name: .navigateToControlCenter, object: nil, userInfo: ["page": "localFile"])
-                }
-            }
+            .frame(height: 170)
+            // Large fonts must not spill over the settings below.
+            .clipShape(RoundedRectangle(cornerRadius: 14))
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)

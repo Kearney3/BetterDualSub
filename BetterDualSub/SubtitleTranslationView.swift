@@ -13,6 +13,7 @@ struct SubtitleTranslationCard: View {
     @State private var source: Locale.Language?
     /// Set only when a language download is needed; `.translationTask` then offers it.
     @State private var download: TranslationSession.Configuration?
+    @State private var showPreview = false
 
     /// The translator's state, unless it belongs to subtitles that have since been replaced.
     private var phase: SubtitleTranslator.Phase {
@@ -51,6 +52,7 @@ struct SubtitleTranslationCard: View {
             }
         }
         .task(id: manager.loadID) {
+            showPreview = false
             guard let document = manager.primaryDocument else { plan = nil; source = nil; return }
             let plan = SubtitleTranslationPlan(document: document)
             self.plan = plan
@@ -83,7 +85,14 @@ struct SubtitleTranslationCard: View {
             }
         case .finished(let lines, let language):
             StatusLine(text: AppLocalization.format("translate.status.done", lines, language))
-            Button("translate.export", action: export).controlSize(.small)
+            HStack(spacing: 10) {
+                Button(showPreview ? "translate.preview.hide" : "translate.preview.show") { showPreview.toggle() }
+                Button("translate.export", action: export)
+            }
+            .controlSize(.small)
+            if showPreview, let document = translator.result?.document {
+                TranslationPreviewList(translated: document.items, original: manager.primaryDocument?.items ?? [])
+            }
         case .failed(let message):
             StatusLine(text: message, isError: true)
         case .cancelled:
@@ -113,5 +122,36 @@ struct SubtitleTranslationCard: View {
         } catch {
             NSAlert(error: error).runModal()
         }
+    }
+}
+
+/// The translated Track 2, each line above the Track 1 line it came from.
+private struct TranslationPreviewList: View {
+    let translated: [SubtitleItem]
+    let original: [SubtitleItem]
+
+    var body: some View {
+        // Translated cues keep Track 1's timing, so a cue's times find the line it translates.
+        let sources = Dictionary(original.map { ("\($0.startMs)-\($0.endMs)", $0.text) }, uniquingKeysWith: { first, _ in first })
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 2) {
+                ForEach(translated, id: \.self) { cue in
+                    HStack(alignment: .top, spacing: 10) {
+                        Text(verbatim: ManualControlBar.format(cue.startMs)).monospacedDigit().foregroundStyle(.secondary)
+                            .frame(width: 56, alignment: .leading)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(verbatim: cue.text.replacingOccurrences(of: "\n", with: " "))
+                            if let source = sources["\(cue.startMs)-\(cue.endMs)"] {
+                                Text(verbatim: SubtitleTranslationPlan.plainText(source)).font(.callout).foregroundStyle(.secondary)
+                            }
+                        }
+                        .textSelection(.enabled)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, 4).padding(.horizontal, 8)
+                }
+            }
+        }
+        .frame(height: 280)
     }
 }

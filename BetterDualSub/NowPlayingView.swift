@@ -88,7 +88,7 @@ struct NowPlayingView: View {
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
     }
 
-    /// The movie link, the most common source, is the prominent one.
+    /// Your own subtitle file, the first source, is the prominent one.
     @ViewBuilder
     private func sourceButton(_ source: LoadSource) -> some View {
         let button = Button {
@@ -96,7 +96,7 @@ struct NowPlayingView: View {
         } label: {
             Label(LocalizedStringKey(source.titleKey), systemImage: source.symbol)
         }
-        if source == .movie { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.glass) }
+        if source == .file { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.glass) }
     }
 
     /// The control center's name for the Load Subtitles page opened on `source`.

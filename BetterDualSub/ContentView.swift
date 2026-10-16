@@ -116,30 +116,9 @@ class SubtitleManager: ObservableObject {
             updateSub()
         }
     }
-    /// Speed of each track's file relative to the video (see `SubtitleTiming`); 1 unless two-line alignment measured drift.
-    @Published var primaryScale = 1.0 {
-        didSet {
-            let bounded = min(SubtitleTiming.scaleRange.upperBound, max(SubtitleTiming.scaleRange.lowerBound, primaryScale))
-            if primaryScale != bounded { primaryScale = bounded }
-            if linkSecondaryDelay && secondaryScale != primaryScale { secondaryScale = primaryScale }
-            saveOffsets()
-            updateSub()
-        }
-    }
-    @Published var secondaryScale = 1.0 {
-        didSet {
-            let bounded = min(SubtitleTiming.scaleRange.upperBound, max(SubtitleTiming.scaleRange.lowerBound, secondaryScale))
-            if secondaryScale != bounded { secondaryScale = bounded }
-            if linkSecondaryDelay && primaryScale != secondaryScale { primaryScale = secondaryScale }
-            saveOffsets()
-            updateSub()
-        }
-    }
-    /// The first line aligned on each track, kept so that aligning a second line can measure speed. Cleared on load.
-    @Published private(set) var alignPoints: [String: SubtitleTiming.Point] = [:]
     /// The timing saved for this title was restored when it was loaded.
     @Published private(set) var restoredTiming = false
-    /// While on, Track B always has the same delay and speed as Track A (changing either changes both). Persisted by `setLink`.
+    /// While on, Track B always has the same delay as Track A (changing either changes both). Persisted by `setLink`.
     @Published var linkSecondaryDelay = UserDefaults.standard.object(forKey: "linkSecondaryDelay") as? Bool ?? true
     @Published var debugTimeStr = "00:00"
     @Published var loadedTitle = ""
@@ -153,6 +132,8 @@ class SubtitleManager: ObservableObject {
     /// Name of the app whose clock is currently followed, if any.
     @Published var syncedAppName: String?
     @Published private(set) var syncStatus: SyncStatus = .waiting(otherApp: nil)
+    /// Speed the subtitles run at: the followed player's playback speed, or the manual clock's.
+    @Published private(set) var playbackSpeed = 1.0
     /// Changes on every load, so work started for one set of subtitles is not applied to the next.
     @Published private(set) var loadID = UUID()
     /// Brief confirmation shown over the subtitles after an offset change.
@@ -280,6 +261,8 @@ class SubtitleManager: ObservableObject {
     }
 
     private func refreshSyncStatus() {
+        let speed = activeSource == .tv ? tracker.playbackRate : manualSpeed
+        if playbackSpeed != speed { playbackSpeed = speed }
         let status = SyncStatus.current(manualMode: SyncMode.current == .manual, listenerAlive: listenerAlive,
                                         followedApp: activeSource == .tv ? syncedAppName : nil,
                                         playing: tvClock.rate > 0, ignoredApp: tracker.ignoredApp)
@@ -341,8 +324,9 @@ class SubtitleManager: ObservableObject {
         if abs(positionMs - position) >= 100 || (position == 0) != (positionMs == 0) { positionMs = position }
         let formatted = String(format: "%02d:%02d:%02d", position / 3_600_000, position / 60_000 % 60, position / 1000 % 60)
         if debugTimeStr != formatted { debugTimeStr = formatted }
-        let first = primary?.text(at: SubtitleTiming.fileTime(atVideo: position, offsetMs: timeOffsetMs, scale: primaryScale)) ?? ""
-        let second = secondary?.text(at: SubtitleTiming.fileTime(atVideo: position, offsetMs: secondaryOffsetMs, scale: secondaryScale)) ?? ""
+        // The video position already runs at the player's speed, so the subtitles follow it 1:1, minus the delay.
+        let first = primary?.text(at: position - timeOffsetMs) ?? ""
+        let second = secondary?.text(at: position - secondaryOffsetMs) ?? ""
         if currentText != first { currentText = first }
         if secondaryText != second { secondaryText = second }
         refreshSyncStatus()
@@ -358,51 +342,16 @@ class SubtitleManager: ObservableObject {
         activeSource == .tv ? tvClock.position(at: uptime) : manualClock.position(at: uptime)
     }
 
-    enum AlignResult: Equatable {
-        /// Only the delay was set: this was the track's first aligned line, or too close to it to measure speed.
-        case delay(Int)
-        /// Two lines far enough apart set both the speed and the delay.
-        case speed(scale: Double, delay: Int)
-        /// The two lines imply an impossible speed; nothing changed.
-        case implausible(scale: Double)
-    }
-
     /// Times `track` so that `cue` is the line on screen right now (cue at 8:00 while playing at 10:00 -> +2:00).
-    /// A second aligned line at least `SubtitleTiming.minimumSpanMs` away from the first also corrects the speed.
+    /// Returns the new delay. Subtitle time runs 1:1 with video time, so only the delay changes.
     @discardableResult
-    func align(track: String, to cue: SubtitleItem) -> AlignResult {
-        let point = SubtitleTiming.Point(fileMs: cue.startMs, videoMs: currentPositionMs())
-        if let first = alignPoints[track] {
-            switch SubtitleTiming.fit(first, point) {
-            case .fitted(let scale, let offset):
-                setSpeed(track: track, scale)
-                setDelay(track: track, ms: offset)
-                // Keep the first line: later lines measure against it over the longest span.
-                return .speed(scale: scale, delay: offset)
-            case .implausible(let scale):
-                return .implausible(scale: scale)
-            case .tooClose:
-                break
-            }
-        }
-        alignPoints[track] = point
-        setDelay(track: track, ms: SubtitleTiming.offset(for: point, scale: speed(track: track)))
-        return .delay(track == "secondary" ? secondaryOffsetMs : timeOffsetMs)
-    }
-
-    /// Forgets the aligned line of `track`, so the next one starts over.
-    func clearAlignPoint(track: String) {
-        alignPoints[track] = nil
-    }
-
-    func speed(track: String) -> Double { track == "secondary" ? secondaryScale : primaryScale }
-
-    func setSpeed(track: String, _ scale: Double) {
-        if track == "secondary" { secondaryScale = scale } else { primaryScale = scale }
+    func align(track: String, to cue: SubtitleItem) -> Int {
+        setDelay(track: track, ms: currentPositionMs() - cue.startMs)
+        return track == "secondary" ? secondaryOffsetMs : timeOffsetMs
     }
 
     private var documentDurationMs: Int {
-        max(Int(Double(primary?.duration ?? 0) * primaryScale), Int(Double(secondary?.duration ?? 0) * secondaryScale))
+        max(primary?.duration ?? 0, secondary?.duration ?? 0)
     }
 
     func togglePlay() {
@@ -490,25 +439,19 @@ class SubtitleManager: ObservableObject {
         let saved = title.isEmpty ? SavedTiming() : timingStore.load(title: title)
         timeOffsetMs = saved.primaryOffsetMs
         secondaryOffsetMs = linkSecondaryDelay ? saved.primaryOffsetMs : saved.secondaryOffsetMs
-        primaryScale = saved.primaryScale
-        secondaryScale = linkSecondaryDelay ? primaryScale : saved.secondaryScale
-        alignPoints = [:]
         timingTitle = title.isEmpty ? nil : title
-        restoredTiming = timeOffsetMs != 0 || secondaryOffsetMs != 0 || primaryScale != 1 || secondaryScale != 1
+        restoredTiming = timeOffsetMs != 0 || secondaryOffsetMs != 0
         // Loading subtitles means the user wants to see them, even if the window was hidden earlier.
         if !OverlayController.isVisible { OverlayController.setVisible(true) }
         updateSub()
         if restoredTiming { showToast(AppLocalization.format("timing.restored.toast", timingSummary), seconds: 3) }
     }
 
-    /// Delay and speed of each track, such as "+1200 ms · ×1.0427" or, for different tracks, both joined by " / ".
+    /// Delay of each track, such as "+1200 ms" or, for different tracks, both joined by " / ".
     var timingSummary: String {
-        func summary(_ offset: Int, _ scale: Double) -> String {
-            String(format: "%+d ms", offset) + (scale == 1 ? "" : String(format: " · ×%.4f", scale))
-        }
-        let first = summary(timeOffsetMs, primaryScale)
-        guard secondary != nil, secondaryOffsetMs != timeOffsetMs || secondaryScale != primaryScale else { return first }
-        return first + " / " + summary(secondaryOffsetMs, secondaryScale)
+        let first = String(format: "%+d ms", timeOffsetMs)
+        guard secondary != nil, secondaryOffsetMs != timeOffsetMs else { return first }
+        return first + " / " + String(format: "%+d ms", secondaryOffsetMs)
     }
 
     /// The loaded Track 1, as the source for a translated Track 2.
@@ -521,14 +464,12 @@ class SubtitleManager: ObservableObject {
         trackNames = [trackNames[0], name]
         durationMs = max(durationMs, documentDurationMs)
         secondaryOffsetMs = timeOffsetMs
-        secondaryScale = primaryScale
         updateSub()
     }
 
     private func saveOffsets() {
         guard let title = timingTitle else { return }
-        timingStore.save(SavedTiming(primaryOffsetMs: timeOffsetMs, secondaryOffsetMs: secondaryOffsetMs,
-                                     primaryScale: primaryScale, secondaryScale: secondaryScale), title: title)
+        timingStore.save(SavedTiming(primaryOffsetMs: timeOffsetMs, secondaryOffsetMs: secondaryOffsetMs), title: title)
     }
 
     func adjustDelay(track: String, delta: Int) {
@@ -558,7 +499,7 @@ class SubtitleManager: ObservableObject {
     func setLink(_ on: Bool) {
         UserDefaults.standard.set(on, forKey: "linkSecondaryDelay")
         linkSecondaryDelay = on
-        if on { secondaryOffsetMs = timeOffsetMs; secondaryScale = primaryScale }
+        if on { secondaryOffsetMs = timeOffsetMs }
     }
 
     /// For loaders that supply a file-level delay and an extra delay for Track B (B = A + extra).
@@ -815,7 +756,7 @@ struct ContentView: View {
 
     /// Control bar (manual mode, on hover) above the subtitle text; the whole stack is the hover region.
     private var bubble: some View {
-        let showBar = !subManager.trackNames.isEmpty && (overlay.isHovering || overlay.isDragging || overlay.isEditing)
+        let showBar = !subManager.trackNames.isEmpty && (overlay.isHovering || overlay.isDragging || overlay.isEditing || overlay.isAligning)
         return VStack(spacing: 6) {
             if showBar {
                 ManualControlBar(manager: subManager)
@@ -1027,6 +968,8 @@ final class OverlayController: ObservableObject {
     @Published var isDragging = false
     /// A text field in the control bar has focus; keep the bar open and the panel interactive.
     @Published var isEditing = false
+    /// The line-alignment panel is open: the bar stays up until it is closed, but only takes the mouse while pointed at.
+    @Published var isAligning = false
     var hitRects: [CGRect] = []
     /// With no real cue on screen the subtitle box is just an empty frame; only capture the mouse once the pointer rests in it.
     var needsDwell = false
@@ -1047,6 +990,7 @@ final class OverlayController: ObservableObject {
         UserDefaults.standard.set(locked, forKey: lockedKey)
         NotificationCenter.default.post(name: .subtitleDisplayChanged, object: nil)
         shared.isHovering = false
+        if locked { shared.isAligning = false }
         SubtitleManager.shared.showToast(AppLocalization.string(locked ? "overlay.locked.toast" : "overlay.unlocked.toast"))
     }
 
@@ -1087,6 +1031,7 @@ final class OverlayController: ObservableObject {
             if !window.ignoresMouseEvents { window.ignoresMouseEvents = true }
             if isHovering { isHovering = false }
             if isEditing { isEditing = false }
+            if isAligning { isAligning = false }
             return
         }
         if NSEvent.pressedMouseButtons != 0 { return }
@@ -1097,7 +1042,7 @@ final class OverlayController: ObservableObject {
         }
         let now = ProcessInfo.processInfo.systemUptime
         var active = inside
-        if inside, needsDwell, !isHovering, !isEditing {
+        if inside, needsDwell, !isHovering, !isEditing, !isAligning {
             if enteredAt == nil { enteredAt = now }
             active = now - (enteredAt ?? now) >= 0.35
         } else if !inside {

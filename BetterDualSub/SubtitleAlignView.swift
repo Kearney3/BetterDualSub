@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// Aligns a track by picking a cue: if the line that appeared at 8:00 in the file is being spoken now (10:00),
-/// the delay becomes +2:00. Aligning a second line later in the video also corrects the track's speed.
+/// the delay becomes +2:00. Subtitle time runs 1:1 with video time, at whatever speed the video plays.
 struct SubtitleAlignView: View {
     @EnvironmentObject private var manager: SubtitleManager
     @State private var track = "primary"
@@ -25,6 +25,8 @@ struct SubtitleAlignView: View {
                     HStack {
                         Text("align.now")
                         Text(verbatim: ManualControlBar.format(manager.positionMs)).monospacedDigit().font(.title3.weight(.semibold))
+                        Text(AppLocalization.format("playback.speed", ManualControlBar.speedLabel(manager.playbackSpeed)))
+                            .monospacedDigit().foregroundStyle(.secondary)
                         Spacer()
                         if manager.cues(track: "secondary").isEmpty == false {
                             Picker("align.track", selection: $track) {
@@ -55,7 +57,7 @@ struct SubtitleAlignView: View {
                     HStack {
                         Button("align.apply") {
                             guard let selected else { return }
-                            result = Self.message(for: manager.align(track: track, to: selected))
+                            result = Self.message(forDelay: manager.align(track: track, to: selected))
                         }
                         .buttonStyle(.borderedProminent)
                         .disabled(selected == nil)
@@ -63,45 +65,13 @@ struct SubtitleAlignView: View {
                     }
                     SettingsHint(key: "align.hint")
                 }
-                SettingsCard(titleKey: "align.speed.title") {
-                    if let point = manager.alignPoints[track] {
-                        HStack(alignment: .firstTextBaseline) {
-                            Text(AppLocalization.format("align.point.first", ManualControlBar.format(point.fileMs),
-                                                        ManualControlBar.format(point.videoMs)))
-                                .fixedSize(horizontal: false, vertical: true)
-                            Spacer()
-                            Button("align.point.clear") { manager.clearAlignPoint(track: track); result = "" }
-                                .controlSize(.small)
-                        }
-                    } else {
-                        Text("align.point.none").foregroundStyle(.secondary)
-                    }
-                    let speed = manager.speed(track: track)
-                    HStack {
-                        Text(AppLocalization.format("align.speed.value", String(format: "%.4f", speed))).monospacedDigit()
-                        Spacer()
-                        Button("align.speed.reset") { manager.setSpeed(track: track, 1) }
-                            .controlSize(.small)
-                            .disabled(speed == 1)
-                    }
-                    SettingsHint(key: "align.speed.help")
-                }
             }
         }
         .onChange(of: track) { _, _ in selected = nil; result = "" }
         .onChange(of: manager.loadID) { _, _ in selected = nil; result = "" }
     }
 
-    private static func message(for result: SubtitleManager.AlignResult) -> String {
-        switch result {
-        case .delay(let delay):
-            AppLocalization.format("align.result", String(format: "%+d ms", delay))
-        case .speed(let scale, let delay) where scale == 1:
-            AppLocalization.format("align.result.noDrift", String(format: "%+d ms", delay))
-        case .speed(let scale, let delay):
-            AppLocalization.format("align.result.speed", String(format: "%.4f", scale), String(format: "%+d ms", delay))
-        case .implausible(let scale):
-            AppLocalization.format("align.error.speed", String(format: "%.3f", scale))
-        }
+    static func message(forDelay delay: Int) -> String {
+        AppLocalization.format("align.result", String(format: "%+d ms", delay))
     }
 }

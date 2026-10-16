@@ -16,6 +16,9 @@
     "0" : {
       "shouldTranslate" : false
     },
+    "1000" : {
+      "shouldTranslate" : false
+    },
     "250" : {
       "shouldTranslate" : false
     },
@@ -42,30 +45,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Pick a line from either track and apply it while that line is being spoken; the delay is set automatically. Align a second line later on to correct speed drift too."
+            "value" : "Pick a line from either track and apply it while that line is being spoken; the delay is set automatically. Subtitles then play 1:1 with the video, at whatever speed it plays."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "在某句台词正在播放时，从任一轨道选中同一句字幕并应用，延迟会自动算出。之后再对齐后段的一句，还能校正速度偏差。"
-          }
-        }
-      }
-    },
-    "align.error.speed" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "These two lines give a speed of ×%@, which is not plausible; one of them is probably the wrong line. Nothing changed."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "这两句算出的速度为 ×%@，不合理，可能选错了台词；未作更改。"
+            "value" : "在某句台词正在播放时，从任一轨道选中同一句字幕并应用，延迟会自动算出。之后字幕与视频按 1:1 同步，视频几倍速，字幕就几倍速。"
           }
         }
       }
@@ -121,57 +107,6 @@
         }
       }
     },
-    "align.point.clear" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Start Over"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重新开始"
-          }
-        }
-      }
-    },
-    "align.point.first" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "First aligned line: file %1$@ → video %2$@. Align another line at least 30 seconds later to correct the speed as well."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已对齐第一句：文件 %1$@ → 视频 %2$@。播放到至少 30 秒之后再对齐一句，可同时校正速度。"
-          }
-        }
-      }
-    },
-    "align.point.none" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No line aligned on this track yet."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "此轨道尚未对齐台词。"
-          }
-        }
-      }
-    },
     "align.result" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -189,40 +124,6 @@
         }
       }
     },
-    "align.result.noDrift" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "No speed drift between the two lines; delay set to %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "两句之间没有速度偏差；延迟已设为 %@"
-          }
-        }
-      }
-    },
-    "align.result.speed" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speed corrected to ×%1$@, delay set to %2$@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "已校正速度 ×%1$@，延迟设为 %2$@"
-          }
-        }
-      }
-    },
     "align.search" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -236,74 +137,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "搜索字幕"
-          }
-        }
-      }
-    },
-    "align.speed.help" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "If subtitles drift further off as the video plays (often a file made for another frame rate), align one line near the start and another much later; the speed is then corrected automatically."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "如果字幕越往后偏得越多（常见于帧率不同的字幕文件），在开头和后段各对齐一句，速度就会自动校正。"
-          }
-        }
-      }
-    },
-    "align.speed.reset" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reset Speed"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "重置速度"
-          }
-        }
-      }
-    },
-    "align.speed.title" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speed"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "速度校正"
-          }
-        }
-      }
-    },
-    "align.speed.value" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speed ×%@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "速度 ×%@"
           }
         }
       }
@@ -872,6 +705,193 @@
         }
       }
     },
+    "bar.back10" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Back 10 seconds"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "后退 10 秒"
+          }
+        }
+      }
+    },
+    "bar.close" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Close"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
+    },
+    "bar.delay.earlier" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show subtitles %@ earlier"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕提前 %@"
+          }
+        }
+      }
+    },
+    "bar.delay.field" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Type a delay such as 250, -1500 or 1.5s, then press Return"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "输入延迟，如 250、-1500 或 1.5s，按回车生效"
+          }
+        }
+      }
+    },
+    "bar.delay.later" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Show subtitles %@ later"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕延后 %@"
+          }
+        }
+      }
+    },
+    "bar.delay.reset" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset the delay to 0"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "延迟归零"
+          }
+        }
+      }
+    },
+    "bar.forward10" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Forward 10 seconds"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "前进 10 秒"
+          }
+        }
+      }
+    },
+    "bar.manualSpeed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback speed of the manual clock"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "手动播放倍速"
+          }
+        }
+      }
+    },
+    "bar.pause" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pause"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "暂停"
+          }
+        }
+      }
+    },
+    "bar.play" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Play"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放"
+          }
+        }
+      }
+    },
+    "bar.seek" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drag to jump to another position"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "拖动跳转播放位置"
+          }
+        }
+      }
+    },
     "BetterDualSub" : {
       "shouldTranslate" : false
     },
@@ -989,6 +1009,7 @@
       }
     },
     "common.loaded.title" : {
+      "extractionState" : "stale",
       "localizations" : {
         "en" : {
           "stringUnit" : {
@@ -2678,13 +2699,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Download subtitles from an Apple TV movie link, extract them from a .movpkg, or open your own .srt / .vtt / .ass / .ssa file."
+            "value" : "Open your own .srt / .vtt / .ass / .ssa file, extract subtitles from a .movpkg, or download them from an Apple TV movie link."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从 Apple TV 电影链接下载字幕、从 .movpkg 提取，或直接打开你自己的 .srt / .vtt / .ass / .ssa 文件。"
+            "value" : "直接打开你自己的 .srt / .vtt / .ass / .ssa 文件、从 .movpkg 提取，或从 Apple TV 电影链接下载字幕。"
           }
         }
       }
@@ -4488,6 +4509,23 @@
         }
       }
     },
+    "playback.speed" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speed %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "倍速 %@"
+          }
+        }
+      }
+    },
     "shortcuts.action.manualBack" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4703,6 +4741,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "组合键至少需要包含一个修饰键。若与已有组合键重复，不会保存。"
+          }
+        }
+      }
+    },
+    "shortcuts.largeStep.title" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Large step in the subtitle window"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕窗口大步长"
           }
         }
       }
@@ -4988,6 +5042,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放同步"
+          }
+        }
+      }
+    },
+    "sync.playerRate.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback speed reported by the player. Subtitles play at the same speed."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放器报告的播放倍速，字幕按相同倍速播放。"
           }
         }
       }
@@ -5298,23 +5369,6 @@
         }
       }
     },
-    "timing.speed" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Speed %@"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "速度 %@"
-          }
-        }
-      }
-    },
     "timing.title" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5532,6 +5586,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用 macOS 端侧翻译，由第一轨生成第二轨，字幕内容不会离开这台 Mac。部分语言首次使用需下载语言包。"
+          }
+        }
+      }
+    },
+    "translate.preview.hide" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hide Preview"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "隐藏预览"
+          }
+        }
+      }
+    },
+    "translate.preview.show" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Preview Track 2"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "预览 2 轨字幕"
           }
         }
       }

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Where subtitles are loaded from; each source has its own panel on the Load Subtitles page.
 enum LoadSource: String, CaseIterable, Identifiable {
-    case movie, episode, file
+    case file, episode, movie
 
     static let storageKey = "loadSource"
     var id: String { rawValue }

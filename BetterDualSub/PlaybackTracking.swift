@@ -72,6 +72,8 @@ nonisolated struct PlaybackTracker: Sendable {
     private(set) var ignoredApp: SyncApp?
     /// Length of the followed media, when the player reports it.
     private(set) var durationMs: Int?
+    /// Playback speed the player is set to, kept while paused (the clock's own rate is 0 then).
+    private(set) var playbackRate = 1.0
 
     /// Takes a report, or nil when nothing is playing. Returns false when the report gives no usable position for
     /// `target` (a bundle identifier or `anyApp`); the caller then calls `invalidate()` once it has read the clock.
@@ -90,7 +92,9 @@ nonisolated struct PlaybackTracker: Sendable {
         }
         let reportedRate = report.playbackRate ?? 0
         let rate = reportedRate > 0 ? reportedRate : 1
-        let newRate = report.playing && rate.isFinite && rate <= 16 ? rate : 0
+        let validRate = rate.isFinite && rate <= 16
+        let newRate = report.playing && validRate ? rate : 0
+        if validRate { playbackRate = rate }
         // Small differences are jitter: keep most of the extrapolated position so subtitles do not flicker.
         let expected = clock.valid ? Double(clock.position(at: uptime)) : -.infinity
         if abs(expected - elapsed * 1000) < Self.jitterMs && clock.rate == newRate {
@@ -122,18 +126,17 @@ nonisolated struct PlaybackTracker: Sendable {
     }
 }
 
-/// Delays and speeds of both tracks, as saved per title.
+/// Delays of both tracks, as saved per title.
 nonisolated struct SavedTiming: Equatable, Sendable {
     var primaryOffsetMs = 0
     var secondaryOffsetMs = 0
-    var primaryScale = 1.0
-    var secondaryScale = 1.0
 
     var isDefault: Bool { self == SavedTiming() }
 }
 
 /// Saves timing per title in user defaults: delays under "offsets.<title>" as [A, B, 0] (older versions wrote
-/// [A, extra] with B = A + extra) and speeds under "speeds.<title>" as [A, B]. Defaults are not stored.
+/// [A, extra] with B = A + extra). Defaults are not stored. Subtitle time maps 1:1 to video time, so the timeline speeds
+/// older versions stored under "speeds.<title>" are ignored and removed on the next save.
 nonisolated struct SubtitleTimingStore {
     let defaults: UserDefaults
 
@@ -142,10 +145,6 @@ nonisolated struct SubtitleTimingStore {
         if let offsets = defaults.array(forKey: "offsets." + title) as? [Int], let first = offsets.first {
             timing.primaryOffsetMs = first
             timing.secondaryOffsetMs = offsets.count > 2 ? offsets[1] : first + (offsets.count > 1 ? offsets[1] : 0)
-        }
-        if let speeds = defaults.array(forKey: "speeds." + title) as? [Double], let first = speeds.first {
-            timing.primaryScale = first
-            timing.secondaryScale = speeds.count > 1 ? speeds[1] : 1
         }
         return timing
     }
@@ -156,10 +155,6 @@ nonisolated struct SubtitleTimingStore {
         } else {
             defaults.set([timing.primaryOffsetMs, timing.secondaryOffsetMs, 0], forKey: "offsets." + title)
         }
-        if timing.primaryScale == 1 && timing.secondaryScale == 1 {
-            defaults.removeObject(forKey: "speeds." + title)
-        } else {
-            defaults.set([timing.primaryScale, timing.secondaryScale], forKey: "speeds." + title)
-        }
+        defaults.removeObject(forKey: "speeds." + title)
     }
 }

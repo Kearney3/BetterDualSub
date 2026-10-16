@@ -63,6 +63,12 @@ enum SubtitleDelayStep {
         guard let stored = UserDefaults.standard.object(forKey: "subtitleDelayStepMs") as? Int else { return 250 }
         return min(60_000, max(1, stored))
     }
+
+    /// Coarse step offered next to the fine one in the subtitle overlay.
+    static var largeMilliseconds: Int {
+        guard let stored = UserDefaults.standard.object(forKey: "subtitleDelayLargeStepMs") as? Int else { return 1000 }
+        return min(60_000, max(1, stored))
+    }
 }
 
 struct ShortcutChord: Equatable {
@@ -128,10 +134,12 @@ enum SubtitleShortcutPreferences {
 
 struct ShortcutSettingsView: View {
     @AppStorage("subtitleDelayStepMs") private var delayStepMs = 250
+    @AppStorage("subtitleDelayLargeStepMs") private var largeStepMs = 1000
     @State private var recordingAction: Int?
     @State private var chords = Dictionary(uniqueKeysWithValues: SubtitleShortcutAction.allCases.map { ($0.id, SubtitleShortcutPreferences.chord(for: $0.id)) })
     @State private var message = ""
     @State private var delayStepText = ""
+    @State private var largeStepText = ""
 
     var body: some View {
         SettingsPage(descriptionKey: "shortcuts.description") {
@@ -144,6 +152,15 @@ struct ShortcutSettingsView: View {
                                 .frame(width: 100)
                                 .textFieldStyle(.roundedBorder)
                                 .onSubmit(saveDelayStep)
+                            Text("common.unit.ms").foregroundStyle(.secondary)
+                        }
+                        HStack {
+                            Text("shortcuts.largeStep.title")
+                            Spacer()
+                            TextField("1000", text: $largeStepText)
+                                .frame(width: 100)
+                                .textFieldStyle(.roundedBorder)
+                                .onSubmit(saveLargeStep)
                             Text("common.unit.ms").foregroundStyle(.secondary)
                         }
                         Text("shortcuts.step.help")
@@ -168,7 +185,11 @@ struct ShortcutSettingsView: View {
                 }
                 SettingsHint(key: "shortcuts.help")
         }
-        .onAppear { delayStepText = String(delayStepMs) }
+        .onAppear { delayStepText = String(delayStepMs); largeStepText = String(largeStepMs) }
+        .onChange(of: largeStepText) { _, text in
+            guard let value = Int(text), (1...60_000).contains(value), value != largeStepMs else { return }
+            largeStepMs = value
+        }
         .onChange(of: delayStepText) { _, text in
             guard let value = Int(text), (1...60_000).contains(value), value != delayStepMs else { return }
             delayStepMs = value
@@ -235,6 +256,11 @@ struct ShortcutSettingsView: View {
         delayStepMs = min(60_000, max(1, value))
         delayStepText = String(delayStepMs)
         NotificationCenter.default.post(name: .subtitleDelayStepChanged, object: nil)
+    }
+
+    private func saveLargeStep() {
+        largeStepMs = min(60_000, max(1, Int(largeStepText) ?? largeStepMs))
+        largeStepText = String(largeStepMs)
     }
 
     private func resetBothTracks() {

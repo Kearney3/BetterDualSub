@@ -14,7 +14,7 @@ The Apple TV app on the Mac shows one subtitle language at a time and cannot loa
 - **Two tracks at once**, each with its own font, color, outline and line layout.
 - **Follows playback** of the Apple TV app, or of any other player that reports Now Playing (IINA, VLC, QuickTime Player, browsers…), including pauses, seeks and playback speed. A manual clock takes over when nothing is playing.
 - **Visible sync status** in the menu bar, on the overlay and in the app, with a one-click fix when subtitles are not following the right player.
-- **Timing tools**: per-track delays, global shortcuts, alignment by picking the line you hear, and automatic speed correction for files made for another frame rate. Timing is remembered per title.
+- **Timing tools**: per-track delays, global shortcuts, and alignment by picking the line you hear. Timing is remembered per title.
 - **On-device translation**: create a second language from the first with macOS translation. Subtitle text never leaves your Mac.
 - **Bilingual export**: merge two subtitle files into one bilingual SRT.
 - Interface in English and Simplified Chinese.
@@ -91,9 +91,9 @@ Choose which player to follow under **General** › **Sync source**.
 ### Timing
 
 - **Delay**: positive values show subtitles later. Set them on **Now Playing**, on the overlay's control bar or with shortcuts. Track 2 follows Track 1 unless you unlink them.
-- **Align by Line**: while a line is being spoken, select it in the list and click **Align to current time**; the delay is calculated for you.
-- **Speed correction**: if subtitles drift further off as the movie plays, align a second line at least 30 seconds after the first. BetterDualSub then corrects the speed as well, for example ×1.0427 for a 23.976 fps file played at 25 fps.
-- Delays and speed are saved per title and restored, with a notice, the next time you load it.
+- **Align by Line**: while a line is being spoken, select it in the list and click **Align to current time**; the delay is calculated for you. It also works from the overlay: click the target button on its control bar.
+- **Playback speed**: subtitle time runs 1:1 with video time. At 2× the video and the subtitles both move two seconds per second; the overlay shows the player's speed.
+- Delays are saved per title and restored, with a notice, the next time you load it.
 
 ### Translating a second language
 
@@ -151,7 +151,7 @@ Check the sync status on **Now Playing** or in the menu bar. If it names another
 <details>
 <summary>The subtitles get further off as the movie goes on</summary>
 
-The file was made for another frame rate. Use **Align by Line** on one line near the start and another much later; the speed is corrected automatically.
+The file was made for another frame rate or a different cut of the movie. BetterDualSub keeps subtitle time 1:1 with video time, so download a subtitle file that matches your version.
 </details>
 
 <details>

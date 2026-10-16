@@ -31,6 +31,18 @@ final class PlaybackTrackingTests: XCTestCase {
         XCTAssertEqual(tracker.clock.rate, 1)
     }
 
+    func testSubtitlesRunAtThePlayersSpeed() {
+        var tracker = PlaybackTracker()
+        // At 2× two seconds of video, and of subtitles, pass in one second.
+        XCTAssertTrue(tracker.receive(report(elapsed: 100, rate: 2), target: tv, uptime: 0, epoch: 0))
+        XCTAssertEqual(tracker.clock.position(at: 1), 102_000)
+        XCTAssertEqual(tracker.playbackRate, 2)
+        // Paused at 1.25×: the clock stops but the player's speed is still known.
+        XCTAssertTrue(tracker.receive(report(elapsed: 103, rate: 1.25, playing: false), target: tv, uptime: 2, epoch: 0))
+        XCTAssertEqual(tracker.clock.position(at: 5), 103_000)
+        XCTAssertEqual(tracker.playbackRate, 1.25)
+    }
+
     func testSmallDifferencesAreSmoothedAndLargeOnesAreSeeks() {
         var tracker = PlaybackTracker()
         _ = tracker.receive(report(elapsed: 10), target: tv, uptime: 0, epoch: 0)
@@ -89,9 +101,13 @@ final class PlaybackTrackingTests: XCTestCase {
         let store = SubtitleTimingStore(defaults: defaults)
 
         XCTAssertTrue(store.load(title: "Movie").isDefault)
-        let timing = SavedTiming(primaryOffsetMs: 1200, secondaryOffsetMs: 800, primaryScale: 25 / 23.976, secondaryScale: 1)
+        let timing = SavedTiming(primaryOffsetMs: 1200, secondaryOffsetMs: 800)
+        defaults.set([1.0427, 1], forKey: "speeds.Movie")
+        // Old timeline speeds are ignored and dropped.
+        XCTAssertTrue(store.load(title: "Movie").isDefault)
         store.save(timing, title: "Movie")
         XCTAssertEqual(store.load(title: "Movie"), timing)
+        XCTAssertNil(defaults.object(forKey: "speeds.Movie"))
 
         store.save(SavedTiming(), title: "Movie")
         XCTAssertNil(defaults.object(forKey: "offsets.Movie"))
