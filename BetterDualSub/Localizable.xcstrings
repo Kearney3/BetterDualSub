@@ -4729,6 +4729,54 @@
         }
       }
     },
+    "shortcuts.disableOne" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Turn off this shortcut"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭此快捷键"
+          }
+        }
+      }
+    },
+    "shortcuts.enabled" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enable global shortcuts"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "启用全局快捷键"
+          }
+        }
+      }
+    },
+    "shortcuts.enabled.help" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When off, none of the shortcuts below respond, so they won’t clash with other apps."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭后下方所有快捷键都不再响应，避免与其他应用冲突。"
+          }
+        }
+      }
+    },
     "shortcuts.help" : {
       "localizations" : {
         "en" : {
@@ -4774,6 +4822,22 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "请同时按下 Control、Option、Shift 或 Command。"
+          }
+        }
+      }
+    },
+    "shortcuts.off" : {
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已关闭"
           }
         }
       }

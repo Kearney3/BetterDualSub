@@ -107,6 +107,20 @@ struct ShortcutChord: Equatable {
 }
 
 enum SubtitleShortcutPreferences {
+    static let enabledKey = "subtitleShortcutsEnabled"
+
+    /// Master switch for every global shortcut.
+    static var isEnabled: Bool { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true }
+
+    static func isDisabled(_ action: Int) -> Bool {
+        UserDefaults.standard.bool(forKey: "subtitleShortcut.\(action).disabled")
+    }
+
+    static func disable(_ action: Int) {
+        UserDefaults.standard.set(true, forKey: "subtitleShortcut.\(action).disabled")
+        NotificationCenter.default.post(name: .subtitleShortcutsChanged, object: nil)
+    }
+
     static func chord(for action: Int) -> ShortcutChord {
         let command = SubtitleShortcutAction(rawValue: action) ?? .primaryEarlier
         let defaults = UserDefaults.standard
@@ -120,6 +134,7 @@ enum SubtitleShortcutPreferences {
     static func save(_ chord: ShortcutChord, for action: Int) {
         UserDefaults.standard.set(Int(chord.keyCode), forKey: "subtitleShortcut.\(action).keyCode")
         UserDefaults.standard.set(Int(chord.modifiers), forKey: "subtitleShortcut.\(action).modifiers")
+        UserDefaults.standard.removeObject(forKey: "subtitleShortcut.\(action).disabled")
         NotificationCenter.default.post(name: .subtitleShortcutsChanged, object: nil)
     }
 
@@ -127,6 +142,7 @@ enum SubtitleShortcutPreferences {
         for action in SubtitleShortcutAction.allCases {
             UserDefaults.standard.removeObject(forKey: "subtitleShortcut.\(action.id).keyCode")
             UserDefaults.standard.removeObject(forKey: "subtitleShortcut.\(action.id).modifiers")
+            UserDefaults.standard.removeObject(forKey: "subtitleShortcut.\(action.id).disabled")
         }
         NotificationCenter.default.post(name: .subtitleShortcutsChanged, object: nil)
     }
@@ -135,6 +151,8 @@ enum SubtitleShortcutPreferences {
 struct ShortcutSettingsView: View {
     @AppStorage("subtitleDelayStepMs") private var delayStepMs = 250
     @AppStorage("subtitleDelayLargeStepMs") private var largeStepMs = 1000
+    @AppStorage(SubtitleShortcutPreferences.enabledKey) private var shortcutsEnabled = true
+    @State private var disabledActions = Set(SubtitleShortcutAction.allCases.map(\.id).filter(SubtitleShortcutPreferences.isDisabled))
     @State private var recordingAction: Int?
     @State private var chords = Dictionary(uniqueKeysWithValues: SubtitleShortcutAction.allCases.map { ($0.id, SubtitleShortcutPreferences.chord(for: $0.id)) })
     @State private var message = ""
@@ -143,6 +161,11 @@ struct ShortcutSettingsView: View {
 
     var body: some View {
         SettingsPage(descriptionKey: "shortcuts.description") {
+                SettingsCard {
+                    SettingsRow(symbol: "keyboard", tint: .blue, titleKey: "shortcuts.enabled", subtitleKey: "shortcuts.enabled.help") {
+                        Toggle("shortcuts.enabled", isOn: $shortcutsEnabled).labelsHidden().toggleStyle(.switch)
+                    }
+                }
                 VStack(spacing: 0) {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -172,6 +195,8 @@ struct ShortcutSettingsView: View {
                     Divider()
                     ForEach(SubtitleShortcutAction.allCases) { action in
                         shortcutRow(action)
+                            .disabled(!shortcutsEnabled)
+                            .opacity(shortcutsEnabled ? 1 : 0.5)
                         if action != SubtitleShortcutAction.allCases.last { Divider() }
                     }
                 }
@@ -184,6 +209,10 @@ struct ShortcutSettingsView: View {
                     }
                 }
                 SettingsHint(key: "shortcuts.help")
+        }
+        .onChange(of: shortcutsEnabled) { _, _ in
+            recordingAction = nil
+            NotificationCenter.default.post(name: .subtitleShortcutsChanged, object: nil)
         }
         .onAppear { delayStepText = String(delayStepMs); largeStepText = String(largeStepMs) }
         .onChange(of: largeStepText) { _, text in
@@ -206,7 +235,18 @@ struct ShortcutSettingsView: View {
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
-            Button(recordingAction == action.id ? AppLocalization.string("shortcuts.recording") : chords[action.id]?.displayName ?? "") {
+            if !disabledActions.contains(action.id), recordingAction != action.id {
+                Button {
+                    SubtitleShortcutPreferences.disable(action.id)
+                    disabledActions.insert(action.id)
+                    message = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .help(AppLocalization.string("shortcuts.disableOne"))
+            }
+            Button(buttonTitle(for: action)) {
                 message = ""
                 recordingAction = action.id
             }
@@ -224,18 +264,25 @@ struct ShortcutSettingsView: View {
         .padding(.vertical, 15)
     }
 
+    private func buttonTitle(for action: SubtitleShortcutAction) -> String {
+        if recordingAction == action.id { return AppLocalization.string("shortcuts.recording") }
+        if disabledActions.contains(action.id) { return AppLocalization.string("shortcuts.off") }
+        return chords[action.id]?.displayName ?? ""
+    }
+
     private func capture(keyCode: UInt16, modifiers: UInt32, for action: SubtitleShortcutAction) {
         guard modifiers != 0 else {
             message = AppLocalization.string("shortcuts.needModifier")
             return
         }
         let chord = ShortcutChord(keyCode: keyCode, modifiers: modifiers)
-        if let conflict = chords.first(where: { $0.key != action.id && $0.value == chord }) {
+        if let conflict = chords.first(where: { $0.key != action.id && !disabledActions.contains($0.key) && $0.value == chord }) {
             let title = SubtitleShortcutAction(rawValue: conflict.key)?.titleKey ?? ""
             message = AppLocalization.format("shortcuts.conflict", AppLocalization.string(title))
             return
         }
         chords[action.id] = chord
+        disabledActions.remove(action.id)
         SubtitleShortcutPreferences.save(chord, for: action.id)
         recordingAction = nil
         message = AppLocalization.string("shortcuts.saved")
@@ -244,6 +291,7 @@ struct ShortcutSettingsView: View {
     private func reset() {
         SubtitleShortcutPreferences.reset()
         chords = Dictionary(uniqueKeysWithValues: SubtitleShortcutAction.allCases.map { ($0.id, SubtitleShortcutPreferences.chord(for: $0.id)) })
+        disabledActions.removeAll()
         recordingAction = nil
         message = AppLocalization.string("shortcuts.restored")
     }

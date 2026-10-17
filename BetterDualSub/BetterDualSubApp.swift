@@ -403,10 +403,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func registerDelayHotKeys() {
         hotKeys.forEach { UnregisterEventHotKey($0) }
         hotKeys.removeAll()
-        guard hotKeyHandler != nil else { return }
+        guard hotKeyHandler != nil, SubtitleShortcutPreferences.isEnabled else { return }
 
         var registered = Set<String>()
-        for action in SubtitleShortcutAction.allCases {
+        for action in SubtitleShortcutAction.allCases where !SubtitleShortcutPreferences.isDisabled(action.id) {
             let chord = SubtitleShortcutPreferences.chord(for: action.id)
             guard registered.insert("\(chord.keyCode):\(chord.modifiers)").inserted else { continue }
             let identifier = EventHotKeyID(signature: OSType(0x45585355), id: UInt32(action.id))
