@@ -54,6 +54,15 @@ struct SyncStatusDetail: View {
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 action(for: status).controlSize(.small).padding(.top, 2)
+                if !manager.trackNames.isEmpty {
+                    Text(LocalizedStringKey(manager.subtitleHealthKey)).font(.caption).foregroundStyle(.secondary)
+                    HStack {
+                        Button("align.open") { showControlCenterPage("align") }
+                        Button("nav.load") { showControlCenterPage("load") }
+                    }.controlSize(.small)
+                }
+                Button("diagnostics.export") { manager.exportDiagnostics() }.controlSize(.small)
+                Text("diagnostics.privacy").font(.caption2).foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }

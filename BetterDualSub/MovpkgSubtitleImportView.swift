@@ -3,6 +3,9 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct MovpkgSubtitleImportView: View {
+    @Binding var inputURLs: [URL]
+
+    init(inputURLs: Binding<[URL]> = .constant([])) { self._inputURLs = inputURLs }
     @EnvironmentObject private var manager: SubtitleManager
     @State fileprivate var packageURL: URL?
     @State fileprivate var tracks: [LocalSubtitleTrack] = []
@@ -15,6 +18,8 @@ struct MovpkgSubtitleImportView: View {
     @State private var busy = false
     @State private var operation: Task<Void, Never>?
     @State private var generation = UUID()
+    @AppStorage("preferredPrimarySubtitleLanguage") private var preferredPrimary = "en"
+    @AppStorage("preferredSecondarySubtitleLanguage") private var preferredSecondary = "zh"
 
     fileprivate var primary: LocalSubtitleTrack? { tracks.first { $0.id == primaryID } }
 
@@ -30,10 +35,16 @@ struct MovpkgSubtitleImportView: View {
             if !tracks.isEmpty {
                 SettingsCard {
                     Text(AppLocalization.format("movpkg.tracksAvailable", tracks.count)).font(.headline)
-                    Picker("download.primary", selection: $primaryID) {
+                    Picker("download.primary", selection: Binding(get: { primaryID }, set: { id in
+                        primaryID = id
+                        if let track = tracks.first(where: { $0.id == id }) { preferredPrimary = track.language }
+                    })) {
                         ForEach(tracks) { Text($0.label).tag($0.id) }
                     }.disabled(busy)
-                    Picker("download.secondary", selection: $secondaryID) {
+                    Picker("download.secondary", selection: Binding(get: { secondaryID }, set: { id in
+                        secondaryID = id
+                        preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? ""
+                    })) {
                         Text("download.noSecondary").tag("")
                         ForEach(tracks) { Text($0.label).tag($0.id) }
                     }.disabled(busy)
@@ -75,6 +86,8 @@ struct MovpkgSubtitleImportView: View {
                 : AppLocalization.format("movpkg.status.read", tracks.count)
         }
         .onDisappear(perform: cancel)
+        .onAppear(perform: consumeInput)
+        .onChange(of: inputURLs) { _, _ in consumeInput() }
     }
 
     private func cancel() {
@@ -132,6 +145,17 @@ struct MovpkgSubtitleImportView: View {
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Movies/Videos/Media.localized/TV Shows", isDirectory: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        inspect(url)
+    }
+
+    private func consumeInput() {
+        guard case .package(let url) = SubtitleInput(urls: inputURLs) else { return }
+        inputURLs = []
+        cancel()
+        inspect(url)
+    }
+
+    private func inspect(_ url: URL) {
         packageURL = nil
         tracks = []
         primaryID = ""
@@ -141,11 +165,12 @@ struct MovpkgSubtitleImportView: View {
             let available = try await background { try MovpkgSubtitleExtractor.inspect(url) }
             packageURL = url
             tracks = available
-            primaryID = available.first(where: { !$0.forced && !$0.sdh && $0.language.lowercased().hasPrefix("en") })?.id
-                ?? available.first(where: { !$0.forced && $0.language.lowercased().hasPrefix("en") })?.id ?? available[0].id
-            secondaryID = available.first(where: {
+            primaryID = available.first(where: { !$0.forced && !$0.sdh && SubtitleLanguagePreference.matches($0.language, preferredPrimary) })?.id
+                ?? available.first(where: { !$0.forced && SubtitleLanguagePreference.matches($0.language, preferredPrimary) })?.id
+                ?? available.first(where: { !$0.forced && !$0.sdh })?.id ?? available.first(where: { !$0.forced })?.id ?? available[0].id
+            secondaryID = preferredSecondary.isEmpty ? "" : available.first(where: {
                 !$0.forced && !$0.sdh && $0.id != primaryID
-                    && ($0.language.lowercased().hasPrefix("zh") || $0.language.lowercased().hasPrefix("cmn"))
+                    && SubtitleLanguagePreference.matches($0.language, preferredSecondary)
             })?.id ?? ""
             status = AppLocalization.format("movpkg.status.read", available.count)
             error = ""
@@ -173,7 +198,8 @@ struct MovpkgSubtitleImportView: View {
                                             packageTimeline: packageTimeline)
             }
             manager.load(primary: documents[0], secondary: documents.count > 1 ? documents[1] : nil,
-                         title: packageURL.deletingPathExtension().lastPathComponent, names: selected.map(\.label))
+                         title: packageURL.deletingPathExtension().lastPathComponent, names: selected.map(\.label),
+                         sourceID: "package:\(packageURL.lastPathComponent):\(packageTimeline)")
             outputFolder = folder
             status = AppLocalization.format("movpkg.status.extracted",
                                             documents.map(\.items.count).map(String.init).joined(separator: " + "))

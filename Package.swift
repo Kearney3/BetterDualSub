@@ -14,10 +14,10 @@ let package = Package(
                           "BilingualExportView.swift", "NowPlayingView.swift", "LoadSubtitlesView.swift", "LocalSubtitleFileView.swift",
                           "ManualControlBar.swift", "SettingsComponents.swift", "SubtitleAlignView.swift",
                           "SyncStatusView.swift", "SubtitleTranslator.swift", "SubtitleTranslationView.swift",
-                          "UpdateChecker.swift"],
+                          "UpdateChecker.swift", "ViewingSessionViews.swift", "SubtitleScreenSettings.swift"],
                 sources: ["SubtitleDocument.swift", "MovieSubtitleDownloader.swift", "MovpkgSubtitleExtractor.swift",
                            "SubtitleTranslationPlan.swift", "PlaybackTracking.swift",
-                           "AppVersion.swift"]),
+                           "AppVersion.swift", "ViewingSession.swift"]),
         .testTarget(name: "BetterDualSubCoreTests", dependencies: ["BetterDualSubCore"], path: "Tests")
     ]
 )

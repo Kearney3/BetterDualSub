@@ -49,11 +49,11 @@ The Homebrew cask does the equivalent for you.
 
 ## Quick start
 
-1. Open BetterDualSub and choose **Load Subtitles** › **Movie link**.
-2. Paste the movie's Apple TV page link, such as `https://tv.apple.com/us/movie/…/umc.cmc.…`, and click **Find subtitles**.
-3. Pick a version, a first language and optionally a second one, then click **Download and show**.
-4. Play the same movie in the TV app and turn off its own subtitles. The overlay follows playback.
-5. If the subtitles are early or late, press Control-Option-← or → (250 ms per press), or use **Align by Line**.
+1. Open **Load Subtitles**. Drop one or two subtitle files or a `.movpkg` package, or paste a movie link and click **Choose source**.
+2. Load the selected tracks. For movie links, find subtitles first, then select the edition and languages.
+3. Play the same title and edition in TV.app, with its built-in subtitles turned off.
+4. On **Now Playing**, use **Ready to Watch** to confirm subtitles are loaded, the player is connected and the overlay is visible.
+5. Adjust with Control-Option-← / → (250 ms), or **Align by Line**.
 
 ## Using BetterDualSub
 
@@ -75,7 +75,11 @@ The menu bar icon offers the same loading, timing and display commands.
 | Local episode | A `.movpkg` package downloaded by the TV app, usually in `~/Movies/Videos/Media.localized/TV Shows` | Choose the episode timeline or the whole package's. **Export SRT files…** saves copies without showing them. |
 | Subtitle file | One or two `.srt`, `.vtt`, `.ass` or `.ssa` files | UTF-8, UTF-16 and common legacy encodings (GB18030, Big5, Shift JIS, EUC-KR) are detected. ASS/SSA styling is ignored. A file name ending in `(-1500ms)` sets the delay. |
 
-After a successful load the window switches to **Now Playing**.
+After a successful load the window switches to **Now Playing**. Movie downloads and local extraction remember your chosen languages. Unsupported links offer local file and local episode alternatives.
+
+### Recent Watching
+
+**Now Playing** keeps the latest 10 sessions, including self-contained subtitle copies, translations, track delays and appearance. **Restore** opens them without the original files or another download, following the player’s current position without seeking the video. Remove individual sessions or clear the list; original and exported files are kept.
 
 ### Sync status
 
@@ -86,22 +90,26 @@ After a successful load the window switches to **Now Playing**.
 | Manual clock | You chose manual timing; use the progress bar shown when hovering over the subtitles. |
 | Playback connection lost | Reading system playback information stopped; BetterDualSub reconnects automatically. |
 
-Choose which player to follow under **General** › **Sync source**.
+Choose which player to follow under **General** › **Sync source**. A connected clock does not confirm a matching subtitle edition. The page distinguishes available text, dialogue gaps and positions outside subtitle coverage, with actions to align or change subtitles.
+
+**Export diagnostics…** writes a local JSON containing versions, clock state, cue counts, offsets and recent state events. It excludes subtitle text, titles, file paths, source URLs and account identifiers, and is never uploaded automatically.
 
 ### Timing
 
 - **Delay**: positive values show subtitles later. Set them on **Now Playing**, on the overlay's control bar or with shortcuts. Track 2 follows Track 1 unless you unlink them.
 - **Align by Line**: while a line is being spoken, select it in the list and click **Align to current time**; the delay is calculated for you. It also works from the overlay: click the target button on its control bar.
 - **Playback speed**: subtitle time runs 1:1 with video time. At 2× the video and the subtitles both move two seconds per second; the overlay shows the player's speed.
-- Delays are saved per title and restored, with a notice, the next time you load it.
+- Delays are saved by subtitle content and source edition, then restored with a notice. Legacy per-title timing is migrated once so a different edition cannot repeatedly inherit it.
 
 ### Translating a second language
 
-On **Now Playing**, **Translate Track 2** creates a second track from Track 1 with the macOS on-device translator. The source language is detected automatically. Languages that are not installed yet are offered as a system download. The result keeps every line's timing and can be exported as SRT.
+On **Now Playing**, **Translate Track 2** creates a second track from Track 1 with the macOS on-device translator. The source language is detected automatically. Languages that are not installed yet are offered as a system download. You can correct the source language and **Preview 8 cues** without replacing Track 2. After a full translation, **Undo track replacement** restores the previous track. Results keep line timing, can be exported as SRT and are retained in Recent Watching.
 
 ### Overlay
 
 Drag the subtitles anywhere on screen. Hovering shows a control bar with playback, delay and alignment controls; right-click for appearance, lock, hide and reset. While locked, the overlay ignores the mouse so the apps underneath stay usable. **Appearance** sets fonts, colors, outlines, background and whether lines are kept as authored, joined into one or balanced over two.
+
+Choose a fixed display or the current main display under **General** › **Subtitle Display**. Each display remembers its position and font sizes; disconnected displays fall back to an available screen.
 
 ### Keyboard shortcuts
 
@@ -130,7 +138,7 @@ Play, pause and seeking control the followed player, or the manual clock when no
 - **Network**: BetterDualSub contacts Apple's TV website only when you look up or download subtitles, and GitHub at most once a day for the latest version number (turn this off under **General**). Nothing else is sent.
 - **Account**: requests are anonymous. The optional DSID field is used only after an eligible request fails and is kept in memory only.
 - **Translation** runs on device.
-- **Files**: downloaded and extracted subtitles are kept in `~/Library/Application Support/BetterDualSub/Subtitles/`; **General** can move this folder to the Trash. Files you export yourself are never touched. Settings and per-title timing are stored in the app's preferences.
+- **Files**: downloaded and extracted subtitles are kept in `~/Library/Application Support/BetterDualSub/Subtitles/`; **General** can move this folder to the Trash. Files you export yourself are never touched. Settings and timing are stored in the app's preferences. Self-contained recent subtitles, translations and configuration are stored in `~/Library/Application Support/BetterDualSub/RecentWatching.json`; clear these using Recent Watching. Clearing the download cache keeps recent-session copies.
 
 To remove everything installed with Homebrew, run `brew uninstall --zap --cask betterdualsub`.
 

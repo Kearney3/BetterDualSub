@@ -11,6 +11,7 @@ struct SubtitleTranslationCard: View {
     @State private var languages: [TranslationLanguage] = []
     @State private var plan: SubtitleTranslationPlan?
     @State private var source: Locale.Language?
+    @State private var sourceID = ""
     /// Set only when a language download is needed; `.translationTask` then offers it.
     @State private var download: TranslationSession.Configuration?
     @State private var showPreview = false
@@ -24,8 +25,11 @@ struct SubtitleTranslationCard: View {
         SettingsCard(titleKey: "translate.title") {
             SettingsHint(key: "translate.help")
             HStack(spacing: 10) {
-                Text(AppLocalization.format("translate.source",
-                                            source.map { SubtitleTranslator.displayName($0) } ?? AppLocalization.string("translate.source.unknown")))
+                Picker("translate.source.choose", selection: $sourceID) {
+                    Text("translate.source.unknown").tag("")
+                    ForEach(languages) { Text(verbatim: $0.name).tag($0.id) }
+                }
+                .disabled(translator.isBusy || languages.isEmpty)
                 Spacer()
                 Picker("translate.target", selection: $target) {
                     ForEach(languages) { Text(verbatim: $0.name).tag($0.id) }
@@ -34,9 +38,14 @@ struct SubtitleTranslationCard: View {
                 .disabled(translator.isBusy || languages.isEmpty)
             }
             HStack(spacing: 10) {
-                Button(manager.trackNames.count > 1 ? "translate.action.replace" : "translate.action.create", action: start)
+                Button("translate.sample") { start(preview: true) }
+                    .disabled(translator.isBusy || sourceID.isEmpty || plan?.sources.isEmpty != false || target.isEmpty)
+                Button(manager.trackNames.count > 1 ? "translate.action.replace" : "translate.action.create") { start(preview: false) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(translator.isBusy || source == nil || plan?.sources.isEmpty != false || target.isEmpty)
+                    .disabled(translator.isBusy || sourceID.isEmpty || plan?.sources.isEmpty != false || target.isEmpty)
+                if manager.canUndoSecondary {
+                    Button("translate.undo") { manager.undoSecondary(); translator.clearResult() }.disabled(translator.isBusy)
+                }
                 if translator.isBusy {
                     Button("common.cancel") { translator.cancel() }
                 }
@@ -44,11 +53,13 @@ struct SubtitleTranslationCard: View {
             status
         }
         .translationTask(download) { session in
+            guard !Task.isCancelled else { return }
+            let requestID = translator.pendingID
             do {
                 try await session.prepareTranslation()
-                await translator.downloadFinished(error: nil, manager: manager)
+                await translator.downloadFinished(error: nil, requestID: requestID, manager: manager)
             } catch {
-                await translator.downloadFinished(error: error, manager: manager)
+                await translator.downloadFinished(error: error, requestID: requestID, manager: manager)
             }
         }
         .task(id: manager.loadID) {
@@ -58,6 +69,11 @@ struct SubtitleTranslationCard: View {
             self.plan = plan
             source = plan.dominantLanguage.map(Locale.Language.init(identifier:))
             if languages.isEmpty { languages = await SubtitleTranslator.languages() }
+            sourceID = source.flatMap { detected in
+                languages.first { Locale.Language(identifier: $0.id).languageCode == detected.languageCode
+                    && Locale.Language(identifier: $0.id).script == Locale.Language(identifier: detected.maximalIdentifier).script }?.id
+                ?? languages.first { Locale.Language(identifier: $0.id).languageCode == detected.languageCode }?.id
+            } ?? ""
             if !languages.contains(where: { $0.id == target }) || source?.languageCode == Locale.Language(identifier: target).languageCode {
                 target = SubtitleTranslator.defaultTarget(source: source)
             }
@@ -84,13 +100,13 @@ struct SubtitleTranslationCard: View {
                 Text(AppLocalization.format("translate.status.progress", done, total)).font(.callout).foregroundStyle(.secondary)
             }
         case .finished(let lines, let language):
-            StatusLine(text: AppLocalization.format("translate.status.done", lines, language))
+            StatusLine(text: AppLocalization.format(translator.previewOnly ? "translate.sample.done" : "translate.status.done", lines, language))
             HStack(spacing: 10) {
                 Button(showPreview ? "translate.preview.hide" : "translate.preview.show") { showPreview.toggle() }
                 Button("translate.export", action: export)
             }
             .controlSize(.small)
-            if showPreview, let document = translator.result?.document {
+            if (showPreview || translator.previewOnly), let document = translator.result?.document {
                 TranslationPreviewList(translated: document.items, original: manager.primaryDocument?.items ?? [])
             }
         case .failed(let message):
@@ -100,13 +116,17 @@ struct SubtitleTranslationCard: View {
         }
     }
 
-    private func start() {
-        guard let plan, let source, !target.isEmpty else { return }
+    private func start(preview: Bool) {
+        guard let fullPlan = plan, !sourceID.isEmpty, !target.isEmpty else { return }
+        let source = Locale.Language(identifier: sourceID)
         let target = Locale.Language(identifier: target)
         Task {
-            guard let configuration = await translator.start(plan: plan, source: source, target: target, manager: manager) else { return }
+            do {
+                let plan = try (preview ? fullPlan.preview() : fullPlan)
+                guard let configuration = await translator.start(plan: plan, source: source, target: target, manager: manager, preview: preview) else { return }
             // An unchanged configuration does not run the task again unless it is invalidated.
-            if download == configuration { download?.invalidate() } else { download = configuration }
+                if download == configuration { download?.invalidate() } else { download = configuration }
+            } catch { NSAlert(error: error).runModal() }
         }
     }
 

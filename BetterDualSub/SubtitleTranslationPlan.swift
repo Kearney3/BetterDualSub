@@ -42,6 +42,10 @@ nonisolated struct SubtitleTranslationPlan: Sendable {
         return recognizer.dominantLanguage.map(\.rawValue)
     }
 
+    func preview(maximumCues: Int = 8) throws -> SubtitleTranslationPlan {
+        SubtitleTranslationPlan(document: try SubtitleDocument(items: Array(items.prefix(max(1, maximumCues)))))
+    }
+
     /// Rebuilds the track; `translations[i]` translates `sources[i]`. Cues without words keep their text,
     /// and cues whose translation came back empty are dropped.
     func document(translations: [String]) throws -> SubtitleDocument {

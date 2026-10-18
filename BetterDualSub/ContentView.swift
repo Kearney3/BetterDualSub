@@ -136,6 +136,18 @@ class SubtitleManager: ObservableObject {
     @Published private(set) var playbackSpeed = 1.0
     /// Changes on every load, so work started for one set of subtitles is not applied to the next.
     @Published private(set) var loadID = UUID()
+    @Published private(set) var recentSessions: [ViewingSession] = []
+    @Published private(set) var historyError: String?
+    @Published private(set) var canUndoSecondary = false
+    private var currentSession: ViewingSession?
+    private var previousSecondary: (document: SubtitleDocument?, name: String?, offset: Int, linked: Bool)?
+    private let sessionStore = ViewingSessionStore(url: URL.applicationSupportDirectory
+        .appendingPathComponent("BetterDualSub/RecentWatching.json"))
+    private var sessionSaveTask: Task<Void, Never>?
+    private var historyWriteTask: Task<Void, Never>?
+    private var preferenceObserver: AnyCancellable?
+    private var lastReportUptime: TimeInterval?
+    private var diagnosticEvents: [[String: String]] = []
     /// Brief confirmation shown over the subtitles after an offset change.
     @Published var delayToast: String?
     private var toastTask: Task<Void, Never>?
@@ -166,14 +178,22 @@ class SubtitleManager: ObservableObject {
             DispatchQueue.main.async { self?.listenerTerminated() }
         }
         mediaController.onDecodingError = { [weak self] _, _ in
-            DispatchQueue.main.async { self?.resetTVClock() }
+            DispatchQueue.main.async { self?.recordDiagnostic("decodeFailed"); self?.resetTVClock() }
         }
         mediaController.startListening()
         refreshSyncStatus()
+        preferenceObserver = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.queueSessionSave() }
+        Task {
+            do { recentSessions = try await sessionStore.load() }
+            catch { historyError = error.localizedDescription }
+        }
     }
 
     private func receive(_ track: TrackInfo?) {
         listenerAlive = true
+        lastReportUptime = uptime
         let report = track.map {
             NowPlayingReport(bundleID: $0.payload.bundleIdentifier, appName: $0.payload.applicationName,
                              isPlaying: $0.payload.isPlaying, playbackRate: $0.payload.playbackRate,
@@ -184,6 +204,7 @@ class SubtitleManager: ObservableObject {
             SyncTarget.remember(app)
         }
         guard tracker.receive(report, target: SyncTarget.current, uptime: uptime, epoch: Date().timeIntervalSince1970) else {
+            recordDiagnostic(report == nil ? "noMedia" : (tracker.ignoredApp == nil ? "missingPosition" : "otherPlayer"))
             resetTVClock()
             return
         }
@@ -194,6 +215,7 @@ class SubtitleManager: ObservableObject {
 
     /// The helper process reading Now Playing exited unexpectedly; restart it after a short pause.
     private func listenerTerminated() {
+        recordDiagnostic("listenerStopped")
         listenerAlive = false
         tracker.clearIgnoredApp()
         resetTVClock()
@@ -210,6 +232,7 @@ class SubtitleManager: ObservableObject {
     /// Restarts reading system playback information. It only applies while disconnected: the listener ignores
     /// a start while it is still running.
     func reconnect() {
+        recordDiagnostic("reconnect")
         reconnectTask?.cancel()
         reconnectTask = nil
         mediaController.startListening()
@@ -269,6 +292,7 @@ class SubtitleManager: ObservableObject {
         guard status != syncStatus else { return }
         let wasFollowing = syncStatus.isFollowing
         syncStatus = status
+        recordDiagnostic(status.isFollowing ? "following" : "notFollowing")
         guard !trackNames.isEmpty, wasFollowing != status.isFollowing else { return }
         if status.isFollowing {
             // A gap shorter than the notice delay is not worth mentioning, and neither is its end.
@@ -423,7 +447,21 @@ class SubtitleManager: ObservableObject {
 
     // MARK: Loading and offsets
 
-    func load(primary: SubtitleDocument, secondary: SubtitleDocument? = nil, title: String, names: [String]) {
+    func load(primary: SubtitleDocument, secondary: SubtitleDocument? = nil, title: String, names: [String],
+              sourceID: String = "file", restoring: ViewingSession? = nil) {
+        if let snapshot = sessionSnapshot() { writeSession(snapshot) }
+        sessionSaveTask?.cancel()
+        SubtitleTranslator.shared.cancel()
+        previousSecondary = nil
+        canUndoSecondary = false
+        var session = restoring ?? ViewingSession(primary: primary, secondary: secondary, title: title, names: names, sourceID: sourceID)
+        session.openedAt = Date()
+        currentSession = nil
+        if let restoring {
+            ViewingDisplaySettings.restore(restoring.display, to: .standard)
+            SubtitleScreenPreferences.acceptRestoredSettings()
+            linkSecondaryDelay = restoring.linked
+        }
         startSubtitleTimerIfNeeded()
         self.primary = primary
         self.secondary = secondary
@@ -436,15 +474,19 @@ class SubtitleManager: ObservableObject {
         manualClock = SubtitleClock(positionMs: 0, uptime: uptime, rate: 0, valid: true)
         manualPlaying = false
         timingTitle = nil
-        let saved = title.isEmpty ? SavedTiming() : timingStore.load(title: title)
+        let timingKey = "session." + session.id
+        let saved = restoring?.timing ?? timingStore.load(sessionID: session.id, legacyTitle: title)
         timeOffsetMs = saved.primaryOffsetMs
         secondaryOffsetMs = linkSecondaryDelay ? saved.primaryOffsetMs : saved.secondaryOffsetMs
-        timingTitle = title.isEmpty ? nil : title
+        timingTitle = timingKey
+        currentSession = session
         restoredTiming = timeOffsetMs != 0 || secondaryOffsetMs != 0
         // Loading subtitles means the user wants to see them, even if the window was hidden earlier.
         if !OverlayController.isVisible { OverlayController.setVisible(true) }
         updateSub()
         if restoredTiming { showToast(AppLocalization.format("timing.restored.toast", timingSummary), seconds: 3) }
+        recordDiagnostic(restoring == nil ? "loaded" : "restored")
+        queueSessionSave()
     }
 
     /// Delay of each track, such as "+1200 ms" or, for different tracks, both joined by " / ".
@@ -460,16 +502,134 @@ class SubtitleManager: ObservableObject {
     /// Replaces Track 2 with `document`, which has Track 1's timing (a translation of it), so it also takes Track 1's delay.
     func setSecondary(_ document: SubtitleDocument, name: String) {
         guard !trackNames.isEmpty else { return }
+        previousSecondary = (secondary, trackNames.count > 1 ? trackNames[1] : nil, secondaryOffsetMs, linkSecondaryDelay)
+        canUndoSecondary = true
         secondary = document
         trackNames = [trackNames[0], name]
         durationMs = max(durationMs, documentDurationMs)
         secondaryOffsetMs = timeOffsetMs
         updateSub()
+        queueSessionSave()
+    }
+
+    func undoSecondary() {
+        guard let previousSecondary else { return }
+        secondary = previousSecondary.document
+        trackNames = [trackNames[0]] + (previousSecondary.name.map { [$0] } ?? [])
+        linkSecondaryDelay = previousSecondary.linked
+        secondaryOffsetMs = previousSecondary.offset
+        self.previousSecondary = nil
+        canUndoSecondary = false
+        durationMs = max(documentDurationMs, tracker.durationMs ?? 0)
+        updateSub()
+        queueSessionSave()
+    }
+
+    func restoreSession(_ session: ViewingSession) {
+        do {
+            let first = try SubtitleDocument(text: session.primarySRT)
+            let second = try session.secondarySRT.map { try SubtitleDocument(text: $0) }
+            guard session.names.count == (second == nil ? 1 : 2) else { throw SubtitleError.message("error.history.invalid") }
+            load(primary: first, secondary: second, title: session.title, names: session.names, restoring: session)
+            // Ask the player for its present position. Never seek the video to an old session position.
+            refreshNowPlaying()
+            showControlCenterPage("nowPlaying")
+        } catch { historyError = error.localizedDescription }
+    }
+
+    func removeSession(id: String?) {
+        sessionSaveTask?.cancel()
+        let removedIDs = id.map { [$0] } ?? recentSessions.map(\.id)
+        if id == nil || currentSession?.id == id { currentSession = nil; timingTitle = nil }
+        let previousWrite = historyWriteTask
+        historyWriteTask = Task {
+            await previousWrite?.value
+            do {
+                recentSessions = try await sessionStore.remove(id: id)
+                for id in removedIDs { timingStore.save(SavedTiming(), title: "session." + id) }
+                historyError = nil
+            }
+            catch { historyError = error.localizedDescription }
+        }
+    }
+
+    private func sessionSnapshot() -> ViewingSession? {
+        guard var session = currentSession, let primary else { return nil }
+        SubtitleScreenPreferences.saveCurrentLayout()
+        session.primarySRT = primary.srt
+        session.secondarySRT = secondary?.srt
+        session.names = trackNames
+        session.timing = SavedTiming(primaryOffsetMs: timeOffsetMs, secondaryOffsetMs: secondaryOffsetMs)
+        session.linked = linkSecondaryDelay
+        session.display = ViewingDisplaySettings.capture(.standard)
+        return session
+    }
+
+    private func writeSession(_ session: ViewingSession) {
+        let previousWrite = historyWriteTask
+        historyWriteTask = Task {
+            await previousWrite?.value
+            do { recentSessions = try await sessionStore.record(session); historyError = nil }
+            catch { historyError = error.localizedDescription }
+        }
+    }
+
+    private func queueSessionSave() {
+        sessionSaveTask?.cancel()
+        sessionSaveTask = Task { [weak self] in
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled, let self, let session = self.sessionSnapshot() else { return }
+            self.writeSession(session)
+        }
+    }
+
+    func flushHistory() async {
+        sessionSaveTask?.cancel()
+        if let session = sessionSnapshot() { writeSession(session) }
+        await historyWriteTask?.value
+    }
+
+    var subtitleHealthKey: String {
+        guard let primary else { return "health.noSubtitles" }
+        if syncStatus == .manual { return "health.manual" }
+        if !syncStatus.isFollowing { return "health.noClock" }
+        if !currentText.isEmpty || !secondaryText.isEmpty { return "health.cue" }
+        let start = min((primary.items.first?.startMs ?? 0) + timeOffsetMs,
+                        secondary.map { ($0.items.first?.startMs ?? 0) + secondaryOffsetMs } ?? Int.max)
+        let end = max(primary.duration + timeOffsetMs, secondary.map { $0.duration + secondaryOffsetMs } ?? Int.min)
+        let time = currentPositionMs()
+        if time < start || time >= end { return "health.outside" }
+        return "health.gap"
+    }
+
+    private func recordDiagnostic(_ event: String) {
+        guard diagnosticEvents.last?["event"] != event else { return }
+        diagnosticEvents.append(["event": event, "time": ISO8601DateFormatter().string(from: Date())])
+        diagnosticEvents = Array(diagnosticEvents.suffix(30))
+    }
+
+    func exportDiagnostics() {
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "BetterDualSub-diagnostics.json"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        // Intentionally exclude subtitle text, titles, file paths, source URLs and account identifiers.
+        var snapshot: [String: Any] = ["version": Bundle.main.appVersion,
+            "system": ProcessInfo.processInfo.operatingSystemVersionString, "time": ISO8601DateFormatter().string(from: Date()),
+            "listenerAlive": listenerAlive, "mode": SyncMode.current.rawValue, "target": SyncTarget.current,
+            "following": syncStatus.isFollowing, "playing": isPlaying, "positionMs": currentPositionMs(),
+            "rate": playbackSpeed, "primaryCueCount": primary?.items.count ?? 0, "secondaryCueCount": secondary?.items.count ?? 0,
+            "primaryOffsetMs": timeOffsetMs, "secondaryOffsetMs": secondaryOffsetMs, "health": subtitleHealthKey,
+            "events": diagnosticEvents]
+        if let lastReportUptime { snapshot["lastReportAgeSeconds"] = max(0, uptime - lastReportUptime) }
+        do { try JSONSerialization.data(withJSONObject: snapshot, options: [.prettyPrinted, .sortedKeys]).write(to: url, options: .atomic) }
+        catch { NSAlert(error: error).runModal() }
     }
 
     private func saveOffsets() {
         guard let title = timingTitle else { return }
         timingStore.save(SavedTiming(primaryOffsetMs: timeOffsetMs, secondaryOffsetMs: secondaryOffsetMs), title: title)
+        queueSessionSave()
     }
 
     func adjustDelay(track: String, delta: Int) {
@@ -872,29 +1032,31 @@ struct ContentView: View {
     
     
     // MARK: - Overlay placement
-    /// Keeps the subtitle panel over the main screen. It deliberately does not follow the player's window,
-    /// so the subtitles stay where the user put them.
+    /// Uses the chosen screen (or the current main screen) and remembers each display's free placement.
     private func startOverlayPlacement() {
         guard placementTimer == nil else { return }
         placementTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { _ in
-            guard let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == OverlayPanel.identifierValue }) else { return }
+            MainActor.assumeIsolated {
+                guard let window = NSApplication.shared.windows.first(where: { $0.identifier?.rawValue == OverlayPanel.identifierValue }) else { return }
 
-            guard OverlayController.isVisible else {
-                if window.isVisible { window.orderOut(nil) }
-                return
+                guard OverlayController.isVisible else {
+                    if window.isVisible { window.orderOut(nil) }
+                    return
+                }
+                guard let screen = SubtitleScreenPreferences.selectedScreen else { return }
+                SubtitleScreenPreferences.prepare(screen)
+                let targetFrame = screen.visibleFrame
+
+                if self.tvWindowSize != targetFrame.size {
+                    DispatchQueue.main.async { self.tvWindowSize = targetFrame.size }
+                }
+
+                let requiredBehavior: NSWindow.CollectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
+                if window.collectionBehavior != requiredBehavior { window.collectionBehavior = requiredBehavior }
+                if window.level != .mainMenu { window.level = .mainMenu }
+                if window.frame != targetFrame { window.setFrame(targetFrame, display: true, animate: false) }
+                if !window.isVisible { window.orderFrontRegardless() }
             }
-            guard let screen = NSScreen.main else { return }
-            let targetFrame = screen.visibleFrame
-
-            if self.tvWindowSize != targetFrame.size {
-                DispatchQueue.main.async { self.tvWindowSize = targetFrame.size }
-            }
-
-            let requiredBehavior: NSWindow.CollectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-            if window.collectionBehavior != requiredBehavior { window.collectionBehavior = requiredBehavior }
-            if window.level != .mainMenu { window.level = .mainMenu }
-            if window.frame != targetFrame { window.setFrame(targetFrame, display: true, animate: false) }
-            if !window.isVisible { window.orderFrontRegardless() }
         }
     }
 }

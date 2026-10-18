@@ -11,6 +11,7 @@ struct NowPlayingView: View {
     var body: some View {
         SettingsPage {
             if hasSubtitles { loadedHeader } else { welcome }
+            ViewingReadinessCard()
 
             SettingsCard {
                 SyncStatusDetail()
@@ -27,6 +28,7 @@ struct NowPlayingView: View {
                 steps
                 tips
             }
+            RecentWatchingCard(limit: 3)
         }
         .onChange(of: showWindow) { _, _ in NotificationCenter.default.post(name: .subtitleDisplayChanged, object: nil) }
     }

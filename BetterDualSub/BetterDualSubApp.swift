@@ -169,6 +169,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        Task {
+            await SubtitleManager.shared.flushHistory()
+            sender.reply(toApplicationShouldTerminate: true)
+        }
+        return .terminateLater
+    }
+
     private func refreshStatusMenu() {
         let manager = SubtitleManager.shared
         let status = manager.syncStatus

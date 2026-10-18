@@ -104,7 +104,9 @@ nonisolated struct PlaybackTracker: Sendable {
             clock = SubtitleClock(positionMs: elapsed * 1000, uptime: uptime, rate: newRate, valid: true)
         }
         followedApp = app
-        durationMs = report.durationMicros.map { Int($0 / 1000) }
+        durationMs = report.durationMicros.flatMap {
+            $0.isFinite && $0 > 0 && $0 < 36_000_000_000_000 ? Int($0 / 1000) : nil
+        }
         return true
     }
 
@@ -127,7 +129,7 @@ nonisolated struct PlaybackTracker: Sendable {
 }
 
 /// Delays of both tracks, as saved per title.
-nonisolated struct SavedTiming: Equatable, Sendable {
+nonisolated struct SavedTiming: Codable, Equatable, Sendable {
     var primaryOffsetMs = 0
     var secondaryOffsetMs = 0
 
@@ -139,6 +141,16 @@ nonisolated struct SavedTiming: Equatable, Sendable {
 /// older versions stored under "speeds.<title>" are ignored and removed on the next save.
 nonisolated struct SubtitleTimingStore {
     let defaults: UserDefaults
+
+    func load(sessionID: String, legacyTitle: String) -> SavedTiming {
+        let key = "session." + sessionID
+        if defaults.object(forKey: "offsets." + key) != nil { return load(title: key) }
+        guard !legacyTitle.isEmpty, defaults.object(forKey: "offsets." + legacyTitle) != nil else { return SavedTiming() }
+        let timing = load(title: legacyTitle)
+        save(timing, title: key)
+        save(SavedTiming(), title: legacyTitle)
+        return timing
+    }
 
     func load(title: String) -> SavedTiming {
         var timing = SavedTiming()

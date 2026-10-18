@@ -2,6 +2,9 @@ import SwiftUI
 import AppKit
 
 struct MovieSubtitleDownloadView: View {
+    @Binding var inputURLs: [URL]
+
+    init(inputURLs: Binding<[URL]> = .constant([])) { self._inputURLs = inputURLs }
     @EnvironmentObject private var manager: SubtitleManager
     @State private var link = ""
     @State private var dsid = ""
@@ -17,6 +20,8 @@ struct MovieSubtitleDownloadView: View {
     @State private var operation: Task<Void, Never>?
     @State private var generation = UUID()
     @State private var downloader = MovieSubtitleDownloader()
+    @AppStorage("preferredPrimarySubtitleLanguage") private var preferredPrimary = "en"
+    @AppStorage("preferredSecondarySubtitleLanguage") private var preferredSecondary = "zh"
 
     private var movie: MovieVersion? { versions.first { $0.id == selectedVersion } }
 
@@ -49,10 +54,16 @@ struct MovieSubtitleDownloadView: View {
             }
             if !tracks.isEmpty {
                 SettingsCard(titleKey: "download.step.tracks") {
-                    Picker("download.primary", selection: $primaryID) {
+                    Picker("download.primary", selection: Binding(get: { primaryID }, set: { id in
+                        primaryID = id
+                        if let track = tracks.first(where: { $0.id == id }) { preferredPrimary = track.language }
+                    })) {
                         ForEach(tracks) { Text($0.label).tag($0.id) }
                     }.disabled(busy)
-                    Picker("download.secondary", selection: $secondaryID) {
+                    Picker("download.secondary", selection: Binding(get: { secondaryID }, set: { id in
+                        secondaryID = id
+                        preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? ""
+                    })) {
                         Text("download.noSecondary").tag("")
                         ForEach(tracks) { Text($0.label).tag($0.id) }
                     }.disabled(busy)
@@ -74,7 +85,13 @@ struct MovieSubtitleDownloadView: View {
                         .keyboardShortcut(.cancelAction)
                 }
             } else if !status.isEmpty { StatusLine(text: status) }
-            if !failure.isEmpty { StatusLine(text: failure, isError: true) }
+            if !failure.isEmpty {
+                StatusLine(text: failure, isError: true)
+                HStack {
+                    Button("load.source.file") { showControlCenterPage("localFile") }
+                    Button("load.source.episode") { showControlCenterPage("localPackage") }
+                }
+            }
             if let cacheFolder, !busy {
                 Button("download.openFolder") { NSWorkspace.shared.open(cacheFolder) }
             }
@@ -96,6 +113,8 @@ struct MovieSubtitleDownloadView: View {
             failure = ""
         }
         .onDisappear { cancel(); dsid = "" }
+        .onAppear(perform: consumeInput)
+        .onChange(of: inputURLs) { _, _ in consumeInput() }
     }
 
     private func cancel() {
@@ -126,10 +145,18 @@ struct MovieSubtitleDownloadView: View {
 
     private func setTracks(_ available: [MovieSubtitleTrack]) {
         tracks = available
-        let full = available.filter { !$0.forced }
-        let first = full.first { $0.language.lowercased().hasPrefix("en") } ?? full.first ?? available.first!
+        let full = available.filter { !$0.forced }.sorted { !$0.accessibility && $1.accessibility }
+        let first = full.first { SubtitleLanguagePreference.matches($0.language, preferredPrimary) } ?? full.first ?? available.first!
         primaryID = first.id
-        secondaryID = full.first { $0.id != first.id && ($0.language.lowercased().hasPrefix("zh") || $0.language.lowercased().hasPrefix("cmn")) }?.id ?? ""
+        secondaryID = preferredSecondary.isEmpty ? "" : full.first {
+            $0.id != first.id && SubtitleLanguagePreference.matches($0.language, preferredSecondary)
+        }?.id ?? ""
+    }
+
+    private func consumeInput() {
+        guard case .movie(let url) = SubtitleInput(urls: inputURLs) else { return }
+        link = url.absoluteString
+        inputURLs = []
     }
 
     private func lookup() {
@@ -204,7 +231,7 @@ struct MovieSubtitleDownloadView: View {
             }
             let folder = try SubtitleCache.save(documents, tracks: selected, movie: movie)
             manager.load(primary: documents[0], secondary: documents.count > 1 ? documents[1] : nil,
-                         title: movie.title, names: selected.map(\.label))
+                         title: movie.title, names: selected.map(\.label), sourceID: "movie:\(movie.id)")
             cacheFolder = folder
             status = AppLocalization.string("download.status.loaded")
         }

@@ -2,10 +2,10 @@ import SwiftUI
 import AppKit
 
 private enum ControlCenterPage: String, CaseIterable, Identifiable {
-    case nowPlaying, load, align, bilingual, appearance, shortcuts, general
+    case nowPlaying, load, recent, align, bilingual, appearance, shortcuts, general
 
     var id: String { rawValue }
-    static let subtitlePages: [Self] = [.nowPlaying, .load]
+    static let subtitlePages: [Self] = [.nowPlaying, .load, .recent]
     static let toolPages: [Self] = [.align, .bilingual]
     static let settingPages: [Self] = [.appearance, .shortcuts, .general]
 
@@ -25,6 +25,7 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
         switch self {
         case .nowPlaying: "nav.nowPlaying"
         case .load: "nav.load"
+        case .recent: "recent.title"
         case .align: "nav.align"
         case .bilingual: "nav.bilingual"
         case .appearance: "nav.appearance"
@@ -37,6 +38,7 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
         switch self {
         case .nowPlaying: "play.rectangle"
         case .load: "square.and.arrow.down"
+        case .recent: "clock.arrow.circlepath"
         case .align: "scope"
         case .bilingual: "character.bubble"
         case .appearance: "textformat"
@@ -49,7 +51,7 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
 struct ControlCenterView: View {
     @AppStorage(AppLocalization.languagePreferenceKey) private var language = AppLocalization.defaultLanguage
     @SceneStorage("controlCenter.selectedPage") private var selectedPageValue = ControlCenterPage.nowPlaying.rawValue
-    @AppStorage(LoadSource.storageKey) private var loadSource = LoadSource.movie
+    @AppStorage(LoadSource.storageKey) private var loadSource = LoadSource.file
     @EnvironmentObject private var manager: SubtitleManager
     @State private var searchText = ""
 
@@ -129,6 +131,11 @@ struct ControlCenterView: View {
             NowPlayingView()
         case .load:
             LoadSubtitlesView()
+        case .recent:
+            SettingsPage {
+                RecentWatchingCard()
+                if manager.recentSessions.isEmpty && manager.historyError == nil { SettingsHint(key: "recent.empty") }
+            }
         case .bilingual:
             BilingualExportView()
         case .align:
@@ -170,13 +177,14 @@ private struct GeneralSettingsView: View {
             SettingsCard {
                 SettingsRow(symbol: "play.rectangle.on.rectangle", tint: .green, titleKey: "sync.source.title", subtitleKey: "sync.source.help") {
                     Picker("sync.source.title", selection: $syncTarget) {
-                        Text("sync.source.tv").tag(SyncTarget.tvBundleID)
-                        Text("sync.source.any").tag(SyncTarget.anyApp)
+                        syncAppLabel(AppLocalization.string("sync.source.tv"), bundleID: SyncTarget.tvBundleID)
+                            .tag(SyncTarget.tvBundleID)
+                        Label("sync.source.any", systemImage: "play.rectangle.on.rectangle").tag(SyncTarget.anyApp)
                         let others = SyncTarget.selectableApps
-                        ForEach(others) { app in Text(verbatim: app.name).tag(app.id) }
+                        ForEach(others) { app in syncAppLabel(app.name, bundleID: app.id).tag(app.id) }
                         // Keep a saved choice selectable even if it was never seen in this list.
                         if syncTarget != SyncTarget.tvBundleID, syncTarget != SyncTarget.anyApp, !others.contains(where: { $0.id == syncTarget }) {
-                            Text(verbatim: syncTarget).tag(syncTarget)
+                            syncAppLabel(syncTarget, bundleID: syncTarget).tag(syncTarget)
                         }
                     }
                     .labelsHidden()
@@ -215,6 +223,14 @@ private struct GeneralSettingsView: View {
                         .labelsHidden().toggleStyle(.switch)
                 }
             }
+            SubtitleScreenSettings()
+            SettingsCard {
+                Button("ready.reset") {
+                    UserDefaults.standard.set(false, forKey: "viewingSetupCompleted")
+                    UserDefaults.standard.set(false, forKey: "subtitleVisibilityConfirmed")
+                    showControlCenterPage("nowPlaying")
+                }
+            }
             SettingsCard {
                 SettingsRow(symbol: "folder", tint: .indigo, titleKey: "general.cache.title",
                             subtitleKey: "general.cache.help") {
@@ -248,6 +264,20 @@ private struct GeneralSettingsView: View {
         }
         .onChange(of: syncMode) { _, value in
             manager.setSyncMode(SyncMode(rawValue: value) ?? .auto)
+        }
+    }
+
+    private func syncAppLabel(_ name: String, bundleID: String) -> some View {
+        let icon = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.icon
+            ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map { NSWorkspace.shared.icon(forFile: $0.path) }
+        return Label {
+            Text(verbatim: name)
+        } icon: {
+            if let icon {
+                Image(nsImage: icon).renderingMode(.original).resizable().frame(width: 16, height: 16)
+            } else {
+                Image(systemName: "app")
+            }
         }
     }
 

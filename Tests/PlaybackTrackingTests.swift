@@ -84,6 +84,15 @@ final class PlaybackTrackingTests: XCTestCase {
         XCTAssertNil(tracker.followedApp)
     }
 
+    func testMalformedDurationCannotCrashPlaybackTracking() {
+        var tracker = PlaybackTracker()
+        for duration in [Double.infinity, Double.nan, -1, Double.greatestFiniteMagnitude] {
+            XCTAssertTrue(tracker.receive(report(duration: duration), target: tv, uptime: 0, epoch: 0))
+            XCTAssertNil(tracker.durationMs)
+            XCTAssertEqual(tracker.clock.position(at: 1), 11_000)
+        }
+    }
+
     func testStatusPrecedence() {
         let iina = SyncApp(id: "com.colliderli.iina", name: "IINA")
         XCTAssertEqual(SyncStatus.current(manualMode: true, listenerAlive: false, followedApp: "TV", playing: true, ignoredApp: nil), .manual)
@@ -115,5 +124,20 @@ final class PlaybackTrackingTests: XCTestCase {
 
         defaults.set([1000, 500], forKey: "offsets.Old")
         XCTAssertEqual(store.load(title: "Old"), SavedTiming(primaryOffsetMs: 1000, secondaryOffsetMs: 1500))
+    }
+
+    func testLegacyTimingMigratesToOneEditionWithoutContaminatingAnother() throws {
+        let suite = "BetterDualSubTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = SubtitleTimingStore(defaults: defaults)
+        defaults.set([1000, 500], forKey: "offsets.Movie")
+        defaults.set([1.04], forKey: "speeds.Movie")
+        let migrated = store.load(sessionID: "editionA", legacyTitle: "Movie")
+        XCTAssertEqual(migrated, SavedTiming(primaryOffsetMs: 1000, secondaryOffsetMs: 1500))
+        XCTAssertEqual(store.load(sessionID: "editionA", legacyTitle: "Movie"), migrated)
+        XCTAssertTrue(store.load(sessionID: "editionB", legacyTitle: "Movie").isDefault)
+        XCTAssertNil(defaults.object(forKey: "offsets.Movie"))
+        XCTAssertNil(defaults.object(forKey: "speeds.Movie"))
     }
 }

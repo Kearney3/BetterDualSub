@@ -3,6 +3,9 @@ import AppKit
 import UniformTypeIdentifiers
 
 struct LocalSubtitleFileView: View {
+    @Binding var inputURLs: [URL]
+
+    init(inputURLs: Binding<[URL]> = .constant([])) { self._inputURLs = inputURLs }
     @EnvironmentObject private var manager: SubtitleManager
     @State private var primaryURL: URL?
     @State private var secondaryURL: URL?
@@ -50,9 +53,19 @@ struct LocalSubtitleFileView: View {
         }
         .frame(minWidth: 560)
         .onChange(of: primaryURL) { _, url in
-            if let url, let hint = SubtitleFileReader.delayHint(in: url) { primaryDelay = hint }
+            primaryDelay = url.flatMap(SubtitleFileReader.delayHint) ?? 0
+            secondaryDelay = 0
         }
+        .onAppear(perform: consumeInput)
+        .onChange(of: inputURLs) { _, _ in consumeInput() }
         .onReceive(NotificationCenter.default.publisher(for: .appLanguageChanged)) { _ in status = ""; error = "" }
+    }
+
+    private func consumeInput() {
+        guard case .files(let urls) = SubtitleInput(urls: inputURLs) else { return }
+        primaryURL = urls.first
+        secondaryURL = urls.count > 1 ? urls[1] : nil
+        inputURLs = []
     }
 
     private func fileRow(url: URL?, symbol: String, choose: @escaping () -> Void, clear: @escaping () -> Void) -> some View {
