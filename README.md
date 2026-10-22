@@ -79,7 +79,7 @@ After a successful load the window switches to **Now Playing**. Movie downloads 
 
 ### Recent Watching
 
-**Now Playing** keeps the latest 10 sessions, including self-contained subtitle copies, translations, track delays and appearance. **Restore** opens them without the original files or another download, following the player’s current position without seeking the video. Remove individual sessions or clear the list; original and exported files are kept.
+**Now Playing** keeps up to 10 sessions within a 100 MiB total archive, including self-contained subtitle copies, translations, track delays and appearance. Older sessions are removed first when the archive reaches its limit; a single oversized session is rejected without changing saved history. **Restore** opens them without the original files or another download, following the player’s current position without seeking the video. Remove individual sessions or clear the list; original and exported files are kept.
 
 ### Sync status
 
@@ -88,6 +88,7 @@ After a successful load the window switches to **Now Playing**. Movie downloads 
 | Following · Playing / Paused | Subtitles follow the chosen player. |
 | Waiting for … to play | The chosen player reports no playback; the manual clock is used meanwhile. If another app is playing, you can follow it with one click. |
 | Manual clock | You chose manual timing; use the progress bar shown when hovering over the subtitles. |
+| Connecting to playback | Waiting for the listener's first report; unsuccessful connections retry automatically with a bounded delay. |
 | Playback connection lost | Reading system playback information stopped; BetterDualSub reconnects automatically. |
 
 Choose which player to follow under **General** › **Sync source**. A connected clock does not confirm a matching subtitle edition. The page distinguishes available text, dialogue gaps and positions outside subtitle coverage, with actions to align or change subtitles.
@@ -212,7 +213,8 @@ If more than one Xcode is installed, prefix the commands with `DEVELOPER_DIR=/Ap
 | `BetterDualSub/SubtitleDocument.swift` | Subtitle model, SRT/WebVTT/ASS parsing, timing math |
 | `BetterDualSub/PlaybackTracking.swift` | Now Playing tracking, sync status, saved timing |
 | `BetterDualSub/MovieSubtitleDownloader.swift`, `MovpkgSubtitleExtractor.swift` | Apple TV download and `.movpkg` extraction |
-| `BetterDualSub/ContentView.swift` | `SubtitleManager` and the subtitle overlay |
+| `BetterDualSub/SubtitleManager.swift`, `PlaybackCoordinator.swift` | Subtitle sessions, playback coordination and listener recovery |
+| `BetterDualSub/ContentView.swift` | Subtitle rendering and overlay interaction |
 | `BetterDualSub/*View.swift` | Control window pages |
 | `Tests/` | Unit tests for the core package |
 | `Casks/betterdualsub.rb` | Homebrew cask |

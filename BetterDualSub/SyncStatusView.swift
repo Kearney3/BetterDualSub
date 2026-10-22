@@ -5,7 +5,7 @@ extension SyncStatus {
         switch self {
         case .manual: .blue
         case .following: .green
-        case .waiting: .orange
+        case .waiting, .connecting: .orange
         case .disconnected: .red
         }
     }
@@ -15,6 +15,7 @@ extension SyncStatus {
         case .manual: "hand.point.up.left"
         case .following(_, let playing): playing ? "play.circle.fill" : "pause.circle.fill"
         case .waiting: "hourglass"
+        case .connecting: "arrow.trianglehead.2.clockwise.rotate.90"
         case .disconnected: "exclamationmark.triangle.fill"
         }
     }
@@ -77,7 +78,7 @@ struct SyncStatusDetail: View {
             Button(AppLocalization.format("sync.action.follow", app.name)) { manager.follow(app) }
         case .disconnected:
             Button("sync.action.reconnect") { manager.reconnect() }
-        case .following, .waiting(nil):
+        case .following, .waiting(nil), .connecting:
             EmptyView()
         }
     }

@@ -138,28 +138,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         observers.append(NotificationCenter.default.addObserver(
             forName: .subtitleShortcutsChanged, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.registerDelayHotKeys()
-            self?.refreshStatusMenu()
+            MainActor.assumeIsolated {
+                self?.registerDelayHotKeys()
+                self?.refreshStatusMenu()
+            }
         })
         observers.append(NotificationCenter.default.addObserver(
             forName: .appLanguageChanged, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.refreshStatusMenu()
+            MainActor.assumeIsolated { self?.refreshStatusMenu() }
         })
         observers.append(NotificationCenter.default.addObserver(
             forName: .subtitleDisplayChanged, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.refreshStatusMenu()
+            MainActor.assumeIsolated { self?.refreshStatusMenu() }
         })
         observers.append(NotificationCenter.default.addObserver(
             forName: .subtitleDelayStepChanged, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.refreshStatusMenu()
+            MainActor.assumeIsolated { self?.refreshStatusMenu() }
         })
         observers.append(NotificationCenter.default.addObserver(
             forName: .statusBarVisibilityChanged, object: nil, queue: .main
         ) { [weak self] _ in
-            self?.updateStatusItemVisibility()
+            MainActor.assumeIsolated { self?.updateStatusItemVisibility() }
         })
     }
 
@@ -294,7 +296,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         guard loaded else { return "captions.bubble" }
         switch status {
         case .following: return "captions.bubble.fill"
-        case .waiting, .disconnected: return "exclamationmark.bubble"
+        case .waiting, .disconnected, .connecting: return "exclamationmark.bubble"
         case .manual: return "captions.bubble"
         }
     }
@@ -462,18 +464,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.terminate(nil)
     }
 
-    func handleHotKey(_ event: EventRef) -> OSStatus {
-        var identifier = EventHotKeyID()
-        let status = GetEventParameter(
-            event,
-            EventParamName(kEventParamDirectObject),
-            EventParamType(typeEventHotKeyID),
-            nil,
-            MemoryLayout<EventHotKeyID>.size,
-            nil,
-            &identifier
-        )
-        guard status == noErr, let action = SubtitleShortcutAction(rawValue: Int(identifier.id)) else { return status }
+    func handleHotKey(_ identifier: UInt32) -> OSStatus {
+        guard let action = SubtitleShortcutAction(rawValue: Int(identifier)) else { return OSStatus(eventNotHandledErr) }
         if action == .toggleLock {
             OverlayController.setLocked(!OverlayController.isLocked)
             return noErr
@@ -494,12 +486,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-private func subtitleHotKeyHandler(
+private nonisolated func subtitleHotKeyHandler(
     _ next: EventHandlerCallRef?,
     _ event: EventRef?,
     _ userData: UnsafeMutableRawPointer?
 ) -> OSStatus {
     guard let event, let userData else { return OSStatus(eventNotHandledErr) }
+    var identifier = EventHotKeyID()
+    let status = GetEventParameter(event, EventParamName(kEventParamDirectObject), EventParamType(typeEventHotKeyID),
+                                   nil, MemoryLayout<EventHotKeyID>.size, nil, &identifier)
+    guard status == noErr else { return status }
+    let actionID = identifier.id
     let delegate = Unmanaged<AppDelegate>.fromOpaque(userData).takeUnretainedValue()
-    return delegate.handleHotKey(event)
+    // Only the value-type action ID crosses into MainActor; Carbon's event pointer stays in this callback.
+    return MainActor.assumeIsolated { delegate.handleHotKey(actionID) }
 }

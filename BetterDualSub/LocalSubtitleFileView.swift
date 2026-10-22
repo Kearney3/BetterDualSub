@@ -14,6 +14,9 @@ struct LocalSubtitleFileView: View {
     @State private var status = ""
     @State private var error = ""
     @State private var targeted = false
+    @State private var busy = false
+    @State private var operation: Task<Void, Never>?
+    @State private var generation = UUID()
 
     private static let types: [UTType] = SubtitleFileReader.fileExtensions.compactMap { UTType(filenameExtension: $0) } + [.plainText]
 
@@ -43,9 +46,15 @@ struct LocalSubtitleFileView: View {
                     TextField("0", value: $secondaryDelay, format: .number).frame(width: 80)
                 }.textFieldStyle(.roundedBorder)
                 SettingsHint(key: "localFile.delay.help")
-                Button("localFile.load", action: load)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(primaryURL == nil)
+                HStack {
+                    Button("localFile.load", action: load)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(primaryURL == nil || busy)
+                    if busy {
+                        ProgressView().controlSize(.small)
+                        Button("common.cancel", action: cancel)
+                    }
+                }
             }
 
             if !status.isEmpty { StatusLine(text: status) }
@@ -53,9 +62,13 @@ struct LocalSubtitleFileView: View {
         }
         .frame(minWidth: 560)
         .onChange(of: primaryURL) { _, url in
+            cancel()
             primaryDelay = url.flatMap(SubtitleFileReader.delayHint) ?? 0
             secondaryDelay = 0
         }
+        .onChange(of: secondaryURL) { _, _ in cancel() }
+        .onDisappear(perform: cancel)
+        .onChange(of: manager.loadID) { _, _ in cancel() }
         .onAppear(perform: consumeInput)
         .onChange(of: inputURLs) { _, _ in consumeInput() }
         .onReceive(NotificationCenter.default.publisher(for: .appLanguageChanged)) { _ in status = ""; error = "" }
@@ -96,22 +109,41 @@ struct LocalSubtitleFileView: View {
     }
 
     private func load() {
-        guard let primaryURL else { return }
+        guard let primaryURL, !busy else { return }
+        let secondaryURL = secondaryURL, firstDelay = primaryDelay, secondDelay = secondaryDelay
+        let token = UUID(), loadID = manager.loadID
+        generation = token
+        busy = true
         status = ""; error = ""
-        do {
-            let first = try SubtitleFileReader.document(at: primaryURL)
-            let second = try secondaryURL.map { try SubtitleFileReader.document(at: $0) }
-            let files = [primaryURL] + (secondaryURL.map { [$0] } ?? [])
-            manager.load(primary: first, secondary: second,
-                         title: primaryURL.deletingPathExtension().lastPathComponent,
-                         names: files.map(\.lastPathComponent))
-            // Typed delays win; with none, the timing saved for this title (if any) stays restored.
-            if primaryDelay != 0 || secondaryDelay != 0 {
-                manager.applyDelays(primary: primaryDelay, secondaryExtra: secondaryDelay)
+        operation = Task {
+            do {
+                let (first, second) = try await SubtitleBackgroundWork.run {
+                    (try SubtitleFileReader.document(at: primaryURL),
+                     try secondaryURL.map { try SubtitleFileReader.document(at: $0) })
+                }
+                guard !Task.isCancelled, generation == token, manager.loadID == loadID else { return }
+                let files = [primaryURL] + (secondaryURL.map { [$0] } ?? [])
+                manager.load(primary: first, secondary: second,
+                             title: primaryURL.deletingPathExtension().lastPathComponent,
+                             names: files.map(\.lastPathComponent))
+                if firstDelay != 0 || secondDelay != 0 {
+                    manager.applyDelays(primary: firstDelay, secondaryExtra: secondDelay)
+                }
+                status = AppLocalization.format("localFile.status.loaded", first.items.count)
+            } catch {
+                guard generation == token, !Task.isCancelled else { return }
+                self.error = error.localizedDescription
             }
-            status = AppLocalization.format("localFile.status.loaded", first.items.count)
-        } catch {
-            self.error = error.localizedDescription
+            guard generation == token else { return }
+            busy = false
+            operation = nil
         }
+    }
+
+    private func cancel() {
+        generation = UUID()
+        operation?.cancel()
+        operation = nil
+        busy = false
     }
 }

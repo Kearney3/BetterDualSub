@@ -22,6 +22,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub \
             -configuration Release -derivedDataPath build \
+            -onlyUsePackageVersionsFromResolvedFile \
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
             ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
             MACOSX_DEPLOYMENT_TARGET=26.0 CODE_SIGNING_ALLOWED=NO build

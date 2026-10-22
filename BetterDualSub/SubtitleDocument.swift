@@ -348,11 +348,18 @@ nonisolated enum SubtitleFileReader {
 
     /// Reads a local .srt/.vtt file, detecting common encodings (BOM, UTF-8, then legacy CJK code pages).
     static func document(at url: URL) throws -> SubtitleDocument {
+        try Task.checkCancellation()
         let data: Data
-        do { data = try Data(contentsOf: url, options: .mappedIfSafe) }
+        do {
+            let file = try FileHandle(forReadingFrom: url)
+            defer { try? file.close() }
+            data = try file.read(upToCount: maximumBytes + 1) ?? Data()
+        }
         catch { throw SubtitleError.message("error.subtitle.unreadable") }
         guard data.count <= maximumBytes else { throw SubtitleError.message("error.subtitle.tooLarge") }
-        return try SubtitleDocument(text: decode(data))
+        let document = try SubtitleDocument(text: decode(data))
+        try Task.checkCancellation()
+        return document
     }
 
     static func decode(_ data: Data) throws -> String {
@@ -372,5 +379,22 @@ nonisolated enum SubtitleFileReader {
         let name = url.deletingPathExtension().lastPathComponent
         guard let match = name.range(of: #"\((-?\d+)ms\)$"#, options: [.regularExpression, .caseInsensitive]) else { return nil }
         return Int(name[match].dropFirst().dropLast(3))
+    }
+}
+
+/// Runs CPU/file work away from MainActor and propagates cancellation to the worker.
+nonisolated enum SubtitleBackgroundWork {
+    static func run<Result: Sendable>(_ work: @escaping @Sendable () throws -> Result) async throws -> Result {
+        let worker = Task.detached(priority: .userInitiated) {
+            try Task.checkCancellation()
+            return try work()
+        }
+        return try await withTaskCancellationHandler {
+            let result = try await worker.value
+            try Task.checkCancellation()
+            return result
+        } onCancel: {
+            worker.cancel()
+        }
     }
 }

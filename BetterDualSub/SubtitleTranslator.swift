@@ -56,9 +56,13 @@ final class SubtitleTranslator: ObservableObject {
 
     static func languages() async -> [TranslationLanguage] {
         let locale = AppLocalization.locale
-        return await LanguageAvailability().supportedLanguages
+        return await supportedLanguages()
             .map { TranslationLanguage(id: $0.maximalIdentifier, name: displayName($0, locale: locale)) }
             .sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
+    }
+
+    @concurrent private nonisolated static func supportedLanguages() async -> [Locale.Language] {
+        await LanguageAvailability().supportedLanguages
     }
 
     /// Chinese is told apart by script (简体 / 繁體) rather than by region.

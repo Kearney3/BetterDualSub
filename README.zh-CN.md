@@ -79,7 +79,7 @@ Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行
 
 ### 最近观看
 
-**正在播放** 页面保存最近 10 次观看的字幕副本、译文、轨道延迟和外观，点击 **恢复** 即可重新加载，无需原始文件或再次下载。恢复后跟随播放器当前位置，不会跳转视频。可逐条移除或清空；原始文件与手动导出文件会保留。
+**正在播放** 页面在 100 MiB 总容量内最多保存最近 10 次观看的字幕副本、译文、轨道延迟和外观。达到上限时优先移除旧记录，单条记录过大时会报错并保留已保存的数据。点击 **恢复** 即可重新加载，无需原始文件或再次下载。恢复后跟随播放器当前位置，不会跳转视频。可逐条移除或清空；原始文件与手动导出文件会保留。
 
 ### 同步状态
 
@@ -88,6 +88,7 @@ Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行
 | 正在跟随 · 播放中 / 已暂停 | 字幕跟随所选播放器。 |
 | 等待 … 播放 | 所选播放器没有在播放，期间使用手动时钟。如果有其他应用正在播放，可以一键改为跟随它。 |
 | 手动时钟 | 你选择了手动计时，可使用鼠标悬停在字幕上时出现的进度条。 |
+| 正在连接播放信息 | 等待监听器首次响应，连接失败后会按有上限的间隔自动重试。 |
 | 播放信息连接中断 | 读取系统播放信息中断，BetterDualSub 会自动重连。 |
 
 在 **通用** › **同步来源** 中选择要跟随的播放器。连接时钟不代表字幕内容已匹配；页面会区分当前有字幕、对白间隙和超出覆盖范围，并提供对齐和更换字幕入口。
@@ -212,7 +213,8 @@ BETTERDUALSUB_LIVE_MOVIE_URL='https://tv.apple.com/hk/movie/spider-man-into-the-
 | `BetterDualSub/SubtitleDocument.swift` | 字幕模型、SRT/WebVTT/ASS 解析、时间计算 |
 | `BetterDualSub/PlaybackTracking.swift` | “正在播放”跟踪、同步状态、校准保存 |
 | `BetterDualSub/MovieSubtitleDownloader.swift`、`MovpkgSubtitleExtractor.swift` | Apple TV 下载与 `.movpkg` 提取 |
-| `BetterDualSub/ContentView.swift` | `SubtitleManager` 与字幕浮层 |
+| `BetterDualSub/SubtitleManager.swift`、`PlaybackCoordinator.swift` | 字幕会话、播放协调与监听器恢复 |
+| `BetterDualSub/ContentView.swift` | 字幕渲染与浮层交互 |
 | `BetterDualSub/*View.swift` | 控制窗口各页面 |
 | `Tests/` | 核心包的单元测试 |
 | `Casks/betterdualsub.rb` | Homebrew cask |

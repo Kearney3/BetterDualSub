@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 /// Self-contained subtitles: reopening a session never needs the original file, network, or a video seek.
-nonisolated struct ViewingSession: Codable, Identifiable, Sendable {
+nonisolated struct ViewingSession: Codable, Equatable, Identifiable, Sendable {
     let id: String
     var title: String
     var names: [String]
@@ -15,12 +15,13 @@ nonisolated struct ViewingSession: Codable, Identifiable, Sendable {
 
     init(primary: SubtitleDocument, secondary: SubtitleDocument?, title: String, names: [String], sourceID: String) {
         // Include the source edition/timeline and both original files; translations keep this original identity.
-        let identity = [sourceID, primary.srt, secondary?.srt ?? ""].joined(separator: "\u{0}")
+        let primarySRT = primary.srt, secondarySRT = secondary?.srt
+        let identity = [sourceID, primarySRT, secondarySRT ?? ""].joined(separator: "\u{0}")
         id = SHA256.hash(data: Data(identity.utf8)).map { String(format: "%02x", $0) }.joined()
         self.title = title
         self.names = names
-        primarySRT = primary.srt
-        secondarySRT = secondary?.srt
+        self.primarySRT = primarySRT
+        self.secondarySRT = secondarySRT
         timing = SavedTiming()
         linked = true
         openedAt = Date()
@@ -31,12 +32,54 @@ nonisolated struct ViewingSession: Codable, Identifiable, Sendable {
 actor ViewingSessionStore {
     let url: URL
     static let limit = 10
+    private let maximumBytes: Int
+    private var cached: [ViewingSession]?
+    private var cachedSignature: FileSignature?
 
-    init(url: URL) { self.url = url }
+    private struct FileSignature: Equatable {
+        let modified: Date?
+        let size: Int?
+        let inode: UInt64?
+    }
+
+    private struct Archive: Codable {
+        var version = 1
+        let sessions: [ViewingSession]
+    }
+
+    init(url: URL, maximumBytes: Int = 100 * 1024 * 1024) {
+        self.url = url
+        self.maximumBytes = maximumBytes
+    }
+
+    private func signature() throws -> FileSignature? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+        return FileSignature(modified: attributes[.modificationDate] as? Date,
+                             size: attributes[.size] as? Int, inode: attributes[.systemFileNumber] as? UInt64)
+    }
 
     func load() throws -> [ViewingSession] {
-        guard FileManager.default.fileExists(atPath: url.path) else { return [] }
-        return try JSONDecoder().decode([ViewingSession].self, from: Data(contentsOf: url))
+        let current = try signature()
+        if let cached, current == cachedSignature { return cached }
+        guard let current else { cached = []; cachedSignature = nil; return [] }
+        guard (current.size ?? 0) <= maximumBytes else { throw SubtitleError.message("error.history.tooLarge") }
+        let file = try FileHandle(forReadingFrom: url)
+        defer { try? file.close() }
+        let data = try file.read(upToCount: maximumBytes + 1) ?? Data()
+        guard data.count <= maximumBytes else { throw SubtitleError.message("error.history.tooLarge") }
+        let decoder = JSONDecoder()
+        let sessions: [ViewingSession]
+        if data.first(where: { ![9, 10, 13, 32].contains($0) }) == 91 {
+            sessions = try decoder.decode([ViewingSession].self, from: data)
+        } else {
+            let archive = try decoder.decode(Archive.self, from: data)
+            guard archive.version == 1 else { throw SubtitleError.message("error.history.unsupportedVersion") }
+            sessions = archive.sessions
+        }
+        cached = Array(sessions.prefix(Self.limit))
+        cachedSignature = current
+        return cached ?? []
     }
 
     func record(_ session: ViewingSession) throws -> [ViewingSession] {
@@ -51,9 +94,19 @@ actor ViewingSessionStore {
     }
 
     private func write(_ sessions: [ViewingSession]) throws -> [ViewingSession] {
+        if sessions == cached, try signature() == cachedSignature { return sessions }
+        var retained = sessions
+        var data = try JSONEncoder().encode(Archive(sessions: retained))
+        while data.count > maximumBytes, retained.count > 1 {
+            retained.removeLast()
+            data = try JSONEncoder().encode(Archive(sessions: retained))
+        }
+        guard data.count <= maximumBytes else { throw SubtitleError.message("error.history.tooLarge") }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(sessions).write(to: url, options: .atomic)
-        return sessions
+        try data.write(to: url, options: .atomic)
+        cached = retained
+        cachedSignature = try signature()
+        return retained
     }
 }
 

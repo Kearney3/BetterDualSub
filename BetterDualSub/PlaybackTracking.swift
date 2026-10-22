@@ -14,6 +14,8 @@ nonisolated enum SyncStatus: Equatable, Sendable {
     case following(app: String, playing: Bool)
     /// Automatic mode, but the chosen player reports no playback; `otherApp` is a player that does.
     case waiting(otherApp: SyncApp?)
+    /// Waiting for the listener's first report, including a valid no-media report.
+    case connecting
     /// The system playback listener stopped and is being restarted.
     case disconnected
 

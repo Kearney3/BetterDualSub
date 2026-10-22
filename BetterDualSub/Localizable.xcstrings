@@ -35,6 +35,40 @@
         }
       }
     },
+    "error.history.tooLarge" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent Watching exceeds its storage limit. Remove older sessions or use smaller subtitle files."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近观看超出存储上限，请移除旧记录或使用较小的字幕文件。"
+          }
+        }
+      }
+    },
+    "error.history.unsupportedVersion" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recent Watching was saved by a newer app. Update BetterDualSub to open it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "最近观看由更新版本的应用保存，请更新 BetterDualSub 后打开。"
+          }
+        }
+      }
+    },
     "error.history.invalid" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -5939,6 +5973,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "播放器"
+          }
+        }
+      }
+    },
+    "sync.status.connecting" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecting to playback…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在连接播放信息…"
+          }
+        }
+      }
+    },
+    "sync.status.connecting.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Waiting for the playback listener to respond. Failed connections retry automatically."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在等待播放信息进程响应，连接失败后会自动重试。"
           }
         }
       }

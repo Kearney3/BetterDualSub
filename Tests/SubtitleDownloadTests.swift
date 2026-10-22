@@ -2,6 +2,66 @@ import XCTest
 @testable import BetterDualSubCore
 
 final class SubtitleDownloadTests: XCTestCase {
+    func testBackgroundWorkLeavesMainActorAndCancelsAnInFlightWorker() async throws {
+        let mainActorTask = await MainActor.run {
+            Task { try await SubtitleBackgroundWork.run { Thread.isMainThread } }
+        }
+        let ranOnMainThread = try await mainActorTask.value
+        XCTAssertFalse(ranOnMainThread)
+        let started = expectation(description: "Worker started")
+        let stopped = expectation(description: "Worker received cancellation")
+        let task = Task {
+            try await SubtitleBackgroundWork.run {
+                started.fulfill()
+                let deadline = Date().addingTimeInterval(2)
+                while Date() < deadline {
+                    if Task.isCancelled { stopped.fulfill(); throw CancellationError() }
+                    Thread.sleep(forTimeInterval: 0.001)
+                }
+                return false
+            }
+        }
+        await fulfillment(of: [started], timeout: 1)
+        task.cancel()
+        do { _ = try await task.value; XCTFail("Expected cancellation") }
+        catch is CancellationError {}
+        await fulfillment(of: [stopped], timeout: 1)
+    }
+
+    func testMovpkgRejectsUnrepresentableOrUnboundedTimelines() throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("BetterDualSub-\(UUID().uuidString).movpkg")
+        defer { try? FileManager.default.removeItem(at: root) }
+        let stream = root.appendingPathComponent("2-test")
+        let data = root.appendingPathComponent("Data")
+        for folder in [stream, data] { try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true) }
+        try "<HLSMoviePackage/>".write(to: root.appendingPathComponent("boot.xml"), atomically: true, encoding: .utf8)
+        try "x".write(to: stream.appendingPathComponent("segment.frag"), atomically: true, encoding: .utf8)
+        try "#EXTM3U\n".write(to: stream.appendingPathComponent("playlist.m3u8"), atomically: true, encoding: .utf8)
+        try "#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,STABLE-RENDITION-ID=test,LANGUAGE=en,NAME=English\n"
+            .write(to: data.appendingPathComponent("test-master.m3u8"), atomically: true, encoding: .utf8)
+        for (start, duration) in [("1e20", "1"), ("0", "1e20"), ("1e308", "1e308"),
+                                  ("nan", "10"), ("0", "inf"), ("35999999", "2")] {
+            let xml = "<StreamInfoBoot><Complete>YES</Complete><Type>Supplemental</Type><MediaType type=\"sbtl\"/>" +
+                "<UniqueIdentifier>test</UniqueIdentifier><PathToLocalCopy>playlist.m3u8</PathToLocalCopy>" +
+                "<SEG PATH=\"segment.frag\" Off=\"0\" Len=\"1\" SeqNum=\"0\" Tim=\"\(start)\" Dur=\"\(duration)\"/></StreamInfoBoot>"
+            try xml.write(to: stream.appendingPathComponent("StreamInfoBoot.xml"), atomically: true, encoding: .utf8)
+            XCTAssertThrowsError(try MovpkgSubtitleExtractor.inspect(root), "\(start), \(duration)")
+        }
+    }
+
+    func testLocalReaderRejectsOversizedFilesAndCancelledWork() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("BetterDualSub-\(UUID().uuidString).srt")
+        defer { try? FileManager.default.removeItem(at: url) }
+        try Data(repeating: 0, count: SubtitleFileReader.maximumBytes + 1).write(to: url)
+        XCTAssertThrowsError(try SubtitleFileReader.document(at: url))
+        let task = Task {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await SubtitleBackgroundWork.run { try SubtitleFileReader.document(at: url) }
+        }
+        do { _ = try await task.value; XCTFail("Expected cancellation") }
+        catch is CancellationError {}
+    }
+
     func testMovpkgSkipsDamagedTracksAndExtractsRemainingTrack() throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("BetterDualSub-\(UUID().uuidString).movpkg")
         defer { try? FileManager.default.removeItem(at: root) }

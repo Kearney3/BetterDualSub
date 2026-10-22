@@ -28,6 +28,9 @@ nonisolated struct LocalSubtitleSegment: Sendable {
 }
 
 nonisolated enum MovpkgSubtitleExtractor {
+    // Match the subtitle parser's 10,000-hour bound before converting seconds to integer milliseconds.
+    private static let maximumTimelineSeconds = 36_000_000.0
+
     static func inspect(_ packageURL: URL) throws -> [LocalSubtitleTrack] {
         let package = packageURL.standardizedFileURL.resolvingSymlinksInPath()
         var isDirectory: ObjCBool = false
@@ -81,7 +84,10 @@ nonisolated enum MovpkgSubtitleExtractor {
                           let length = Int(item.attributes["Len"] ?? "0"),
                           let sequence = Int(item.attributes["SeqNum"] ?? "0"),
                           let start = Double(item.attributes["Tim"] ?? ""), let duration = Double(item.attributes["Dur"] ?? ""),
-                          offset >= 0, length > 0, start.isFinite, duration.isFinite, start >= 0, duration > 0 else {
+                          offset >= 0, length > 0, sequence >= 0,
+                          start.isFinite, duration.isFinite, start >= 0, duration > 0,
+                          start < maximumTimelineSeconds, duration < maximumTimelineSeconds,
+                          start + duration < maximumTimelineSeconds else {
                         throw SubtitleError.message("error.movpkg.invalidOffset")
                     }
                     let file = try containedURL(path, in: directory)

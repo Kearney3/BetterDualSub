@@ -30,13 +30,20 @@ jobs:
   test:
     name: Test & Build
     runs-on: macos-26
+    strategy:
+      matrix:
+        configuration: [Debug, Release]
     steps:
       - uses: actions/checkout@v4
 
       - name: Unit tests
+        if: matrix.configuration == 'Debug'
         run: swift test
 
-      - name: Build app (Debug)
+      - name: Build app (${{ matrix.configuration }})
+        env:
+          BUILD_CONFIGURATION: ${{ matrix.configuration }}
         run: |
           xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub \
-            -configuration Debug -derivedDataPath build MACOSX_DEPLOYMENT_TARGET=26.0 CODE_SIGNING_ALLOWED=NO build
+            -configuration "$BUILD_CONFIGURATION" -derivedDataPath build \
+            -onlyUsePackageVersionsFromResolvedFile MACOSX_DEPLOYMENT_TARGET=26.0 CODE_SIGNING_ALLOWED=NO build

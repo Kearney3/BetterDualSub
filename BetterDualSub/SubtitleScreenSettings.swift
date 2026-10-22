@@ -80,5 +80,8 @@ struct SubtitleScreenSettings: View {
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in
             screens = NSScreen.screens
         }
+        .onChange(of: displayID) { _, _ in
+            NotificationCenter.default.post(name: .subtitleDisplayChanged, object: nil)
+        }
     }
 }

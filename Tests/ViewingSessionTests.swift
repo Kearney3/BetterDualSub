@@ -2,6 +2,74 @@ import XCTest
 @testable import BetterDualSubCore
 
 final class ViewingSessionTests: XCTestCase {
+    func testUnchangedSnapshotsDoNotRewriteTheArchive() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let store = ViewingSessionStore(url: url)
+        let session = ViewingSession(primary: try document(), secondary: nil, title: "Movie", names: ["en"], sourceID: "file")
+        _ = try await store.record(session)
+        let before = try FileManager.default.attributesOfItem(atPath: url.path)
+        _ = try await store.record(session)
+        let after = try FileManager.default.attributesOfItem(atPath: url.path)
+        XCTAssertEqual(before[.systemFileNumber] as? NSNumber, after[.systemFileNumber] as? NSNumber)
+        XCTAssertEqual(before[.modificationDate] as? Date, after[.modificationDate] as? Date)
+    }
+
+    func testLegacyHistoryUpgradesWithoutLosingSubtitleCopies() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        var session = ViewingSession(primary: try document(), secondary: nil, title: "Movie", names: ["en"], sourceID: "file")
+        try JSONEncoder().encode([session]).write(to: url)
+        let store = ViewingSessionStore(url: url)
+        let legacy = try await store.load()
+        XCTAssertEqual(legacy, [session])
+        session.timing.primaryOffsetMs = 1250
+        _ = try await store.record(session)
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        XCTAssertEqual(object["version"] as? Int, 1)
+        let restored = try await ViewingSessionStore(url: url).load()
+        XCTAssertEqual(restored, [session])
+    }
+
+    func testHistoryBudgetEvictsOldestAndRejectsAnOversizedSessionWithoutChangingDisk() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let first = ViewingSession(primary: try document(String(repeating: "A", count: 400)), secondary: nil,
+                                   title: "First", names: ["en"], sourceID: "a")
+        let second = ViewingSession(primary: try document(String(repeating: "B", count: 400)), secondary: nil,
+                                title: "Second", names: ["en"], sourceID: "b")
+        // A single record fits, but the pair does not.
+        let store = ViewingSessionStore(url: url, maximumBytes: 1100)
+        _ = try await store.record(first)
+        let retained = try await store.record(second)
+        XCTAssertEqual(retained.map(\.title), ["Second"])
+        let previous = try Data(contentsOf: url)
+        var oversized = second
+        oversized.secondarySRT = String(repeating: "大", count: 1000)
+        do { _ = try await store.record(oversized); XCTFail("Expected size rejection") }
+        catch { XCTAssertEqual(try Data(contentsOf: url), previous) }
+        let restored = try await store.load()
+        XCTAssertEqual(restored, [second])
+    }
+
+    func testCachedHistoryNoticesExternalDamageAndPreservesUnknownVersions() async throws {
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).json")
+        defer { try? FileManager.default.removeItem(at: url) }
+        let session = ViewingSession(primary: try document(), secondary: nil, title: "Movie", names: ["en"], sourceID: "file")
+        let store = ViewingSessionStore(url: url)
+        _ = try await store.record(session)
+        let future = Data("{\"version\":999,\"sessions\":[]}".utf8)
+        try future.write(to: url, options: .atomic)
+        do { _ = try await store.record(session); XCTFail("Expected unsupported version") }
+        catch { XCTAssertEqual(try Data(contentsOf: url), future) }
+        let broken = Data("broken".utf8)
+        try broken.write(to: url, options: .atomic)
+        do { _ = try await store.record(session); XCTFail("Expected damaged history") }
+        catch { XCTAssertEqual(try Data(contentsOf: url), broken) }
+        let empty = try await store.remove(id: nil)
+        XCTAssertTrue(empty.isEmpty)
+    }
+
     private func document(_ text: String = "Original", start: Int = 1000) throws -> SubtitleDocument {
         try SubtitleDocument(items: [SubtitleItem(startMs: start, endMs: start + 2000, text: text)])
     }

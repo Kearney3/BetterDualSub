@@ -75,7 +75,7 @@ struct SubtitleBackgroundView: View {
     }
 }
 
-struct SubtitleTrackStyle {
+struct SubtitleTrackStyle: Equatable {
     let family: String
     let weight: String
     let textColor: String

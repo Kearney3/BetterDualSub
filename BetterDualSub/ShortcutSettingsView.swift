@@ -152,7 +152,7 @@ struct ShortcutSettingsView: View {
     @AppStorage("subtitleDelayStepMs") private var delayStepMs = 250
     @AppStorage("subtitleDelayLargeStepMs") private var largeStepMs = 1000
     @AppStorage(SubtitleShortcutPreferences.enabledKey) private var shortcutsEnabled = true
-    @State private var disabledActions = Set(SubtitleShortcutAction.allCases.map(\.id).filter(SubtitleShortcutPreferences.isDisabled))
+    @State private var disabledActions = Set(SubtitleShortcutAction.allCases.map(\.id).filter { SubtitleShortcutPreferences.isDisabled($0) })
     @State private var recordingAction: Int?
     @State private var chords = Dictionary(uniqueKeysWithValues: SubtitleShortcutAction.allCases.map { ($0.id, SubtitleShortcutPreferences.chord(for: $0.id)) })
     @State private var message = ""
