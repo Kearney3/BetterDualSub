@@ -83,7 +83,7 @@ extension SyncStatus {
 
 // Both subtitle tracks are driven by one clock: the Apple TV playback clock, or a manual one when TV is unavailable.
 @MainActor
-class SubtitleManager: ObservableObject {
+class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     /// Shared with the overlay panel, which lives outside the SwiftUI scene graph.
     static let shared = SubtitleManager()
     static let manualSpeeds: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2]

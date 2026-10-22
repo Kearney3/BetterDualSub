@@ -44,8 +44,18 @@ final class SubtitleTranslator: ObservableObject {
     private var pending: Request?
     var pendingID: UUID? { pending?.token }
     private var task: Task<Void, Never>?
-    private var session: TranslationSession?
+    private var session: (any SubtitleTranslationSession)?
     private var generation = UUID()
+    private let availability: (Locale.Language, Locale.Language) async -> LanguageAvailability.Status
+    private let makeSession: (Locale.Language, Locale.Language) -> any SubtitleTranslationSession
+
+    init(availability: @escaping (Locale.Language, Locale.Language) async -> LanguageAvailability.Status = systemAvailability,
+         makeSession: @escaping (Locale.Language, Locale.Language) -> any SubtitleTranslationSession = {
+             SystemSubtitleTranslationSession(source: $0, target: $1)
+         }) {
+        self.availability = availability
+        self.makeSession = makeSession
+    }
 
     var isBusy: Bool {
         switch phase {
@@ -63,6 +73,10 @@ final class SubtitleTranslator: ObservableObject {
 
     @concurrent private nonisolated static func supportedLanguages() async -> [Locale.Language] {
         await LanguageAvailability().supportedLanguages
+    }
+
+    @concurrent private nonisolated static func systemAvailability(from source: Locale.Language, to target: Locale.Language) async -> LanguageAvailability.Status {
+        await LanguageAvailability().status(from: source, to: target)
     }
 
     /// Chinese is told apart by script (简体 / 繁體) rather than by region.
@@ -84,7 +98,7 @@ final class SubtitleTranslator: ObservableObject {
     /// Starts translating. Returns a configuration when a language must be downloaded first: the view runs it with
     /// `.translationTask`, then calls `downloadFinished`.
     func start(plan: SubtitleTranslationPlan, source: Locale.Language, target: Locale.Language,
-               manager: SubtitleManager, preview: Bool = false) async -> TranslationSession.Configuration? {
+               manager: any SubtitleTranslationTarget, preview: Bool = false) async -> TranslationSession.Configuration? {
         guard !isBusy else { return nil }
         generation = UUID()
         let token = generation
@@ -94,7 +108,7 @@ final class SubtitleTranslator: ObservableObject {
         guard !plan.sources.isEmpty else { fail(AppLocalization.string("translate.error.empty")); return nil }
         phase = .preparing
         let request = Request(plan: plan, source: source, target: target, loadID: manager.loadID, token: token, preview: preview)
-        let availability = await LanguageAvailability().status(from: source, to: target)
+        let availability = await availability(source, target)
         guard generation == token, manager.loadID == request.loadID else { return nil }
         switch availability {
         case .installed:
@@ -113,7 +127,7 @@ final class SubtitleTranslator: ObservableObject {
     }
 
     /// Called by the view once the language download it offered is over (accepted, declined or failed).
-    func downloadFinished(error: Error?, requestID: UUID?, manager: SubtitleManager) async {
+    func downloadFinished(error: Error?, requestID: UUID?, manager: any SubtitleTranslationTarget) async {
         guard let request = pending, request.token == requestID else { return }
         pending = nil
         guard request.token == generation, request.loadID == manager.loadID else { return }
@@ -122,7 +136,7 @@ final class SubtitleTranslator: ObservableObject {
             fail(error.localizedDescription)
             return
         }
-        let availability = await LanguageAvailability().status(from: request.source, to: request.target)
+        let availability = await availability(request.source, request.target)
         guard request.token == generation, request.loadID == manager.loadID else { return }
         guard availability == .installed else {
             fail(AppLocalization.string("translate.error.notInstalled"))
@@ -151,30 +165,31 @@ final class SubtitleTranslator: ObservableObject {
         phase = .failed(message)
     }
 
-    private func run(_ request: Request, manager: SubtitleManager) {
+    private func run(_ request: Request, manager: any SubtitleTranslationTarget) {
         guard request.token == generation, request.loadID == manager.loadID else { return }
-        let session = TranslationSession(installedSource: request.source, target: request.target)
+        let session = makeSession(request.source, request.target)
         self.session = session
         let sources = request.plan.sources
         phase = .translating(done: 0, total: sources.count)
         task = Task { [weak self] in
+            defer { session.cancel() }
             do {
                 var translations = [String](repeating: "", count: sources.count)
                 var start = 0
                 // Batches keep the progress moving and let a cancel or a new subtitle load stop the work early.
                 while start < sources.count {
                     let end = min(sources.count, start + Self.batchSize)
-                    let batch = (start..<end).map { TranslationSession.Request(sourceText: sources[$0], clientIdentifier: String($0)) }
-                    let responses = try await session.translations(from: batch)
-                    guard !Task.isCancelled, manager.loadID == request.loadID, self?.generation == request.token else { throw CancellationError() }
+                    let batch = (start..<end).map { SubtitleTranslationInput(index: $0, text: sources[$0]) }
                     var received = Set<Int>()
-                    for response in responses {
-                        if let index = response.clientIdentifier.flatMap(Int.init), (start..<end).contains(index),
-                           !response.targetText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            translations[index] = response.targetText
-                            received.insert(index)
-                        }
+                    try await session.translate(batch) { response in
+                        guard !Task.isCancelled, manager.loadID == request.loadID, self?.generation == request.token else { throw CancellationError() }
+                        guard let index = response.identifier.flatMap(Int.init), (start..<end).contains(index),
+                              !response.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                              received.insert(index).inserted else { throw SubtitleError.message("error.translation.incomplete") }
+                        translations[index] = response.text
+                        self?.phase = .translating(done: start + received.count, total: sources.count)
                     }
+                    guard !Task.isCancelled, manager.loadID == request.loadID, self?.generation == request.token else { throw CancellationError() }
                     guard received.count == end - start else { throw SubtitleError.message("error.translation.incomplete") }
                     start = end
                     self?.phase = .translating(done: start, total: sources.count)

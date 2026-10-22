@@ -14,6 +14,7 @@ struct SubtitleTranslationCard: View {
     @State private var sourceID = ""
     /// Set only when a language download is needed; `.translationTask` then offers it.
     @State private var download: TranslationSession.Configuration?
+    @State private var downloadRequestID: UUID?
     @State private var showPreview = false
 
     /// The translator's state, unless it belongs to subtitles that have since been replaced.
@@ -52,15 +53,9 @@ struct SubtitleTranslationCard: View {
             }
             status
         }
-        .translationTask(download) { session in
-            guard !Task.isCancelled else { return }
-            let requestID = translator.pendingID
-            do {
-                try await session.prepareTranslation()
-                await translator.downloadFinished(error: nil, requestID: requestID, manager: manager)
-            } catch {
-                await translator.downloadFinished(error: error, requestID: requestID, manager: manager)
-            }
+        .translationTask(download, action: SubtitleTranslationDownload(requestID: downloadRequestID, translator: translator, target: manager).prepare)
+        .onChange(of: translator.isBusy) { _, busy in
+            if !busy { download = nil; downloadRequestID = nil }
         }
         .task(id: manager.loadID) {
             showPreview = false
@@ -82,6 +77,7 @@ struct SubtitleTranslationCard: View {
             // The download offer belongs to this view; without it the request could never finish.
             if download != nil, phase == .preparing { translator.cancel() }
             download = nil
+            downloadRequestID = nil
         }
     }
 
@@ -124,7 +120,8 @@ struct SubtitleTranslationCard: View {
             do {
                 let plan = try (preview ? fullPlan.preview() : fullPlan)
                 guard let configuration = await translator.start(plan: plan, source: source, target: target, manager: manager, preview: preview) else { return }
-            // An unchanged configuration does not run the task again unless it is invalidated.
+                downloadRequestID = translator.pendingID
+                // An unchanged configuration does not run the task again unless it is invalidated.
                 if download == configuration { download?.invalidate() } else { download = configuration }
             } catch { NSAlert(error: error).runModal() }
         }
