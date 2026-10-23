@@ -1,6 +1,40 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "nowPlaying.tracks.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch to another subtitle track of this video for this viewing only; the delay is kept and the default languages for new imports stay the same."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "仅为本次观看切换到该视频的其他字幕轨道；当前的字幕偏移会保留，新导入时的默认语言不变。"
+          }
+        }
+      }
+    },
+    "nowPlaying.tracks.switched" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtitles switched · delay kept at %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已切换字幕 · 保留偏移 %@"
+          }
+        }
+      }
+    },
     "recent.remove.confirm" : {
       "extractionState" : "manual",
       "localizations" : {

@@ -131,8 +131,13 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     @Published private(set) var recentSessions: [ViewingSession] = []
     @Published private(set) var historyError: String?
     @Published private(set) var canUndoSecondary = false
+    /// Set when the subtitles were extracted from a package, whose other tracks can then replace them.
+    @Published private(set) var packageTracks: PackageTrackChoice?
+    @Published private(set) var switchingTracks = false
+    @Published private(set) var trackSwitchError: String?
+    private var trackSwitchTask: Task<Void, Never>?
     private var currentSession: ViewingSession?
-    private var previousSecondary: (document: SubtitleDocument?, name: String?, offset: Int, linked: Bool)?
+    private var previousSecondary: (document: SubtitleDocument?, name: String?, trackID: String?, offset: Int, linked: Bool)?
     private let sessionStore = ViewingSessionStore(url: URL.applicationSupportDirectory
         .appendingPathComponent("BetterDualSub/RecentWatching.json"))
     private var sessionSaveTask: Task<Void, Never>?
@@ -322,8 +327,12 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     // MARK: Loading and offsets
 
     func load(primary: SubtitleDocument, secondary: SubtitleDocument? = nil, title: String, names: [String],
-              sourceID: String = "file", restoring: ViewingSession? = nil) {
+              sourceID: String = "file", restoring: ViewingSession? = nil, packageTracks: PackageTrackChoice? = nil) {
         historyRestoreTask?.cancel()
+        trackSwitchTask?.cancel()
+        switchingTracks = false
+        trackSwitchError = nil
+        self.packageTracks = packageTracks
         historyRestoreID = UUID()
         if let snapshot = sessionSnapshot() { writeSession(snapshot) }
         sessionSaveTask?.cancel()
@@ -376,8 +385,10 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     /// Replaces Track 2 with `document`, which has Track 1's timing (a translation of it), so it also takes Track 1's delay.
     func setSecondary(_ document: SubtitleDocument, name: String) {
         guard !trackNames.isEmpty else { return }
-        previousSecondary = (secondary, trackNames.count > 1 ? trackNames[1] : nil, secondaryOffsetMs, linkSecondaryDelay)
+        previousSecondary = (secondary, trackNames.count > 1 ? trackNames[1] : nil, packageTracks?.secondaryID,
+                             secondaryOffsetMs, linkSecondaryDelay)
         canUndoSecondary = true
+        packageTracks?.secondaryID = nil
         secondary = document
         currentSession?.secondarySRT = document.srt
         trackNames = [trackNames[0], name]
@@ -392,12 +403,81 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         secondary = previousSecondary.document
         currentSession?.secondarySRT = secondary?.srt
         trackNames = [trackNames[0]] + (previousSecondary.name.map { [$0] } ?? [])
+        packageTracks?.secondaryID = previousSecondary.trackID
         linkSecondaryDelay = previousSecondary.linked
         secondaryOffsetMs = previousSecondary.offset
         self.previousSecondary = nil
         canUndoSecondary = false
         durationMs = max(documentDurationMs, playback.tracker.durationMs ?? 0)
         updateSub()
+        queueSessionSave()
+    }
+
+    /// Replaces Track 1 and/or Track 2 (nil keeps it, "" removes Track 2) with other tracks of the same package for
+    /// this viewing only: the language preferences used by the next import stay as they are. The tracks share the
+    /// package's timeline, so the delays are kept; choosing the other track's subtitles swaps the two.
+    func switchPackageTracks(primaryID newPrimary: String? = nil, secondaryID newSecondary: String? = nil) {
+        guard let choice = packageTracks, !switchingTracks,
+              newSecondary.map({ $0.isEmpty || choice.label($0) != nil }) ?? true else { return }
+        let oldPrimary = choice.primaryID, oldSecondary = choice.secondaryID
+        var primaryID = newPrimary ?? oldPrimary, secondaryID = newSecondary ?? oldSecondary
+        if primaryID == secondaryID {
+            guard let oldSecondary, !oldSecondary.isEmpty else { return }
+            if newPrimary != nil { secondaryID = oldPrimary } else { primaryID = oldSecondary }
+        }
+        guard primaryID != oldPrimary || secondaryID != oldSecondary, choice.label(primaryID) != nil else { return }
+        var loaded: [String: SubtitleDocument] = [:]
+        loaded[oldPrimary] = primary
+        if let oldSecondary, !oldSecondary.isEmpty { loaded[oldSecondary] = secondary }
+        let missing = choice.tracks.filter { [primaryID, secondaryID].contains($0.id) && loaded[$0.id] == nil }
+        let packageTimeline = choice.packageTimeline, initialLoad = loadID, current = loaded
+        switchingTracks = true
+        trackSwitchError = nil
+        trackSwitchTask = Task {
+            do {
+                let extracted = try await SubtitleBackgroundWork.run {
+                    try missing.map { ($0.id, try MovpkgSubtitleExtractor.document(for: $0, packageTimeline: packageTimeline)) }
+                }
+                guard !Task.isCancelled, loadID == initialLoad else { return }
+                let documents = current.merging(extracted) { $1 }
+                guard let first = documents[primaryID] else { return }
+                applyPackageTracks(choice, primaryID: primaryID, secondaryID: secondaryID, first: first,
+                                   second: secondaryID.flatMap { documents[$0] })
+            } catch {
+                guard !Task.isCancelled, loadID == initialLoad else { return }
+                trackSwitchError = error.localizedDescription
+            }
+            switchingTracks = false
+        }
+    }
+
+    private func applyPackageTracks(_ choice: PackageTrackChoice, primaryID: String, secondaryID: String?,
+                                    first: SubtitleDocument, second: SubtitleDocument?) {
+        SubtitleTranslator.shared.cancel()
+        // Work started for the replaced subtitles (a translation, an alignment pick) no longer applies.
+        loadID = UUID()
+        let hadSecondary = secondary != nil
+        primary = first
+        var names = [choice.label(primaryID) ?? trackNames[0]]
+        if secondaryID == choice.secondaryID {
+            names += trackNames.dropFirst()
+        } else {
+            secondary = second
+            if let secondaryID, let name = choice.label(secondaryID) { names.append(name) }
+            previousSecondary = nil
+            canUndoSecondary = false
+        }
+        packageTracks?.primaryID = primaryID
+        packageTracks?.secondaryID = secondaryID
+        trackNames = names
+        currentSession?.primarySRT = first.srt
+        currentSession?.secondarySRT = secondary?.srt
+        // A new Track 2 starts on Track 1's delay; existing delays stay exactly as they were.
+        if !hadSecondary && secondary != nil { secondaryOffsetMs = timeOffsetMs }
+        currentText = ""
+        secondaryText = ""
+        updateSub()
+        showToast(AppLocalization.format("nowPlaying.tracks.switched", timingSummary))
         queueSessionSave()
     }
 

@@ -199,7 +199,9 @@ struct MovpkgSubtitleImportView: View {
             }
             manager.load(primary: documents[0], secondary: documents.count > 1 ? documents[1] : nil,
                          title: packageURL.deletingPathExtension().lastPathComponent, names: selected.map(\.label),
-                         sourceID: "package:\(packageURL.lastPathComponent):\(packageTimeline)")
+                         sourceID: "package:\(packageURL.lastPathComponent):\(packageTimeline)",
+                         packageTracks: PackageTrackChoice(tracks: tracks, packageTimeline: packageTimeline,
+                                                           primaryID: primary.id, secondaryID: secondaryID))
             outputFolder = folder
             status = AppLocalization.format("movpkg.status.extracted",
                                             documents.map(\.items.count).map(String.init).joined(separator: " + "))

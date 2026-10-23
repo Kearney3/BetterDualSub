@@ -18,6 +18,17 @@ nonisolated struct LocalSubtitleTrack: Identifiable, Sendable {
     }
 }
 
+/// The tracks of the package the loaded subtitles came from, so their languages can be switched while watching.
+nonisolated struct PackageTrackChoice: Sendable {
+    let tracks: [LocalSubtitleTrack]
+    let packageTimeline: Bool
+    var primaryID: String
+    /// "" for no Track 2; nil while Track 2 is not one of the package's tracks (a translation).
+    var secondaryID: String?
+
+    func label(_ id: String) -> String? { tracks.first { $0.id == id }?.label }
+}
+
 nonisolated struct LocalSubtitleSegment: Sendable {
     let file: URL
     let offset: Int

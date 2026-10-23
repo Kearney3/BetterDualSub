@@ -40,9 +40,13 @@ struct NowPlayingView: View {
             Text(verbatim: manager.loadedTitle.isEmpty ? AppLocalization.string("common.loaded.title") : manager.loadedTitle)
                 .font(.title.weight(.semibold))
                 .textSelection(.enabled)
-            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
-                trackRow("nowPlaying.track.primary", manager.trackNames.first)
-                trackRow("nowPlaying.track.secondary", manager.trackNames.count > 1 ? manager.trackNames[1] : nil)
+            if let choice = manager.packageTracks {
+                packageTrackPickers(choice)
+            } else {
+                Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                    trackRow("nowPlaying.track.primary", manager.trackNames.first)
+                    trackRow("nowPlaying.track.secondary", manager.trackNames.count > 1 ? manager.trackNames[1] : nil)
+                }
             }
             HStack(spacing: 10) {
                 Button("nowPlaying.change") { showControlCenterPage("load") }
@@ -55,6 +59,43 @@ struct NowPlayingView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 24))
     }
+
+    /// Subtitles extracted from a package can switch to its other tracks without losing their delay.
+    private func packageTrackPickers(_ choice: PackageTrackChoice) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 6) {
+                GridRow {
+                    Text("nowPlaying.track.primary").foregroundStyle(.secondary)
+                    Picker("nowPlaying.track.primary", selection: Binding(get: { choice.primaryID },
+                                                                           set: { manager.switchPackageTracks(primaryID: $0) })) {
+                        ForEach(choice.tracks) { Text(verbatim: $0.label).tag($0.id) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                GridRow {
+                    Text("nowPlaying.track.secondary").foregroundStyle(.secondary)
+                    Picker("nowPlaying.track.secondary", selection: Binding(get: { choice.secondaryID ?? Self.otherTrackTag },
+                                                                             set: { manager.switchPackageTracks(secondaryID: $0) })) {
+                        Text("download.noSecondary").tag("")
+                        if choice.secondaryID == nil, manager.trackNames.count > 1 {
+                            Text(verbatim: manager.trackNames[1]).tag(Self.otherTrackTag)
+                        }
+                        ForEach(choice.tracks) { Text(verbatim: $0.label).tag($0.id) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+            }
+            .disabled(manager.switchingTracks)
+            if let error = manager.trackSwitchError {
+                StatusLine(text: error, isError: true)
+            } else {
+                SettingsHint(key: "nowPlaying.tracks.help")
+            }
+        }
+    }
+
+    /// Picker tag for a Track 2 that is not one of the package's tracks (a translation); choosing it changes nothing.
+    private static let otherTrackTag = "\u{0}other"
 
     private func trackRow(_ label: LocalizedStringKey, _ name: String?) -> some View {
         GridRow {
