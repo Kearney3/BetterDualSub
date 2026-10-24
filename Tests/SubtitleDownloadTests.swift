@@ -136,8 +136,11 @@ final class SubtitleDownloadTests: XCTestCase {
         ])
     }
 
-    func testHTMLPreservesBilingualLinesWithoutExternalResources() throws {
-        XCTAssertEqual(SubtitleDocument.displayHTML("<b>你好</b>\n<v Speaker>Hello</v><img src='https://example.com/x'>"), "<b>你好</b><br>Hello")
+    func testMarkupPreservesBilingualLinesWithoutExternalResources() throws {
+        XCTAssertEqual(SubtitleMarkup.runs("<b>你好</b>\n<v Speaker>Hello</v><img src='https://example.com/x'>"), [
+            SubtitleTextRun(text: "你好", bold: true),
+            SubtitleTextRun(text: "\nHello"),
+        ])
     }
 
     func testClockHandlesSpeedPauseSeekAndLongTimerDelay() {

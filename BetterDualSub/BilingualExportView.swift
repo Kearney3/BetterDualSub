@@ -9,6 +9,7 @@ struct BilingualExportView: View {
     @State private var secondaryDelay = 0
     @State private var status = ""
     @State private var error = ""
+    @State private var busy = false
 
     private static let types: [UTType] = SubtitleFileReader.fileExtensions.compactMap { UTType(filenameExtension: $0) } + [.plainText]
 
@@ -24,9 +25,12 @@ struct BilingualExportView: View {
                     TextField("0", value: $secondaryDelay, format: .number).frame(width: 80).textFieldStyle(.roundedBorder)
                 }
                 SettingsHint(key: "bilingual.offset.help")
-                Button("bilingual.export", action: export)
-                    .buttonStyle(.borderedProminent)
-                    .disabled(primaryURL == nil || secondaryURL == nil)
+                HStack {
+                    Button("bilingual.export", action: export)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(primaryURL == nil || secondaryURL == nil || busy)
+                    if busy { ProgressView().controlSize(.small) }
+                }
             }
             if !status.isEmpty { StatusLine(text: status) }
             if !error.isEmpty { StatusLine(text: error, isError: true) }
@@ -67,14 +71,23 @@ struct BilingualExportView: View {
         panel.directoryURL = primaryURL.deletingLastPathComponent()
         panel.nameFieldStringValue = primaryURL.deletingPathExtension().lastPathComponent + ".bilingual.srt"
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            let first = try SubtitleFileReader.document(at: primaryURL)
-            let second = try SubtitleFileReader.document(at: secondaryURL)
-            let merged = try SubtitleDocument.bilingual(primary: first, secondary: second, secondaryOffsetMs: secondaryDelay)
-            try merged.srt.write(to: url, atomically: true, encoding: .utf8)
-            status = AppLocalization.format("bilingual.status.exported", merged.items.count)
-        } catch {
-            self.error = error.localizedDescription
+        let offset = secondaryDelay
+        busy = true
+        // Reading, merging and writing large files stays off the main thread.
+        Task {
+            do {
+                let count = try await SubtitleBackgroundWork.run {
+                    let first = try SubtitleFileReader.document(at: primaryURL)
+                    let second = try SubtitleFileReader.document(at: secondaryURL)
+                    let merged = try SubtitleDocument.bilingual(primary: first, secondary: second, secondaryOffsetMs: offset)
+                    try merged.srt.write(to: url, atomically: true, encoding: .utf8)
+                    return merged.items.count
+                }
+                status = AppLocalization.format("bilingual.status.exported", count)
+            } catch {
+                self.error = error.localizedDescription
+            }
+            busy = false
         }
     }
 }

@@ -37,6 +37,8 @@ struct SyncStatusIndicator: View {
 
 /// Status with its explanation and the fix that applies, for the control center.
 struct SyncStatusDetail: View {
+    /// Diagnostics are for troubleshooting, so they stay on the settings page.
+    var showsDiagnostics = false
     @EnvironmentObject private var manager: SubtitleManager
 
     var body: some View {
@@ -62,8 +64,10 @@ struct SyncStatusDetail: View {
                         Button("nav.load") { showControlCenterPage("load") }
                     }.controlSize(.small)
                 }
-                Button("diagnostics.export") { manager.exportDiagnostics() }.controlSize(.small)
-                Text("diagnostics.privacy").font(.caption2).foregroundStyle(.secondary)
+                if showsDiagnostics {
+                    Button("diagnostics.export") { manager.exportDiagnostics() }.controlSize(.small)
+                    Text("diagnostics.privacy").font(.caption2).foregroundStyle(.secondary)
+                }
             }
             Spacer(minLength: 0)
         }

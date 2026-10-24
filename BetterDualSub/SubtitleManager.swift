@@ -160,6 +160,9 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     private var timingTitle: String?
     private var internalTimer: Timer?
     private var subtitleTimerInterval: TimeInterval?
+    /// Fires at the next cue start or end, so lines change on time instead of on the next periodic tick.
+    private var cueTimer: Timer?
+    private var cueFireUptime: TimeInterval?
     private var appNapActivityToken: NSObjectProtocol?
     private var workspaceObservers: [NSObjectProtocol] = []
 
@@ -198,8 +201,9 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         syncTargetDidChange()
     }
 
+    /// The periodic timer only keeps the position readouts moving; cue changes have their own timer.
     private func refreshSubtitleTimer() {
-        let interval: TimeInterval? = isPlaying && !trackNames.isEmpty ? (OverlayController.isVisible ? 0.1 : 1) : nil
+        let interval: TimeInterval? = isPlaying && !trackNames.isEmpty ? (OverlayController.isVisible ? 0.25 : 1) : nil
         guard subtitleTimerInterval != interval else { return }
         internalTimer?.invalidate()
         internalTimer = nil
@@ -211,6 +215,34 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         timer.tolerance = interval * 0.2
         RunLoop.main.add(timer, forMode: .common)
         internalTimer = timer
+    }
+
+    /// Schedules an update for the moment either track's text next changes, at the current playback speed.
+    private func scheduleCueTimer(position: Int) {
+        let speed = playbackSpeed
+        let next = [primary?.nextChange(after: position - timeOffsetMs).map { $0 + timeOffsetMs },
+                    secondary?.nextChange(after: position - secondaryOffsetMs).map { $0 + secondaryOffsetMs }]
+            .compactMap { $0 }.min()
+        guard isPlaying, OverlayController.isVisible, speed > 0, let next else {
+            cueTimer?.invalidate()
+            cueTimer = nil
+            cueFireUptime = nil
+            return
+        }
+        // A couple of milliseconds late, so the clock has reached the boundary when the timer fires.
+        let fire = ProcessInfo.processInfo.systemUptime + Double(next - position) / 1000 / speed + 0.002
+        if let cueFireUptime, cueTimer?.isValid == true, abs(cueFireUptime - fire) < 0.004 { return }
+        cueTimer?.invalidate()
+        cueFireUptime = fire
+        let timer = Timer(timeInterval: max(0, fire - ProcessInfo.processInfo.systemUptime), repeats: false) { [weak self] _ in
+            MainActor.assumeIsolated {
+                self?.cueFireUptime = nil
+                self?.updateSub()
+            }
+        }
+        timer.tolerance = 0
+        RunLoop.main.add(timer, forMode: .common)
+        cueTimer = timer
     }
 
     func syncTargetDidChange() { playback.setTarget(SyncTarget.current) }
@@ -260,7 +292,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
             ProcessInfo.processInfo.endActivity(token)
             appNapActivityToken = nil
         }
-        if abs(positionMs - position) >= 100 || !playing && positionMs != position || (position == 0) != (positionMs == 0) { positionMs = position }
+        if abs(positionMs - position) >= 200 || !playing && positionMs != position || (position == 0) != (positionMs == 0) { positionMs = position }
         let formatted = String(format: "%02d:%02d:%02d", position / 3_600_000, position / 60_000 % 60, position / 1000 % 60)
         if debugTimeStr != formatted { debugTimeStr = formatted }
         // The video position already runs at the player's speed, so the subtitles follow it 1:1, minus the delay.
@@ -270,6 +302,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         if secondaryText != second { secondaryText = second }
         refreshSyncStatus()
         refreshSubtitleTimer()
+        scheduleCueTimer(position: position)
     }
 
     // MARK: Playback controls (manual clock, or the followed player through Now Playing commands)

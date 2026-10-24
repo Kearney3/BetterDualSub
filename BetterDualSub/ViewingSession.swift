@@ -115,7 +115,7 @@ nonisolated enum ViewingDisplaySettings {
     static let keys = ["primaryFontFamily", "secondaryFontFamily", "primaryFontSize", "secondaryFontSize",
                        "primaryFontWeight", "secondaryFontWeight", "primaryTextColor", "secondaryTextColor",
                        "primaryOutlineColor", "secondaryOutlineColor", "primaryOutlinePixels", "secondaryOutlinePixels",
-                       "primaryLineMode", "secondaryLineMode", "backgroundStyle", "customBackgroundColor",
+                       "primaryLineMode", "secondaryLineMode", "primaryShadow", "secondaryShadow", "backgroundStyle", "customBackgroundColor",
                        "customBackgroundOpacity", "customBackgroundRadius", "subtitleDisplayID", "subtitleScreenLayouts",
                        "subtitleOffsetX", "subtitleOffsetY"]
 

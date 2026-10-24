@@ -192,7 +192,7 @@ private struct GeneralSettingsView: View {
                     .fixedSize()
                 }
                 Divider()
-                SyncStatusDetail()
+                SyncStatusDetail(showsDiagnostics: true)
             }
             SettingsCard {
                 SettingsRow(symbol: "timer", tint: .orange, titleKey: "sync.mode.title", subtitleKey: "sync.mode.help") {

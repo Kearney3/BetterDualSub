@@ -206,12 +206,7 @@ private struct OverlayAlignPanel: View {
     @State private var selected: SubtitleItem?
     @State private var result = ""
 
-    private var cues: [SubtitleItem] {
-        let all = manager.cues(track: track)
-        let query = search.trimmingCharacters(in: .whitespaces)
-        guard !query.isEmpty else { return all }
-        return all.filter { $0.text.localizedCaseInsensitiveContains(query) }
-    }
+    private var cues: [SubtitleItem] { SubtitleCueSearch.filter(manager.cues(track: track), query: search) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -247,7 +242,7 @@ private struct OverlayAlignPanel: View {
                             HStack(alignment: .top, spacing: 8) {
                                 Text(verbatim: ManualControlBar.format(cue.startMs)).monospacedDigit().foregroundStyle(.secondary)
                                     .frame(width: 52, alignment: .leading)
-                                Text(verbatim: cue.text.replacingOccurrences(of: "\n", with: " ")).lineLimit(1)
+                                Text(verbatim: SubtitleCueSearch.displayText(cue)).lineLimit(1)
                                 Spacer(minLength: 0)
                             }
                             .padding(.vertical, 3).padding(.horizontal, 6)
@@ -284,9 +279,7 @@ private struct OverlayAlignPanel: View {
     /// Brings the line that should be on screen now (at the track's current delay) into view.
     private func scrollToNow(_ proxy: ScrollViewProxy) {
         let offset = track == "secondary" ? manager.secondaryOffsetMs : manager.timeOffsetMs
-        let fileMs = manager.positionMs - offset
-        let list = cues
-        guard let target = list.last(where: { $0.startMs <= fileMs }) ?? list.first else { return }
+        guard let target = SubtitleCueSearch.nearest(in: cues, atFileMs: manager.positionMs - offset) else { return }
         DispatchQueue.main.async { proxy.scrollTo(target, anchor: .center) }
     }
 }

@@ -38,7 +38,7 @@ enum SubtitleAppearanceDefaults {
         return [prefix + "FontFamily": "Helvetica Neue", prefix + "FontWeight": secondary ? "Regular" : "Bold",
                 prefix + "FontSize": secondary ? 28.8 : 32.0, prefix + "TextColor": "#FFFFFF",
                 prefix + "OutlineColor": "#000000", prefix + "OutlinePixels": 1.0,
-                prefix + "LineMode": SubtitleLineMode.defaultValue.rawValue]
+                prefix + "LineMode": SubtitleLineMode.defaultValue.rawValue, prefix + "Shadow": true]
     }
 
     static var backgroundValues: [String: Any] {
@@ -81,6 +81,7 @@ struct SubtitleTrackStyle: Equatable {
     let textColor: String
     let outlineColor: String
     let outlinePixels: CGFloat
+    var shadow = true
 }
 
 struct SubtitleAppearanceView: View {
@@ -200,6 +201,8 @@ private struct SubtitlePreviewCard: View {
     @AppStorage("secondaryOutlinePixels") private var secondaryOutlinePixels = SubtitleAppearanceDefaults.outlinePixels(secondary: true)
     @AppStorage("primaryLineMode") private var primaryLineMode = SubtitleLineMode.defaultValue.rawValue
     @AppStorage("secondaryLineMode") private var secondaryLineMode = SubtitleLineMode.defaultValue.rawValue
+    @AppStorage("primaryShadow") private var primaryShadow = true
+    @AppStorage("secondaryShadow") private var secondaryShadow = true
     @AppStorage("backgroundStyle") private var backgroundStyle = BackgroundStyleOption.transparent.rawValue
     @AppStorage(SubtitleAppearanceDefaults.backgroundColorKey) private var backgroundColor = SubtitleAppearanceDefaults.backgroundColor
     @AppStorage(SubtitleAppearanceDefaults.backgroundOpacityKey) private var backgroundOpacity = SubtitleAppearanceDefaults.backgroundOpacity
@@ -219,10 +222,10 @@ private struct SubtitlePreviewCard: View {
                 )
                 GeometryReader { _ in
                     VStack(spacing: 12) {
-                        HTMLStrokeText(rawText: "A subtitle preview",
+                        SubtitleTextView(rawText: "A subtitle preview",
                                        fontSize: max(SubtitleAppearanceLimits.minimumFontSize, primaryFontSize), style: primaryStyle,
                                        lineMode: SubtitleLineMode(rawValue: primaryLineMode) ?? .original)
-                        HTMLStrokeText(rawText: AppLocalization.string("overlay.placeholder.secondary"),
+                        SubtitleTextView(rawText: AppLocalization.string("overlay.placeholder.secondary"),
                                        fontSize: max(SubtitleAppearanceLimits.minimumFontSize, secondaryFontSize), style: secondaryStyle,
                                        lineMode: SubtitleLineMode(rawValue: secondaryLineMode) ?? .original)
                     }
@@ -244,12 +247,14 @@ private struct SubtitlePreviewCard: View {
 
     private var primaryStyle: SubtitleTrackStyle {
         SubtitleTrackStyle(family: primaryFamily, weight: primaryWeight,
-                           textColor: primaryTextColor, outlineColor: primaryOutlineColor, outlinePixels: primaryOutlinePixels)
+                           textColor: primaryTextColor, outlineColor: primaryOutlineColor, outlinePixels: primaryOutlinePixels,
+                           shadow: primaryShadow)
     }
 
     private var secondaryStyle: SubtitleTrackStyle {
         SubtitleTrackStyle(family: secondaryFamily, weight: secondaryWeight,
-                           textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlinePixels: secondaryOutlinePixels)
+                           textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlinePixels: secondaryOutlinePixels,
+                           shadow: secondaryShadow)
     }
 }
 
@@ -266,6 +271,7 @@ private struct SubtitleTrackStyleEditor: View {
     @AppStorage private var outlineHex: String
     @AppStorage private var outlinePixels: Double
     @AppStorage private var lineMode: String
+    @AppStorage private var shadow: Bool
 
     init(secondary: Bool) {
         self.secondary = secondary
@@ -278,6 +284,7 @@ private struct SubtitleTrackStyleEditor: View {
         _outlineHex = AppStorage(wrappedValue: defaults.string(forKey: prefix + "OutlineColor") ?? "#000000", prefix + "OutlineColor")
         _outlinePixels = AppStorage(wrappedValue: SubtitleAppearanceDefaults.outlinePixels(secondary: secondary), prefix + "OutlinePixels")
         _lineMode = AppStorage(wrappedValue: SubtitleLineMode.defaultValue.rawValue, prefix + "LineMode")
+        _shadow = AppStorage(wrappedValue: true, prefix + "Shadow")
     }
 
     var body: some View {
@@ -321,6 +328,7 @@ private struct SubtitleTrackStyleEditor: View {
                 Text("\(outlinePixels.formatted(.number.precision(.fractionLength(0...1)))) px")
                     .monospacedDigit().frame(width: 60, alignment: .trailing)
             }
+            Toggle("appearance.shadow", isOn: $shadow)
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -341,21 +349,22 @@ private struct SubtitleTrackStyleEditor: View {
 
 extension Color {
     init(hex: String) {
-        let digits = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        let value = UInt64(digits, radix: 16) ?? 0xFFFFFF
-        self.init(.sRGB, red: Double((value >> 16) & 0xFF) / 255,
-                  green: Double((value >> 8) & 0xFF) / 255, blue: Double(value & 0xFF) / 255, opacity: 1)
+        self.init(nsColor: NSColor(hex: hex))
     }
 
+    /// Read in sRGB, the space `init(hex:)` uses, and rounded, so picking a color and reading it back never drifts.
     var hexString: String {
-        let rgb = NSColor(self).usingColorSpace(.deviceRGB) ?? .white
-        return String(format: "#%02X%02X%02X", Int(rgb.redComponent * 255), Int(rgb.greenComponent * 255), Int(rgb.blueComponent * 255))
+        let rgb = NSColor(self).usingColorSpace(.sRGB) ?? .white
+        func byte(_ component: CGFloat) -> Int { Int((min(1, max(0, component)) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", byte(rgb.redComponent), byte(rgb.greenComponent), byte(rgb.blueComponent))
     }
 }
 
 extension NSColor {
+    /// "#RRGGBB" or "#RGB" in sRGB; anything else is white.
     convenience init(hex: String) {
-        let color = Color(hex: hex)
-        self.init(color)
+        let value = SubtitleMarkup.hexColor(hex.hasPrefix("#") ? hex : "#" + hex).flatMap { UInt32($0.dropFirst(), radix: 16) } ?? 0xFFFFFF
+        self.init(srgbRed: CGFloat((value >> 16) & 0xFF) / 255, green: CGFloat((value >> 8) & 0xFF) / 255,
+                  blue: CGFloat(value & 0xFF) / 255, alpha: 1)
     }
 }

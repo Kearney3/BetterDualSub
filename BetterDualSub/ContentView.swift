@@ -10,137 +10,162 @@ import Combine
 import UniformTypeIdentifiers
 import Foundation
 
-// MARK: - 2. Crisp black-outlined text component
-struct HTMLStrokeText: View, Equatable {
+// MARK: - 2. Outlined subtitle text
+/// One track's cue. The outline is drawn as its own pass beneath the letters, so a thick outline frames the glyphs
+/// instead of eating into them, and emphasis and colors from the subtitle markup are kept.
+struct SubtitleTextView: View, Equatable {
     let rawText: String
     let fontSize: CGFloat
     let style: SubtitleTrackStyle
     var lineMode: SubtitleLineMode = .original
-    
-    private var customNSFont: NSFont {
-        let weightOption = FontWeightOption(rawValue: style.weight) ?? .regular
-        var fontDescriptor = NSFontDescriptor(fontAttributes: [.family: style.family])
-        
-        var traits: NSFontDescriptor.SymbolicTraits = []
-        if weightOption == .bold || weightOption == .heavy {
-            traits.insert(.bold)
-        }
-        
-        if !traits.isEmpty {
-            fontDescriptor = fontDescriptor.withSymbolicTraits(traits)
-        }
-        
-        fontDescriptor = fontDescriptor.addingAttributes([
-            .traits: [NSFontDescriptor.TraitKey.weight: weightOption.nsWeight]
-        ])
-        
-        return NSFont(descriptor: fontDescriptor, size: fontSize) ?? NSFont.systemFont(ofSize: fontSize, weight: weightOption.nsWeight)
-    }
-    
-    private var attributedString: NSAttributedString {
-        var cleanRawText = SubtitleDocument.displayHTML(lineMode.apply(to: rawText))
-        
-        if style.weight == FontWeightOption.regular.rawValue {
-            cleanRawText = cleanRawText.replacingOccurrences(of: "<b>", with: "", options: .caseInsensitive)
-                .replacingOccurrences(of: "</b>", with: "", options: .caseInsensitive)
-                .replacingOccurrences(of: "<strong>", with: "", options: .caseInsensitive)
-                .replacingOccurrences(of: "</strong>", with: "", options: .caseInsensitive)
-        }
-        
-        let htmlData = Data(cleanRawText.utf8)
-        // AppKit stores stroke width as a percentage of the font size.
-        let strokePercent = fontSize > 0 ? -100 * style.outlinePixels / fontSize : 0
-        if let nsAttributedString = try? NSMutableAttributedString(
-            data: htmlData,
-            options: [.documentType: NSAttributedString.DocumentType.html,
-                      .characterEncoding: String.Encoding.utf8.rawValue],
-            documentAttributes: nil
-        ) {
-            let range = NSRange(location: 0, length: nsAttributedString.length)
-            
-            nsAttributedString.removeAttribute(.font, range: range)
-            nsAttributedString.addAttributes([
-                .font: customNSFont,
-                .foregroundColor: NSColor(hex: style.textColor),
-                .strokeColor: NSColor(hex: style.outlineColor),
-                .strokeWidth: strokePercent
-            ], range: range)
 
-            let paragraphStyle = NSMutableParagraphStyle()
-            paragraphStyle.alignment = .center
-            paragraphStyle.lineSpacing = 4
-            nsAttributedString.addAttribute(.paragraphStyle, value: paragraphStyle, range: range)
-            return nsAttributedString
-        }
-
-        return NSAttributedString(string: cleanRawText, attributes: [
-            .font: customNSFont,
-            .foregroundColor: NSColor(hex: style.textColor),
-            .strokeColor: NSColor(hex: style.outlineColor),
-            .strokeWidth: strokePercent
-        ])
-    }
-    
     var body: some View {
-        OutlinedSubtitleLabel(attributedString: attributedString, fitSingleLine: lineMode == .single)
+        SubtitleTextLabel(runs: SubtitleMarkup.runs(lineMode.apply(to: rawText)), fontSize: fontSize, style: style,
+                          fitSingleLine: lineMode == .single)
     }
 }
 
-private struct OutlinedSubtitleLabel: NSViewRepresentable {
-    let attributedString: NSAttributedString
+/// The fill and outline layers of a cue, laid out for one width.
+struct SubtitleTextLayers {
+    var fill = NSAttributedString()
+    var outline: NSAttributedString?
+    /// Room around the text for the outline and shadow, which spill past the glyphs.
+    var inset: CGFloat = 0
+    var size: CGSize = .zero
+}
+
+private struct SubtitleTextLabel: NSViewRepresentable {
+    let runs: [SubtitleTextRun]
+    let fontSize: CGFloat
+    let style: SubtitleTrackStyle
     /// Shrink the text (down to half size) instead of wrapping when a single line is too wide.
     var fitSingleLine = false
 
-    final class Coordinator { var width: CGFloat = 0 }
+    final class Coordinator { var width: CGFloat? }
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    func makeNSView(context: Context) -> NSTextField {
-        let label = NSTextField(labelWithAttributedString: attributedString)
-        label.alignment = .center
-        label.maximumNumberOfLines = 0
-        label.lineBreakMode = .byWordWrapping
-        label.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        return label
+    func makeNSView(context: Context) -> SubtitleTextNSView { SubtitleTextNSView() }
+
+    func updateNSView(_ view: SubtitleTextNSView, context: Context) {
+        view.layers = layers(width: context.coordinator.width)
     }
 
-    func updateNSView(_ label: NSTextField, context: Context) {
-        label.attributedStringValue = fitted(to: context.coordinator.width)
-        label.alignment = .center
-        label.maximumNumberOfLines = 0
-        label.lineBreakMode = .byWordWrapping
+    func sizeThatFits(_ proposal: ProposedViewSize, nsView: SubtitleTextNSView, context: Context) -> CGSize? {
+        let width = proposal.width.flatMap { $0.isFinite ? $0 : nil }
+        context.coordinator.width = width
+        let layers = layers(width: width)
+        nsView.layers = layers
+        return layers.size
     }
 
-    private static let horizontalMargin: CGFloat = 12, verticalMargin: CGFloat = 6
+    private var shadowBlur: CGFloat { style.shadow ? max(2, fontSize * 0.1) : 0 }
+    private var shadowDrop: CGFloat { style.shadow ? max(1, fontSize * 0.04) : 0 }
 
-    private func fitted(to width: CGFloat) -> NSAttributedString {
-        guard fitSingleLine, width > Self.horizontalMargin else { return attributedString }
-        let available = width - Self.horizontalMargin
-        let natural = attributedString.boundingRect(with: NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude),
-                                                    options: [.usesLineFragmentOrigin, .usesFontLeading]).width
-        guard natural > available, natural > 0 else { return attributedString }
-        let scale = max(0.5, available / natural)
-        let scaled = NSMutableAttributedString(attributedString: attributedString)
-        scaled.enumerateAttribute(.font, in: NSRange(location: 0, length: scaled.length)) { value, range, _ in
-            if let font = value as? NSFont {
-                scaled.addAttribute(.font, value: NSFont(descriptor: font.fontDescriptor, size: font.pointSize * scale) ?? font, range: range)
+    private func layers(width: CGFloat?) -> SubtitleTextLayers {
+        let inset = ceil(style.outlinePixels + shadowBlur + shadowDrop) + 3
+        let available = width.map { max(1, $0 - inset * 2) } ?? .greatestFiniteMagnitude
+        var size = fontSize
+        var layers = makeLayers(size: size)
+        if fitSingleLine, width != nil {
+            let natural = measure(layers.fill, width: .greatestFiniteMagnitude).width
+            if natural > available, natural > 0 {
+                size = fontSize * max(0.5, available / natural)
+                layers = makeLayers(size: size)
             }
         }
-        return scaled
+        let bounds = measure(layers.fill, width: available)
+        layers.inset = inset
+        layers.size = CGSize(width: min(width ?? .greatestFiniteMagnitude, ceil(bounds.width) + inset * 2),
+                             height: ceil(bounds.height) + inset * 2)
+        return layers
     }
 
-    func sizeThatFits(_ proposal: ProposedViewSize, nsView: NSTextField, context: Context) -> CGSize? {
-        guard let width = proposal.width, width.isFinite else { return nsView.intrinsicContentSize }
-        context.coordinator.width = width
-        let text = fitted(to: width)
-        if nsView.attributedStringValue != text { nsView.attributedStringValue = text }
-        // NSTextField insets its text and the outline spills past the glyphs, so measure inside a smaller box
-        // and add the margins back; otherwise the last characters wrap onto a line that is clipped.
-        let bounds = text.boundingRect(
-            with: NSSize(width: max(1, width - Self.horizontalMargin), height: .greatestFiniteMagnitude),
-            options: [.usesLineFragmentOrigin, .usesFontLeading]
-        )
-        return CGSize(width: min(width, ceil(bounds.width) + Self.horizontalMargin),
-                      height: ceil(bounds.height) + Self.verticalMargin)
+    private func measure(_ text: NSAttributedString, width: CGFloat) -> CGSize {
+        text.boundingRect(with: NSSize(width: width, height: .greatestFiniteMagnitude),
+                          options: [.usesLineFragmentOrigin, .usesFontLeading]).size
+    }
+
+    private func baseFont(size: CGFloat) -> NSFont {
+        let weightOption = FontWeightOption(rawValue: style.weight) ?? .regular
+        var descriptor = NSFontDescriptor(fontAttributes: [.family: style.family])
+        if weightOption == .bold || weightOption == .heavy { descriptor = descriptor.withSymbolicTraits(.bold) }
+        descriptor = descriptor.addingAttributes([.traits: [NSFontDescriptor.TraitKey.weight: weightOption.nsWeight]])
+        return NSFont(descriptor: descriptor, size: size) ?? .systemFont(ofSize: size, weight: weightOption.nsWeight)
+    }
+
+    private func makeLayers(size: CGFloat) -> SubtitleTextLayers {
+        let base = baseFont(size: size)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.alignment = .center
+        paragraph.lineSpacing = 4
+        paragraph.lineBreakMode = .byWordWrapping
+        let textColor = NSColor(hex: style.textColor)
+        let outlineColor = NSColor(hex: style.outlineColor)
+        let shadow: NSShadow? = style.shadow ? {
+            let shadow = NSShadow()
+            shadow.shadowColor = NSColor.black.withAlphaComponent(0.8)
+            shadow.shadowBlurRadius = max(2, size * 0.1)
+            shadow.shadowOffset = NSSize(width: 0, height: -max(1, size * 0.04))
+            return shadow
+        }() : nil
+        let hasOutline = style.outlinePixels > 0
+        let fill = NSMutableAttributedString()
+        let outline = NSMutableAttributedString()
+        let manager = NSFontManager.shared
+        for run in runs {
+            var font = base
+            if run.bold, !manager.traits(of: font).contains(.boldFontMask) {
+                font = manager.convert(font, toHaveTrait: .boldFontMask)
+            }
+            var attributes: [NSAttributedString.Key: Any] = [.font: font, .paragraphStyle: paragraph]
+            if run.italic {
+                let italic = manager.convert(font, toHaveTrait: .italicFontMask)
+                if manager.traits(of: italic).contains(.italicFontMask) {
+                    attributes[.font] = italic
+                } else {
+                    // Most CJK fonts have no italic; slant the regular face instead.
+                    attributes[.obliqueness] = 0.18
+                }
+            }
+            outline.append(NSAttributedString(string: run.text, attributes: attributes.merging([
+                .foregroundColor: outlineColor, .strokeColor: outlineColor,
+                // A positive width strokes without filling; the stroke is centred on the glyph edge and the fill
+                // covers its inner half, so twice the outline size leaves exactly that much showing.
+                .strokeWidth: size > 0 ? 200 * style.outlinePixels / size : 0,
+            ]) { $1 }))
+            if run.underline { attributes[.underlineStyle] = NSUnderlineStyle.single.rawValue }
+            if run.strikethrough { attributes[.strikethroughStyle] = NSUnderlineStyle.single.rawValue }
+            attributes[.foregroundColor] = run.color.map(NSColor.init(hex:)) ?? textColor
+            fill.append(NSAttributedString(string: run.text, attributes: attributes))
+        }
+        if let shadow {
+            let target = hasOutline ? outline : fill
+            target.addAttribute(.shadow, value: shadow, range: NSRange(location: 0, length: target.length))
+        }
+        return SubtitleTextLayers(fill: fill, outline: hasOutline ? outline : nil)
+    }
+}
+
+/// Draws the outline layer, then the fill on top of it.
+final class SubtitleTextNSView: NSView {
+    var layers = SubtitleTextLayers() {
+        didSet {
+            guard !layers.fill.isEqual(to: oldValue.fill) || layers.outline != oldValue.outline
+                    || layers.inset != oldValue.inset else { return }
+            needsDisplay = true
+        }
+    }
+
+    override var isFlipped: Bool { true }
+    override var intrinsicContentSize: NSSize { layers.size }
+    /// The drag handle above takes the mouse.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let rect = bounds.insetBy(dx: layers.inset, dy: layers.inset)
+        let options: NSString.DrawingOptions = [.usesLineFragmentOrigin, .usesFontLeading]
+        layers.outline?.draw(with: rect, options: options)
+        layers.fill.draw(with: rect, options: options)
     }
 }
 
@@ -161,6 +186,8 @@ struct ContentView: View {
     @AppStorage("secondaryOutlinePixels") private var secondaryOutlinePixels = SubtitleAppearanceDefaults.outlinePixels(secondary: true)
     @AppStorage("primaryLineMode") private var primaryLineMode = SubtitleLineMode.defaultValue.rawValue
     @AppStorage("secondaryLineMode") private var secondaryLineMode = SubtitleLineMode.defaultValue.rawValue
+    @AppStorage("primaryShadow") private var primaryShadow = true
+    @AppStorage("secondaryShadow") private var secondaryShadow = true
     @AppStorage("backgroundStyle") private var backgroundStyle: String = BackgroundStyleOption.transparent.rawValue
     @AppStorage(SubtitleAppearanceDefaults.backgroundColorKey) private var backgroundColor = SubtitleAppearanceDefaults.backgroundColor
     @AppStorage(SubtitleAppearanceDefaults.backgroundOpacityKey) private var backgroundOpacity = SubtitleAppearanceDefaults.backgroundOpacity
@@ -297,13 +324,13 @@ struct ContentView: View {
         let emptyHeight = (primarySize + (subManager.trackNames.count > 1 ? secondarySize + 5 : 0)) * 1.4 + 16
         return VStack(spacing: 5) {
             if !primaryDisplayText.isEmpty {
-                HTMLStrokeText(rawText: primaryDisplayText,
+                SubtitleTextView(rawText: primaryDisplayText,
                                fontSize: primarySize, style: primaryStyle,
                                lineMode: SubtitleLineMode(rawValue: primaryLineMode) ?? .original)
                     .equatable()
             }
             if !secondaryDisplayText.isEmpty {
-                HTMLStrokeText(rawText: secondaryDisplayText,
+                SubtitleTextView(rawText: secondaryDisplayText,
                                fontSize: secondarySize, style: secondaryStyle,
                                lineMode: SubtitleLineMode(rawValue: secondaryLineMode) ?? .original)
                     .equatable()
@@ -359,22 +386,15 @@ struct ContentView: View {
 
     private var primaryStyle: SubtitleTrackStyle {
         SubtitleTrackStyle(family: primaryFontFamily, weight: primaryFontWeight,
-                           textColor: primaryTextColor, outlineColor: primaryOutlineColor, outlinePixels: primaryOutlinePixels)
+                           textColor: primaryTextColor, outlineColor: primaryOutlineColor, outlinePixels: primaryOutlinePixels,
+                           shadow: primaryShadow)
     }
 
     private var secondaryStyle: SubtitleTrackStyle {
         SubtitleTrackStyle(family: secondaryFontFamily, weight: secondaryFontWeight,
-                           textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlinePixels: secondaryOutlinePixels)
+                           textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlinePixels: secondaryOutlinePixels,
+                           shadow: secondaryShadow)
     }
-    
-    // Helper that checks for full screen
-    private func checkIfAppleTVIsFullScreen(tvRect: CGRect) -> Bool {
-        let currentScreen = NSScreen.screens.first(where: { $0.frame.intersects(tvRect) }) ?? NSScreen.main
-        guard let screenSize = currentScreen?.frame.size else { return false }
-        
-        return abs(tvRect.width - screenSize.width) < 15 && abs(tvRect.height - screenSize.height) < 15
-    }
-    
     
     // MARK: - Overlay placement
     /// Uses the chosen screen (or the current main screen) and remembers each display's free placement.

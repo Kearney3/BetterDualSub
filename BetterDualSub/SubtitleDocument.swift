@@ -41,6 +41,8 @@ nonisolated struct SubtitleDocument: Sendable {
     let items: [SubtitleItem]
     /// Running maximum of `endMs`, so lookups can stop scanning backwards once nothing earlier can still be active.
     private let prefixMaxEnd: [Int]
+    /// Every cue start and end, sorted: the moments the text on screen can change.
+    private let boundaries: [Int]
 
     init(items: [SubtitleItem], allowEmpty: Bool = false) throws {
         let valid = Set(items.filter { $0.startMs >= 0 && $0.endMs > $0.startMs && !$0.text.isEmpty })
@@ -52,6 +54,7 @@ nonisolated struct SubtitleDocument: Sendable {
         }
         var running = 0
         prefixMaxEnd = self.items.map { running = max(running, $0.endMs); return running }
+        boundaries = Set(self.items.flatMap { [$0.startMs, $0.endMs] }).sorted()
     }
 
     init(text: String) throws {
@@ -181,6 +184,16 @@ nonisolated struct SubtitleDocument: Sendable {
         return active.reversed().joined(separator: "\n")
     }
 
+    /// The first cue start or end after `milliseconds`, when `text(at:)` next changes; nil after the last cue.
+    func nextChange(after milliseconds: Int) -> Int? {
+        var low = 0, high = boundaries.count
+        while low < high {
+            let mid = (low + high) / 2
+            if boundaries[mid] <= milliseconds { low = mid + 1 } else { high = mid }
+        }
+        return low < boundaries.count ? boundaries[low] : nil
+    }
+
     var srt: String {
         items.enumerated().map { index, item in
             "\(index + 1)\n\(Self.timestamp(item.startMs)) --> \(Self.timestamp(item.endMs))\n\(item.text)"
@@ -239,11 +252,239 @@ nonisolated struct SubtitleDocument: Sendable {
         String(format: "%02d:%02d:%02d,%03d", value / 3_600_000, value / 60_000 % 60, value / 1000 % 60, value % 1000)
     }
 
-    static func displayHTML(_ text: String) -> String {
-        // Preserve basic subtitle emphasis without loading HTML images or other resources.
-        let tags = try! NSRegularExpression(pattern: "<(?!/?(?:b|i|u)\\s*>|br\\s*/?>)[^>]*>", options: .caseInsensitive)
-        return tags.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
-            .replacingOccurrences(of: "\n", with: "<br>")
+}
+
+/// A stretch of cue text with one set of emphasis attributes.
+nonisolated struct SubtitleTextRun: Equatable, Sendable {
+    var text: String
+    var bold = false
+    var italic = false
+    var underline = false
+    var strikethrough = false
+    /// "#RRGGBB" from a font color, a WebVTT color class or an ASS override; nil uses the track's color.
+    var color: String?
+
+    func sameStyle(as other: SubtitleTextRun) -> Bool {
+        bold == other.bold && italic == other.italic && underline == other.underline
+            && strikethrough == other.strikethrough && color == other.color
+    }
+}
+
+/// Reads the markup found in subtitle cues without an HTML engine: b/i/u/s and font color tags, WebVTT voice, class,
+/// language, ruby and timestamp tags, ASS override blocks left in SRT files ({\an8}, {\i1}, {\c&H00FFFF&}) and
+/// character entities. Anything else that looks like a tag is dropped; a lone "<" stays as text.
+nonisolated enum SubtitleMarkup {
+    private struct State {
+        var bold = 0, italic = 0, underline = 0, strikethrough = 0
+        var colors: [String?] = []
+        /// Ruby annotations (<rt>) are skipped: they would repeat the base text inline.
+        var hidden = 0
+        /// ASS overrides stay on until switched off or the cue ends.
+        var assBold = false, assItalic = false, assUnderline = false, assStrikethrough = false
+        var assColor: String?
+
+        var run: SubtitleTextRun {
+            SubtitleTextRun(text: "", bold: bold > 0 || assBold, italic: italic > 0 || assItalic,
+                            underline: underline > 0 || assUnderline, strikethrough: strikethrough > 0 || assStrikethrough,
+                            color: colors.last(where: { $0 != nil }) ?? assColor)
+        }
+    }
+
+    static func runs(_ text: String) -> [SubtitleTextRun] {
+        var runs: [SubtitleTextRun] = []
+        var state = State()
+        func append(_ string: String) {
+            guard !string.isEmpty, state.hidden == 0 else { return }
+            var run = state.run
+            if let last = runs.last, last.sameStyle(as: run) {
+                runs[runs.count - 1].text += string
+            } else {
+                run.text = string
+                runs.append(run)
+            }
+        }
+        let characters = Array(text)
+        var index = 0
+        var literal = ""
+        func flush() { append(literal); literal = "" }
+        while index < characters.count {
+            let character = characters[index]
+            if character == "<", let close = characters[index...].firstIndex(of: ">"),
+               let tag = Tag(String(characters[(index + 1)..<close])) {
+                flush()
+                if apply(tag, to: &state) { append("\n") }
+                index = close + 1
+            } else if character == "{", index + 1 < characters.count, characters[index + 1] == "\\",
+                      let close = characters[index...].firstIndex(of: "}") {
+                flush()
+                applyOverrides(String(characters[(index + 1)..<close]), to: &state)
+                index = close + 1
+            } else if character == "&", let end = characters[index...].prefix(12).firstIndex(of: ";"),
+                      let decoded = entity(String(characters[(index + 1)..<end])) {
+                literal += decoded
+                index = end + 1
+            } else {
+                literal.append(character)
+                index += 1
+            }
+        }
+        flush()
+        return trimmed(runs)
+    }
+
+    /// Cue text without markup, with its line breaks.
+    static func plainText(_ text: String) -> String {
+        runs(text).map(\.text).joined()
+    }
+
+    /// Lines trimmed of surrounding spaces, empty lines removed, as the plain-text parsers do.
+    private static func trimmed(_ runs: [SubtitleTextRun]) -> [SubtitleTextRun] {
+        // Rebuilt character by character so each kept character keeps its run's style; cues are short.
+        var styled: [(Character, Int)] = []
+        for (number, run) in runs.enumerated() { styled += run.text.map { ($0, number) } }
+        var kept: [(Character, Int)] = []
+        var line: [(Character, Int)] = []
+        func endLine() {
+            var start = 0, end = line.count
+            while start < end, line[start].0.isWhitespace { start += 1 }
+            while end > start, line[end - 1].0.isWhitespace { end -= 1 }
+            if start < end {
+                if !kept.isEmpty { kept.append(("\n", line[start].1)) }
+                kept += line[start..<end]
+            }
+            line = []
+        }
+        for item in styled { if item.0 == "\n" { endLine() } else { line.append(item) } }
+        endLine()
+        var result: [SubtitleTextRun] = []
+        for (character, number) in kept {
+            if let last = result.last, last.sameStyle(as: runs[number]) {
+                result[result.count - 1].text.append(character)
+            } else {
+                var run = runs[number]
+                run.text = String(character)
+                result.append(run)
+            }
+        }
+        return result
+    }
+
+    private struct Tag {
+        let name: String
+        let closing: Bool
+        let classes: [String]
+        let attributes: String
+
+        init?(_ body: String) {
+            // "a < b" is text: a tag name follows the bracket directly.
+            guard let lead = body.first, lead.isLetter || lead.isNumber || lead == "/" else { return nil }
+            var body = body.trimmingCharacters(in: .whitespaces)
+            // WebVTT karaoke timestamps such as <00:01.500>.
+            if lead.isNumber {
+                guard body.contains(":"), body.allSatisfy({ $0.isNumber || $0 == ":" || $0 == "." }) else { return nil }
+                name = "timestamp"; closing = false; classes = []; attributes = ""; return
+            }
+            closing = body.hasPrefix("/")
+            if closing { body.removeFirst() }
+            if body.hasSuffix("/") { body.removeLast() }
+            guard let first = body.first, first.isLetter else { return nil }
+            let head = body.prefix { !$0.isWhitespace }
+            let parts = head.split(separator: ".").map { String($0).lowercased() }
+            name = parts[0]
+            classes = Array(parts.dropFirst())
+            attributes = String(body.dropFirst(head.count))
+        }
+    }
+
+    /// Returns true for a line break.
+    private static func apply(_ tag: Tag, to state: inout State) -> Bool {
+        let step = tag.closing ? -1 : 1
+        func change(_ value: inout Int) { value = max(0, value + step) }
+        switch tag.name {
+        case "b", "strong": change(&state.bold)
+        case "i", "em": change(&state.italic)
+        case "u": change(&state.underline)
+        case "s", "strike", "del": change(&state.strikethrough)
+        case "br": return !tag.closing
+        case "rt", "rp": change(&state.hidden)
+        case "font", "c", "span":
+            if tag.closing {
+                if !state.colors.isEmpty { state.colors.removeLast() }
+            } else {
+                state.colors.append(fontColor(tag.attributes) ?? tag.classes.lazy.compactMap(namedColor).first)
+            }
+        default: break
+        }
+        return false
+    }
+
+    private static func fontColor(_ attributes: String) -> String? {
+        guard let match = attributes.range(of: #"(?i)color\s*=\s*["']?\s*([#A-Za-z0-9]+)"#, options: .regularExpression) else { return nil }
+        let value = attributes[match].split(separator: "=").last?
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\"' ")) ?? ""
+        return hexColor(value) ?? namedColor(value.lowercased())
+    }
+
+    /// "#RGB", "#RRGGBB" or "RRGGBB" as "#RRGGBB".
+    static func hexColor(_ value: String) -> String? {
+        var digits = value.hasPrefix("#") ? String(value.dropFirst()) : value
+        guard digits.allSatisfy(\.isHexDigit) else { return nil }
+        if digits.count == 3 { digits = digits.map { "\($0)\($0)" }.joined() }
+        guard digits.count == 6 else { return nil }
+        return "#" + digits.uppercased()
+    }
+
+    private static func namedColor(_ name: String) -> String? {
+        [
+            "white": "#FFFFFF", "black": "#000000", "red": "#FF0000", "lime": "#00FF00", "green": "#00FF00",
+            "blue": "#0000FF", "yellow": "#FFFF00", "cyan": "#00FFFF", "aqua": "#00FFFF", "magenta": "#FF00FF",
+            "fuchsia": "#FF00FF", "orange": "#FFA500", "gray": "#808080", "grey": "#808080", "silver": "#C0C0C0",
+        ][name]
+    }
+
+    /// The ASS overrides that change emphasis or color: \b \i \u \s with 0/1, \c / \1c with &HBBGGRR&, \r to reset.
+    private static func applyOverrides(_ block: String, to state: inout State) {
+        for item in block.split(separator: "\\").map({ $0.trimmingCharacters(in: .whitespaces) }) where !item.isEmpty {
+            let lower = item.lowercased()
+            if lower.hasPrefix("r") {
+                state.assBold = false; state.assItalic = false; state.assUnderline = false; state.assStrikethrough = false
+                state.assColor = nil
+            } else if let flag = flag(lower, "b") {
+                state.assBold = flag
+            } else if let flag = flag(lower, "i") {
+                state.assItalic = flag
+            } else if let flag = flag(lower, "u") {
+                state.assUnderline = flag
+            } else if let flag = flag(lower, "s") {
+                state.assStrikethrough = flag
+            } else if lower.hasPrefix("c&h") || lower.hasPrefix("1c&h") {
+                let digits = lower.drop { $0 != "h" }.dropFirst().prefix { $0.isHexDigit }
+                guard let value = UInt32(digits, radix: 16) else { continue }
+                state.assColor = String(format: "#%02X%02X%02X", value & 0xFF, (value >> 8) & 0xFF, (value >> 16) & 0xFF)
+            }
+        }
+    }
+
+    /// `\b1` / `\b0` (and the ASS weights `\b700`, `\b400`) as on/off; nil when `item` is another override.
+    private static func flag(_ item: String, _ name: Character) -> Bool? {
+        guard item.first == name, let value = Int(item.dropFirst()) else { return nil }
+        return name == "b" && value >= 100 ? value >= 600 : value != 0
+    }
+
+    private static func entity(_ name: String) -> String? {
+        switch name.lowercased() {
+        case "amp": return "&"
+        case "lt": return "<"
+        case "gt": return ">"
+        case "quot": return "\""
+        case "apos": return "'"
+        case "nbsp": return " "
+        case "lrm", "rlm": return ""
+        default:
+            let number = name.lowercased().hasPrefix("#x") ? UInt32(name.dropFirst(2), radix: 16)
+                : name.hasPrefix("#") ? UInt32(name.dropFirst()) : nil
+            return number.flatMap(Unicode.Scalar.init).map { String(Character($0)) }
+        }
     }
 }
 
@@ -253,9 +494,10 @@ nonisolated enum SubtitleLineMode: String, CaseIterable, Sendable {
 
     static let defaultValue = SubtitleLineMode.original
 
-    /// Terminal width of a line, counting CJK characters double.
+    /// Terminal width of a line, counting CJK characters double and markup not at all.
     private static func width(_ text: String) -> Int {
-        text.unicodeScalars.reduce(0) { $0 + (isWide($1) ? 2 : 1) }
+        let visible = text.contains("<") || text.contains("{") ? SubtitleMarkup.plainText(text) : text
+        return visible.unicodeScalars.reduce(0) { $0 + (isWide($1) ? 2 : 1) }
     }
 
     private static func isWide(_ scalar: Unicode.Scalar) -> Bool {
@@ -279,9 +521,17 @@ nonisolated enum SubtitleLineMode: String, CaseIterable, Sendable {
     private static func balancedSplit(_ text: String) -> [String] {
         var tokens: [String] = []
         var current = ""
+        // Markup stays whole inside its token, so a tag with attributes is never split at its spaces.
+        var closing: Character?
         for character in text {
             let wide = character.unicodeScalars.first.map(isWide) ?? false
-            if character == " " {
+            if let end = closing {
+                current.append(character)
+                if character == end { closing = nil }
+            } else if character == "<" || character == "{" {
+                current.append(character)
+                closing = character == "<" ? ">" : "}"
+            } else if character == " " {
                 if !current.isEmpty { tokens.append(current); current = "" }
             } else if wide {
                 if !current.isEmpty { tokens.append(current); current = "" }

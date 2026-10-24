@@ -27,12 +27,7 @@ nonisolated struct SubtitleTranslationPlan: Sendable {
     /// The cue text a translator should see: one line, without tags or entities. Lines of one sentence are often split
     /// across a cue, and translating them separately gives worse results.
     static func plainText(_ text: String) -> String {
-        let markup = try! NSRegularExpression(pattern: #"<[^>]*>|\{\\[^}]*\}"#)
-        var plain = markup.stringByReplacingMatches(in: text, range: NSRange(text.startIndex..., in: text), withTemplate: "")
-        for (entity, value) in [("&lrm;", ""), ("&rlm;", ""), ("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&")] {
-            plain = plain.replacingOccurrences(of: entity, with: value)
-        }
-        return SubtitleLineMode.single.apply(to: plain).trimmingCharacters(in: .whitespacesAndNewlines)
+        SubtitleLineMode.single.apply(to: SubtitleMarkup.plainText(text)).trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Most likely language of the track, as a BCP 47 identifier such as "en" or "zh-Hans".

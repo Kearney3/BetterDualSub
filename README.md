@@ -73,7 +73,7 @@ The menu bar icon offers the same loading, timing and display commands.
 | --- | --- | --- |
 | Movie link | An Apple TV movie page link | Lists the subtitle tracks of the chosen version. **Download only…** saves SRT files without showing them. |
 | Local episode | A `.movpkg` package downloaded by the TV app, usually in `~/Movies/Videos/Media.localized/TV Shows` | Choose the episode timeline or the whole package's. **Export SRT files…** saves copies without showing them. |
-| Subtitle file | One or two `.srt`, `.vtt`, `.ass` or `.ssa` files | UTF-8, UTF-16 and common legacy encodings (GB18030, Big5, Shift JIS, EUC-KR) are detected. ASS/SSA styling is ignored. A file name ending in `(-1500ms)` sets the delay. |
+| Subtitle file | One or two `.srt`, `.vtt`, `.ass` or `.ssa` files | UTF-8, UTF-16 and common legacy encodings (GB18030, Big5, Shift JIS, EUC-KR) are detected. ASS/SSA styling is ignored; bold, italic, underline and colors written in the cue text (HTML-style tags, WebVTT classes, `{\i1}`-style overrides) are shown. A file name ending in `(-1500ms)` sets the delay. |
 
 After a successful load the window switches to **Now Playing**. Movie downloads and local extraction remember your chosen languages. Unsupported links offer local file and local episode alternatives.
 
@@ -98,7 +98,7 @@ Choose which player to follow under **General** › **Sync source**. A connected
 ### Timing
 
 - **Delay**: positive values show subtitles later. Set them on **Now Playing**, on the overlay's control bar or with shortcuts. Track 2 follows Track 1 unless you unlink them.
-- **Align by Line**: while a line is being spoken, select it in the list and click **Align to current time**; the delay is calculated for you. It also works from the overlay: click the target button on its control bar.
+- **Align by Line**: while a line is being spoken, select it in the list and click **Align to current time**; the delay is calculated for you. The line that should be showing at the current delay is marked, and **Current line** scrolls back to it. It also works from the overlay: click the target button on its control bar.
 - **Playback speed**: subtitle time runs 1:1 with video time. At 2× the video and the subtitles both move two seconds per second; the overlay shows the player's speed.
 - Delays are saved by subtitle content and source edition, then restored with a notice. Legacy per-title timing is migrated once so a different edition cannot repeatedly inherit it.
 
@@ -108,7 +108,7 @@ On **Now Playing**, **Translate Track 2** creates a second track from Track 1 wi
 
 ### Overlay
 
-Drag the subtitles anywhere on screen. Hovering shows a control bar with playback, delay and alignment controls; right-click for appearance, lock, hide and reset. While locked, the overlay ignores the mouse so the apps underneath stay usable. **Appearance** sets fonts, colors, outlines, background and whether lines are kept as authored, joined into one or balanced over two.
+Drag the subtitles anywhere on screen. Hovering shows a control bar with playback, delay and alignment controls; right-click for appearance, lock, hide and reset. While locked, the overlay ignores the mouse so the apps underneath stay usable. **Appearance** sets fonts, colors, outlines (drawn around the letters, never over them), a soft shadow, background and whether lines are kept as authored, joined into one or balanced over two.
 
 Choose a fixed display or the current main display under **General** › **Subtitle Display**. Each display remembers its position and font sizes; disconnected displays fall back to an available screen.
 
