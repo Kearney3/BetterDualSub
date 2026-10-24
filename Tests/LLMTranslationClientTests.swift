@@ -129,6 +129,42 @@ final class LLMTranslationClientTests: XCTestCase {
         XCTAssertEqual(decoded?.batchSize, LLMConfiguration().batchSize)
         XCTAssertEqual(decoded?.translateNames, true, "Settings saved before the option existed translate names.")
         XCTAssertEqual(decoded?.untranslatedKinds, [])
+        XCTAssertEqual(decoded?.promptID, LLMPromptTemplate.standard.id)
+    }
+
+    func testPromptTemplatesFillInLanguagesAndKeepTheAppsRules() async throws {
+        let template = LLMPromptTemplate(id: "mine", name: "Anime", text: "  Translate anime from {source} into {target}.\n")
+        XCTAssertEqual(template.resolved(source: "Japanese", target: "Simplified Chinese"), "Translate anime from Japanese into Simplified Chinese.")
+        for template in LLMPromptTemplate.builtIn + [template] {
+            let prompt = LLMSubtitleTranslationSession.translationPrompt(template, from: "Japanese", to: "Simplified Chinese",
+                                                                         configuration: configuration)
+            XCTAssertTrue(prompt.hasPrefix(template.resolved(source: "Japanese", target: "Simplified Chinese") + "\n\nEach item"), template.id)
+            XCTAssertTrue(prompt.contains(#"{"translations":[{"id":0,"segments":["…"]}]}"#), template.id)
+            XCTAssertFalse(prompt.contains("{source}") || prompt.contains("{target}"), template.id)
+        }
+
+        // A session uses the template it is given.
+        let reply = chat(#"{"translations":[{"id":0,"segments":["好。"]}]}"#)
+        let session = LLMSubtitleTranslationSession(client: client([(200, reply)]), source: Locale.Language(identifier: "ja"),
+                                                    target: Locale.Language(identifier: "zh-Hans"), prompt: template)
+        try await session.translate([SubtitleTranslationInput(index: 0, text: "よし。")], context: SubtitleTranslationContext()) { _ in }
+        let system = try XCTUnwrap((StubURLProtocol.body(0)["messages"] as? [[String: String]])?.first?["content"])
+        XCTAssertTrue(system.hasPrefix("Translate anime from Japanese into Simplified Chinese."))
+    }
+
+    func testPromptLibrarySavesOnlyTheUsersTemplatesAndFallsBackToStandard() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "LLMPromptLibraryTests"))
+        defaults.removePersistentDomain(forName: "LLMPromptLibraryTests")
+        defer { defaults.removePersistentDomain(forName: "LLMPromptLibraryTests") }
+        XCTAssertEqual(LLMPromptLibrary.custom(from: defaults), [])
+        let mine = LLMPromptTemplate(id: UUID().uuidString, name: "Mine", text: "Be brief.")
+        LLMPromptLibrary.saveCustom([.faithful, mine], to: defaults)
+        XCTAssertEqual(LLMPromptLibrary.custom(from: defaults), [mine])
+        XCTAssertEqual(LLMPromptLibrary.template(id: mine.id, defaults: defaults), mine)
+        XCTAssertEqual(LLMPromptLibrary.template(id: LLMPromptTemplate.localized.id, defaults: defaults), .localized)
+        XCTAssertEqual(LLMPromptLibrary.template(id: "deleted", defaults: defaults), .standard)
+        XCTAssertTrue(LLMPromptTemplate.builtIn.allSatisfy(\.isBuiltIn))
+        XCTAssertFalse(mine.isBuiltIn)
     }
 
     func testStyleChoicesBecomeRulesOfTheTranslationPrompt() async throws {

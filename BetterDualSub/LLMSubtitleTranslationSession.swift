@@ -7,13 +7,15 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
     private let client: LLMTranslationClient
     private let source: Locale.Language
     private let target: Locale.Language
+    private let prompt: LLMPromptTemplate
     /// Cleared once the service turns down JSON mode, so later requests do not ask again.
     private var jsonMode = true
 
-    init(client: LLMTranslationClient, source: Locale.Language, target: Locale.Language) {
+    init(client: LLMTranslationClient, source: Locale.Language, target: Locale.Language, prompt: LLMPromptTemplate = .standard) {
         self.client = client
         self.source = source
         self.target = target
+        self.prompt = prompt
     }
 
     var understandsContext: Bool { true }
@@ -39,7 +41,8 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
             "known": known.map { ["source": $0.source, "target": $0.target] },
             "lines": lines,
         ]
-        let reply = try await complete([.system(termPrompt), .user(Self.json(payload))])
+        let reply = try await complete([.system(Self.termPrompt(from: Self.englishName(source), to: Self.englishName(target),
+                                                                     configuration: client.configuration)), .user(Self.json(payload))])
         guard let object = LLMTranslationClient.jsonObject(in: reply) else { return [] }
         let terms = (object as? [String: Any])?["terms"] as? [[String: Any]] ?? object as? [[String: Any]] ?? []
         return terms.compactMap { term in
@@ -63,7 +66,8 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
             payload["context_before"] = context.preceding.map { ["source": $0.source, "translation": $0.translation] }
         }
         if !context.following.isEmpty { payload["context_after"] = context.following }
-        let reply = try await complete([.system(translationPrompt(strict: context.strict)), .user(Self.json(payload))])
+        let reply = try await complete([.system(Self.translationPrompt(prompt, from: Self.englishName(source), to: Self.englishName(target),
+                                                                            configuration: client.configuration, strict: context.strict)), .user(Self.json(payload))])
         return Self.translations(in: reply, expected: Set(inputs.map(\.index)))
     }
 
@@ -100,14 +104,13 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
 
     // MARK: Prompts
 
-    private var instructions: String {
-        let text = client.configuration.instructions.trimmingCharacters(in: .whitespacesAndNewlines)
+    private static func instructions(_ configuration: LLMConfiguration) -> String {
+        let text = configuration.instructions.trimmingCharacters(in: .whitespacesAndNewlines)
         return text.isEmpty ? "" : "\n\nInstructions from the viewer (follow them unless they break the reply format):\n\(text)"
     }
 
     /// The viewer's choices on the settings page, as more rules of the translation prompt.
-    private func styleRules(_ to: String) -> String {
-        let configuration = client.configuration
+    private static func styleRules(_ configuration: LLMConfiguration, to: String) -> String {
         var rules: [String] = []
         if !configuration.translateNames {
             rules.append("Do not translate or transliterate people's names and nicknames: write them exactly as in the original " +
@@ -127,22 +130,23 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
         return rules.map { "\n- " + $0 }.joined()
     }
 
-    private func translationPrompt(strict: Bool) -> String {
-        let from = Self.englishName(source), to = Self.englishName(target)
-        var prompt = """
-        You are a professional subtitle translator. Translate film and TV subtitles from \(from) into \(to).
+    /// The system prompt of a translation request: the template's role and style, then the app's own rules for segments,
+    /// glossary, context and the reply, which every template keeps so replies stay readable.
+    static func translationPrompt(_ template: LLMPromptTemplate, from: String, to: String, configuration: LLMConfiguration,
+                                  strict: Bool = false) -> String {
+        var prompt = template.resolved(source: from, target: to) + """
+
 
         Each item of "lines" has an "id" and "segments": the consecutive subtitle cues one sentence is spoken over. \
         Translate the sentence as a whole, then return it as the same number of segments, in the same order, so that \
         each translated segment can be shown while its original segment is spoken. Only move words between segments \
         when \(to) word order requires it, and never leave a segment empty unless the sentence is shorter than its segments.
 
-        - Write natural, concise, spoken \(to) that reads well as subtitles. Keep each speaker's tone, register and humor.
         - Always translate names and terms listed in "glossary" exactly as given there.
         - Keep other names, places and recurring terms consistent with "context_before".
         - "context_before" (already translated) and "context_after" are only there to help you understand; do not \
         translate or return them.
-        - Do not add notes, explanations, quotes around lines or romanization. Keep ♪ and numbers as they are.\(styleRules(to))
+        - Do not add notes, explanations, quotes around lines or romanization. Keep ♪ and numbers as they are.\(styleRules(configuration, to: to))
 
         Reply with JSON only, in this form:
         {"translations":[{"id":0,"segments":["…"]}]}
@@ -152,12 +156,12 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
             prompt += "\n\nThe previous translation of these lines did not use the glossary. Every glossary term that " +
                 "occurs in a line must appear in its translation exactly as written in \"glossary\"."
         }
-        return prompt + instructions
+        return prompt + instructions(configuration)
     }
 
-    private var termPrompt: String {
-        let from = Self.englishName(source), to = Self.englishName(target)
-        return """
+    /// The system prompt that gathers a show's names and terms.
+    static func termPrompt(from: String, to: String, configuration: LLMConfiguration) -> String {
+        """
         You prepare the glossary for translating the subtitles of one film or TV show from \(from) into \(to).
 
         From "lines", list the names of people, places and organizations, and the terms particular to this show: \
@@ -167,7 +171,7 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
 
         Reply with JSON only, in this form:
         {"terms":[{"source":"…","target":"…","kind":"person|place|organization|term"}]}
-        """ + instructions
+        """ + instructions(configuration)
     }
 
     /// The language's English name, which models understand best; Chinese is told apart by script.
@@ -178,5 +182,67 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
                 ? "Traditional Chinese" : "Simplified Chinese"
         }
         return language.languageCode.flatMap { english.localizedString(forLanguageCode: $0.identifier) } ?? language.minimalIdentifier
+    }
+}
+
+/// The translator's role and style at the top of the translation prompt, with `{source}` and `{target}` standing for
+/// the languages. The app adds the rest itself (`LLMSubtitleTranslationSession.translationPrompt`).
+nonisolated struct LLMPromptTemplate: Codable, Equatable, Identifiable, Sendable {
+    var id: String
+    /// The user's name for their own template; built-in ones are named in the interface language (`title`).
+    var name: String
+    var text: String
+
+    var isBuiltIn: Bool { id.hasPrefix("builtin.") }
+    var title: String { isBuiltIn ? subtitleLocalizedString("llm.prompt.\(id.dropFirst("builtin.".count))") : name }
+
+    func resolved(source: String, target: String) -> String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "{source}", with: source)
+            .replacingOccurrences(of: "{target}", with: target)
+    }
+
+    static let standard = LLMPromptTemplate(id: "builtin.standard", name: "", text: """
+        You are a professional subtitle translator. Translate film and TV subtitles from {source} into {target}.
+
+        Write natural, concise, spoken {target} that reads well as subtitles. Keep each speaker's tone, register and humor.
+        """)
+
+    static let faithful = LLMPromptTemplate(id: "builtin.faithful", name: "", text: """
+        You are a careful subtitle translator for viewers who follow the original alongside the translation. Translate \
+        film and TV subtitles from {source} into {target}.
+
+        Stay close to the original wording and sentence structure, so each line can be compared with its source, as long \
+        as the {target} stays correct and readable. Translate idioms by their meaning, and do not add, drop or embellish \
+        anything.
+        """)
+
+    static let localized = LLMPromptTemplate(id: "builtin.localized", name: "", text: """
+        You are an experienced subtitle localizer. Translate film and TV subtitles from {source} into {target} for an \
+        audience who speaks {target}.
+
+        Prefer what a native speaker would naturally say over a literal rendering. Render idioms, wordplay, jokes and \
+        cultural references with {target} equivalents that land the same way, keep each character's slang and register, \
+        and keep lines short enough to read at a glance.
+        """)
+
+    static let builtIn = [standard, faithful, localized]
+}
+
+/// The built-in prompt templates and the user's own, kept in user defaults.
+nonisolated enum LLMPromptLibrary {
+    static let storageKey = "llmPromptTemplates"
+
+    static func custom(from defaults: UserDefaults = .standard) -> [LLMPromptTemplate] {
+        defaults.data(forKey: storageKey).flatMap { try? JSONDecoder().decode([LLMPromptTemplate].self, from: $0) } ?? []
+    }
+
+    static func saveCustom(_ templates: [LLMPromptTemplate], to defaults: UserDefaults = .standard) {
+        if let data = try? JSONEncoder().encode(templates.filter { !$0.isBuiltIn }) { defaults.set(data, forKey: storageKey) }
+    }
+
+    /// The template with `id`, or the standard one when it was deleted.
+    static func template(id: String, defaults: UserDefaults = .standard) -> LLMPromptTemplate {
+        (LLMPromptTemplate.builtIn + custom(from: defaults)).first { $0.id == id } ?? .standard
     }
 }

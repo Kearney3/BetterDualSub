@@ -8,6 +8,8 @@ struct TranslationSettingsView: View {
     @State private var models: [String] = []
     @State private var testing = false
     @State private var choosingModel = false
+    @State private var customPrompts = LLMPromptLibrary.custom()
+    @State private var editingPrompt: LLMPromptTemplate?
     @State private var testStatus: (text: String, isError: Bool)?
 
     var body: some View {
@@ -78,6 +80,29 @@ struct TranslationSettingsView: View {
                     .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
                 SettingsHint(key: "llm.instructions.help")
             }
+            SettingsCard(titleKey: "llm.prompt.title") {
+                HStack(spacing: 10) {
+                    Picker("llm.prompt", selection: $configuration.promptID) {
+                        Section("llm.prompt.builtIn") {
+                            ForEach(LLMPromptTemplate.builtIn) { Text(verbatim: $0.title).tag($0.id) }
+                        }
+                        if !customPrompts.isEmpty {
+                            Section("llm.prompt.custom") {
+                                ForEach(customPrompts) { Text(verbatim: $0.title).tag($0.id) }
+                            }
+                        }
+                    }
+                    .labelsHidden()
+                    .fixedSize()
+                    Spacer()
+                    Button(selectedPrompt.isBuiltIn ? "llm.prompt.view" : "llm.prompt.edit") { editingPrompt = selectedPrompt }
+                    Button("llm.prompt.new") {
+                        editingPrompt = LLMPromptTemplate(id: UUID().uuidString, name: AppLocalization.string("llm.prompt.newName"),
+                                                          text: LLMPromptTemplate.standard.text)
+                    }
+                }
+                SettingsHint(key: "llm.prompt.help")
+            }
             SettingsCard(titleKey: "llm.style.title") {
                 Toggle("llm.translateNames", isOn: $configuration.translateNames)
                 Toggle("llm.translatePlaces", isOn: $configuration.translatePlaces)
@@ -87,7 +112,17 @@ struct TranslationSettingsView: View {
                 Toggle("llm.softenProfanity", isOn: $configuration.softenProfanity)
             }
         }
-        .onAppear { apiKey = configuration.apiKey ?? "" }
+        .onAppear {
+            apiKey = configuration.apiKey ?? ""
+            // A template deleted elsewhere falls back to the standard one, as translation does.
+            if LLMPromptLibrary.template(id: configuration.promptID).id != configuration.promptID {
+                configuration.promptID = LLMPromptTemplate.standard.id
+            }
+        }
+        .sheet(item: $editingPrompt) { template in
+            LLMPromptEditorView(template: template, configuration: configuration,
+                                isSaved: customPrompts.contains { $0.id == template.id }, onSave: savePrompt, onDelete: deletePrompt)
+        }
         .onChange(of: configuration) { old, new in
             if old.preset != new.preset {
                 models = []
@@ -101,6 +136,27 @@ struct TranslationSettingsView: View {
         .onChange(of: apiKey) { _, key in
             KeychainStore.setPassword(key.trimmingCharacters(in: .whitespacesAndNewlines), account: configuration.keychainAccount)
         }
+    }
+
+    private var selectedPrompt: LLMPromptTemplate {
+        (LLMPromptTemplate.builtIn + customPrompts).first { $0.id == configuration.promptID } ?? .standard
+    }
+
+    /// Adds or replaces the user's template and uses it.
+    private func savePrompt(_ template: LLMPromptTemplate) {
+        if let index = customPrompts.firstIndex(where: { $0.id == template.id }) {
+            customPrompts[index] = template
+        } else {
+            customPrompts.append(template)
+        }
+        LLMPromptLibrary.saveCustom(customPrompts)
+        configuration.promptID = template.id
+    }
+
+    private func deletePrompt(_ template: LLMPromptTemplate) {
+        customPrompts.removeAll { $0.id == template.id }
+        LLMPromptLibrary.saveCustom(customPrompts)
+        if configuration.promptID == template.id { configuration.promptID = LLMPromptTemplate.standard.id }
     }
 
     /// Asks the service for its models, which also tests the connection; `choosing` then shows them to pick from.

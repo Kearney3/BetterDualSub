@@ -50,6 +50,8 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
     /// Keep -san, -kun, oppa and the like rather than replacing them with forms of address of the target language.
     var keepHonorifics = false
     var softenProfanity = false
+    /// The `LLMPromptTemplate` that sets the translator's role and style.
+    var promptID = LLMPromptTemplate.standard.id
 
     init() {}
 
@@ -67,6 +69,7 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
         translatePlaces = try container.decodeIfPresent(Bool.self, forKey: .translatePlaces) ?? defaults.translatePlaces
         keepHonorifics = try container.decodeIfPresent(Bool.self, forKey: .keepHonorifics) ?? defaults.keepHonorifics
         softenProfanity = try container.decodeIfPresent(Bool.self, forKey: .softenProfanity) ?? defaults.softenProfanity
+        promptID = try container.decodeIfPresent(String.self, forKey: .promptID) ?? defaults.promptID
     }
 
     static func load(from defaults: UserDefaults = .standard) -> LLMConfiguration {

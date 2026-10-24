@@ -106,7 +106,7 @@ final class SubtitleTranslator: ObservableObject {
             SystemSubtitleTranslationSession(source: source, target: target)
         case .llm(let configuration):
             LLMSubtitleTranslationSession(client: LLMTranslationClient(configuration: configuration, apiKey: configuration.apiKey),
-                                          source: source, target: target)
+                                          source: source, target: target, prompt: LLMPromptLibrary.template(id: configuration.promptID))
         }
     }
 

@@ -13,7 +13,7 @@ let package = Package(
                           "Info.plist", "Localizable.xcstrings", "ThirdPartyNotices.txt",
                           "BilingualExportView.swift", "NowPlayingView.swift", "LoadSubtitlesView.swift", "LocalSubtitleFileView.swift",
                           "ManualControlBar.swift", "SettingsComponents.swift", "SubtitleAlignView.swift",
-                          "SyncStatusView.swift", "SubtitleTranslationView.swift", "TranslationSettingsView.swift", "GlossaryEditorView.swift",
+                          "SyncStatusView.swift", "SubtitleTranslationView.swift", "TranslationSettingsView.swift", "GlossaryEditorView.swift", "LLMPromptEditorView.swift",
                           "UpdateChecker.swift", "ViewingSessionViews.swift", "SubtitleScreenSettings.swift",
                           "MediaRemotePlaybackClient.swift", "SubtitleManager.swift", "OnboardingViews.swift"],
                 sources: ["SubtitleDocument.swift", "MovieSubtitleDownloader.swift", "MovpkgSubtitleExtractor.swift", "VideoSubtitleExtractor.swift",
