@@ -17,6 +17,26 @@ jobs:
       - name: Unit tests
         run: swift test
 
+      # The private key is the base64 export of `generate_keys -x`; the app gets the matching public key so that
+      # Sparkle only installs updates signed with it.
+      - name: Read Sparkle signing key
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          if [ -z "$SPARKLE_PRIVATE_KEY" ]; then
+            echo "::error::The SPARKLE_PRIVATE_KEY secret is not set, so in-app updates could not be signed."
+            exit 1
+          fi
+          PUBLIC_KEY="$(swift - <<'SWIFT'
+          import CryptoKit
+          import Foundation
+          let secret = ProcessInfo.processInfo.environment["SPARKLE_PRIVATE_KEY"]!
+          let seed = Data(base64Encoded: secret.trimmingCharacters(in: .whitespacesAndNewlines))!.prefix(32)
+          print(try! Curve25519.Signing.PrivateKey(rawRepresentation: seed).publicKey.rawRepresentation.base64EncodedString())
+          SWIFT
+          )"
+          echo "SPARKLE_PUBLIC_ED_KEY=$PUBLIC_KEY" >> "$GITHUB_ENV"
+
       - name: Build app (Release)
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
@@ -24,6 +44,7 @@ jobs:
             -configuration Release -derivedDataPath build \
             -onlyUsePackageVersionsFromResolvedFile \
             MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${GITHUB_RUN_NUMBER}" \
+            SPARKLE_PUBLIC_ED_KEY="$SPARKLE_PUBLIC_ED_KEY" \
             ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
             MACOSX_DEPLOYMENT_TARGET=26.0 CODE_SIGNING_ALLOWED=NO build
 
@@ -38,12 +59,46 @@ jobs:
           hdiutil create -volname "BetterDualSub" -srcfolder dmg-root -ov -format UDZO \
             "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg"
 
+      # The app reads the feed from releases/latest/download/appcast.xml, so it is uploaded with the DMG in one step.
+      - name: Create signed appcast
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DMG="BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg"
+          SIGN_UPDATE="build/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update"
+          gh api "repos/$GITHUB_REPOSITORY/releases/generate-notes" -f tag_name="$GITHUB_REF_NAME" --jq .body > notes.md
+          NOTES_HTML="$(gh api markdown -F text=@notes.md -f mode=gfm -f context="$GITHUB_REPOSITORY")"
+          NOTES_HTML="${NOTES_HTML//]]>/]]]]><![CDATA[>}"
+          ENCLOSURE="$(printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - "$DMG")"
+          cat > appcast.xml <<XML
+          <?xml version="1.0" encoding="utf-8"?>
+          <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+            <channel>
+              <title>BetterDualSub</title>
+              <item>
+                <title>BetterDualSub ${VERSION}</title>
+                <pubDate>$(LC_ALL=C date -u '+%a, %d %b %Y %H:%M:%S +0000')</pubDate>
+                <sparkle:version>${GITHUB_RUN_NUMBER}</sparkle:version>
+                <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
+                <sparkle:minimumSystemVersion>26.0</sparkle:minimumSystemVersion>
+                <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+                <sparkle:fullReleaseNotesLink>https://github.com/${GITHUB_REPOSITORY}/releases/tag/${GITHUB_REF_NAME}</sparkle:fullReleaseNotesLink>
+                <description><![CDATA[${NOTES_HTML}]]></description>
+                <enclosure url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/${DMG}" type="application/octet-stream" ${ENCLOSURE} />
+              </item>
+            </channel>
+          </rss>
+          XML
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | "$SIGN_UPDATE" --ed-key-file - appcast.xml
+
       - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg" \
-            --title "BetterDualSub ${GITHUB_REF_NAME}" --generate-notes --verify-tag
+          gh release create "$GITHUB_REF_NAME" "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg" appcast.xml \
+            --title "BetterDualSub ${GITHUB_REF_NAME}" --notes-file notes.md --verify-tag
 
       - name: Update Homebrew cask
         run: |

@@ -383,6 +383,12 @@ private struct UpdateStatusView: View {
                         Button("update.notes") { NSWorkspace.shared.open(release.page) }
                     }
                     .controlSize(.small)
+                } else if UpdateChecker.canInstallInApp {
+                    HStack {
+                        Button("update.install") { updater.installUpdate() }
+                            .buttonStyle(.borderedProminent)
+                        Button("update.notes") { NSWorkspace.shared.open(release.page) }
+                    }
                 } else {
                     Button("update.download") { NSWorkspace.shared.open(release.page) }
                         .buttonStyle(.borderedProminent)

@@ -219,7 +219,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         if let release = UpdateChecker.shared.available {
             let update = NSMenuItem(title: AppLocalization.format("menu.update", release.version.description),
-                                    action: #selector(openSettings), keyEquivalent: "")
+                                    action: UpdateChecker.canInstallInApp ? #selector(installUpdate) : #selector(openSettings),
+                                    keyEquivalent: "")
             update.target = self
             update.image = NSImage(systemSymbolName: "arrow.down.circle.fill", accessibilityDescription: nil)
             menu.addItem(update)
@@ -347,6 +348,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         showControlCenter(page: "general")
+    }
+
+    @objc private func installUpdate() {
+        UpdateChecker.shared.installUpdate()
     }
 
     @objc private func openMoviePage() {

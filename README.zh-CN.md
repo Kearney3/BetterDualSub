@@ -47,6 +47,8 @@ Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行
 
 通过 Homebrew 安装时会自动完成这一步。
 
+有新版本时，**设置** › **通用** 中会出现 **安装更新…**，点击后会下载新版本、校验签名并重新打开应用。通过 Homebrew 安装的仍用 `brew` 升级。
+
 ## 快速开始
 
 1. 首次启动时，欢迎页会介绍三个步骤，点击 **加载字幕** 即进入加载页（之后可从 **帮助** › **BetterDualSub 使用引导** 再次打开）。选择 **加载字幕**。可拖入一到两个字幕文件、视频文件或 `.movpkg` 包，也可粘贴影片链接并点击 **识别来源**。
@@ -249,11 +251,23 @@ git config core.hooksPath .githooks
 
 ### 发布
 
-推送 `v*` 标签，如 `v1.1.0`。发布流程会运行测试、构建 arm64 DMG、发布 GitHub Release，并更新 Homebrew cask 中的版本和校验值。
+推送 `v*` 标签，如 `v1.1.0`。发布流程会运行测试、构建 arm64 DMG、发布附带已签名 Sparkle `appcast.xml` 的 GitHub Release，并更新 Homebrew cask 中的版本和校验值。
+
+应用内更新使用 Sparkle EdDSA 密钥签名，私钥保存在仓库 secret `SPARKLE_PRIVATE_KEY` 中；缺少该 secret 时发布流程会中止。首次配置（需先让 Xcode 解析完依赖包）：
+
+```sh
+SPARKLE_BIN="$(find ~/Library/Developer/Xcode/DerivedData -path '*artifacts/sparkle/Sparkle/bin' -type d | head -1)"
+"$SPARKLE_BIN/generate_keys"                      # 在登录钥匙串中生成密钥
+"$SPARKLE_BIN/generate_keys" -x sparkle-key.txt   # 导出密钥
+gh secret set SPARKLE_PRIVATE_KEY < sparkle-key.txt && rm sparkle-key.txt
+```
+
+请妥善保留钥匙串中的密钥：已安装的应用会拒绝用其他密钥签名的更新。公钥在构建时由 secret 推导，因此本地构建不含公钥，会改为打开下载页面。
 
 ## 致谢
 
 - Apple TV 电影接口的发现流程参考了 [iSubRip](https://github.com/MichaelYochpaz/iSubRip)（MIT），并用 Swift 原生重新实现。署名与源码分析见 [`ThirdPartyNotices.txt`](BetterDualSub/ThirdPartyNotices.txt) 和 [`docs/isubrip-download-research.md`](docs/isubrip-download-research.md)。
 - 播放信息通过 [mediaremote-adapter](https://github.com/ejbills/mediaremote-adapter) 读取。
+- 应用内更新使用 [Sparkle](https://sparkle-project.org)（MIT）。
 
 BetterDualSub 与 Apple 无关联，也未获 Apple 认可。Apple TV 是 Apple Inc. 的商标。

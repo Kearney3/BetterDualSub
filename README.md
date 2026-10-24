@@ -47,6 +47,8 @@ Homebrew only installs casks from third-party taps that you trust; `brew trust` 
 
 The Homebrew cask does the equivalent for you.
 
+When a new version is out, **Settings** › **General** offers **Install Update…**, which downloads it, checks its signature and relaunches the app. Homebrew installs are upgraded with `brew` instead.
+
 ## Quick start
 
 1. On first launch a welcome screen walks through the three steps; **Load Subtitles** takes you to the loading page (reopen it any time from **Help** › **BetterDualSub Guide**). Open **Load Subtitles**. Drop one or two subtitle files, a video file or a `.movpkg` package, or paste a movie link and click **Choose source**.
@@ -249,11 +251,23 @@ git config core.hooksPath .githooks
 
 ### Releasing
 
-Push a `v*` tag, such as `v1.1.0`. The release workflow runs the tests, builds an arm64 DMG, publishes the GitHub release and updates the version and checksum in the Homebrew cask.
+Push a `v*` tag, such as `v1.1.0`. The release workflow runs the tests, builds an arm64 DMG, publishes the GitHub release with a signed Sparkle `appcast.xml`, and updates the version and checksum in the Homebrew cask.
+
+In-app updates are signed with a Sparkle EdDSA key kept in the `SPARKLE_PRIVATE_KEY` repository secret; the workflow stops if it is missing. To set it up once, after Xcode has resolved the packages:
+
+```sh
+SPARKLE_BIN="$(find ~/Library/Developer/Xcode/DerivedData -path '*artifacts/sparkle/Sparkle/bin' -type d | head -1)"
+"$SPARKLE_BIN/generate_keys"                      # creates the key in your login keychain
+"$SPARKLE_BIN/generate_keys" -x sparkle-key.txt   # exports it
+gh secret set SPARKLE_PRIVATE_KEY < sparkle-key.txt && rm sparkle-key.txt
+```
+
+Keep the key in your keychain: updates signed with another key are refused by installed copies. The public key is derived from the secret at build time, so local builds have none and offer the download page instead.
 
 ## Acknowledgments
 
 - The Apple TV movie API discovery follows [iSubRip](https://github.com/MichaelYochpaz/iSubRip) (MIT), reimplemented natively in Swift. See [`ThirdPartyNotices.txt`](BetterDualSub/ThirdPartyNotices.txt) and [`docs/isubrip-download-research.md`](docs/isubrip-download-research.md).
 - Playback information is read with [mediaremote-adapter](https://github.com/ejbills/mediaremote-adapter).
+- In-app updates use [Sparkle](https://sparkle-project.org) (MIT).
 
 BetterDualSub is not affiliated with or endorsed by Apple. Apple TV is a trademark of Apple Inc.

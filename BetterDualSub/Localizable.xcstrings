@@ -6532,6 +6532,23 @@
         }
       }
     },
+    "update.install" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install Update…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "安装更新…"
+          }
+        }
+      }
+    },
     "update.download" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6572,13 +6589,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "At most once a day, asks GitHub for the latest version number. Nothing else is sent, and nothing is downloaded or installed automatically."
+            "value" : "At most once a day, asks GitHub for the latest version number. Nothing else is sent. An update is downloaded only when you install it, and its signature is checked first."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每天最多一次向 GitHub 查询最新版本号，不发送其他信息，也不会自动下载或安装。"
+            "value" : "每天最多一次向 GitHub 查询最新版本号，不发送其他信息。只有在你选择安装时才会下载更新，并先校验签名。"
           }
         }
       }

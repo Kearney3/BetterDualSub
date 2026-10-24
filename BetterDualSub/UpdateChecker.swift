@@ -1,8 +1,9 @@
 import Foundation
 import Combine
+import Sparkle
 
-/// Looks up the latest GitHub release and tells the user when it is newer than the running app. It never downloads
-/// or installs anything: Homebrew installs are upgraded with `brew`, others from the release page.
+/// Looks up the latest GitHub release and tells the user when it is newer than the running app. Nothing is downloaded
+/// until the user asks: Homebrew installs are upgraded with `brew`, others in the app through Sparkle.
 @MainActor
 final class UpdateChecker: ObservableObject {
     static let shared = UpdateChecker()
@@ -29,6 +30,11 @@ final class UpdateChecker: ObservableObject {
 
     @Published private(set) var state: State = .idle
 
+    /// Sparkle only installs updates the user asks for; its own scheduled checks are off in Info.plist, and it is not
+    /// started for Homebrew installs, which it must not replace behind `brew`'s back.
+    private let sparkle = SPUStandardUpdaterController(startingUpdater: UpdateChecker.canInstallInApp,
+                                                       updaterDelegate: nil, userDriverDelegate: nil)
+
     var available: Release? {
         if case .available(let release) = state { release } else { nil }
     }
@@ -39,6 +45,18 @@ final class UpdateChecker: ObservableObject {
     static var installedWithHomebrew: Bool {
         ["/opt/homebrew/Caskroom/betterdualsub", "/usr/local/Caskroom/betterdualsub"]
             .contains { FileManager.default.fileExists(atPath: $0) }
+    }
+
+    /// Not installed with Homebrew, and built with the release signing key (local builds are not), so the app can
+    /// download and install updates itself.
+    static var canInstallInApp: Bool {
+        !installedWithHomebrew && !(Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? "").isEmpty
+    }
+
+    /// Shows Sparkle's update window, which downloads, verifies and installs the update, then relaunches.
+    func installUpdate() {
+        guard Self.canInstallInApp else { return }
+        sparkle.checkForUpdates(nil)
     }
 
     private init() {

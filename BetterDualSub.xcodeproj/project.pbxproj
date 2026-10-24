@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		FA549C7B3018618A00FA2DBA /* MediaRemoteAdapter in Frameworks */ = {isa = PBXBuildFile; productRef = FA549C7A3018618A00FA2DBA /* MediaRemoteAdapter */; };
 		FA549C7C30187CB700FA2DBA /* MediaRemoteAdapter in Embed Frameworks */ = {isa = PBXBuildFile; productRef = FA549C7A3018618A00FA2DBA /* MediaRemoteAdapter */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		5A0000000000000000000003 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 5A0000000000000000000002 /* Sparkle */; };
 		FA549C813018830600FA2DBA /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = FA549C803018830600FA2DBA /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -55,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				FA549C7B3018618A00FA2DBA /* MediaRemoteAdapter in Frameworks */,
+				5A0000000000000000000003 /* Sparkle in Frameworks */,
 			);
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -97,6 +99,7 @@
 			name = BetterDualSub;
 			packageProductDependencies = (
 				FA549C7A3018618A00FA2DBA /* MediaRemoteAdapter */,
+				5A0000000000000000000002 /* Sparkle */,
 			);
 			productName = MyApp;
 			productReference = 000000000000000000000120 /* BetterDualSub.app */;
@@ -129,6 +132,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				FA549C793018618A00FA2DBA /* XCRemoteSwiftPackageReference "mediaremote-adapter" */,
+				5A0000000000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
@@ -327,6 +331,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = studio.bbit.betterdualsub;
+				SPARKLE_PUBLIC_ED_KEY = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -377,6 +382,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = studio.bbit.betterdualsub;
+				SPARKLE_PUBLIC_ED_KEY = "";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
@@ -423,6 +429,14 @@
 				kind = branch;
 			};
 		};
+		5A0000000000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -430,6 +444,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = FA549C793018618A00FA2DBA /* XCRemoteSwiftPackageReference "mediaremote-adapter" */;
 			productName = MediaRemoteAdapter;
+		};
+		5A0000000000000000000002 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 5A0000000000000000000001 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
