@@ -314,13 +314,20 @@ private struct GeneralSettingsView: View {
     }
 
     private func syncAppLabel(_ name: String, bundleID: String) -> some View {
-        let icon = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.icon
+        let appIcon = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?.icon
             ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID).map { NSWorkspace.shared.icon(forFile: $0.path) }
+        // Menu pickers render through NSMenu/NSPopUpButton, which ignore SwiftUI frames and
+        // draw the NSImage at its own size, so hand them a copy that is already 16×16.
+        let icon = appIcon.map { image -> NSImage in
+            let sized = image.copy() as! NSImage
+            sized.size = NSSize(width: 16, height: 16)
+            return sized
+        }
         return Label {
             Text(verbatim: name)
         } icon: {
             if let icon {
-                Image(nsImage: icon).renderingMode(.original).resizable().frame(width: 16, height: 16)
+                Image(nsImage: icon).renderingMode(.original)
             } else {
                 Image(systemName: "app")
             }
