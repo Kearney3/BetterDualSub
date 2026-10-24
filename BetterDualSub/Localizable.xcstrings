@@ -7538,6 +7538,57 @@
         }
       }
     },
+    "llm.model.fetch" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fetch Models"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "获取模型列表"
+          }
+        }
+      }
+    },
+    "llm.model.filter" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Filter models"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "筛选模型"
+          }
+        }
+      }
+    },
+    "llm.model.none" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The service offers no models."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "该服务未提供任何模型。"
+          }
+        }
+      }
+    },
     "llm.model.prompt" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7561,13 +7612,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose from the models the service offers"
+            "value" : "Fetch the models the service offers and choose one"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "从服务提供的模型中选择"
+            "value" : "获取服务提供的模型并从中选择"
           }
         }
       }

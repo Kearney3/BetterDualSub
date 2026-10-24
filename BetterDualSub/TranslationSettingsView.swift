@@ -7,6 +7,7 @@ struct TranslationSettingsView: View {
     @State private var apiKey = ""
     @State private var models: [String] = []
     @State private var testing = false
+    @State private var choosingModel = false
     @State private var testStatus: (text: String, isError: Bool)?
 
     var body: some View {
@@ -25,22 +26,25 @@ struct TranslationSettingsView: View {
                     TextField("llm.baseURL", text: $configuration.baseURL, prompt: Text(verbatim: LLMPreset.ollama.baseURL))
                     HStack {
                         TextField("llm.model", text: $configuration.model, prompt: Text("llm.model.prompt"))
-                        Menu {
-                            ForEach(models, id: \.self) { model in Button(model) { configuration.model = model } }
-                        } label: {
-                            Image(systemName: "list.bullet")
+                        Button { loadModels(choosing: true) } label: {
+                            Label("llm.model.fetch", systemImage: "list.bullet")
                         }
-                        .menuIndicator(.hidden)
                         .fixedSize()
-                        .disabled(models.isEmpty)
+                        .disabled(testing || configuration.endpoint == nil)
                         .help(Text("llm.model.choose"))
+                        .popover(isPresented: $choosingModel, arrowEdge: .bottom) {
+                            LLMModelPicker(models: models, selection: configuration.model) { model in
+                                configuration.model = model
+                                choosingModel = false
+                            }
+                        }
                     }
                     SecureField("llm.apiKey", text: $apiKey,
                                 prompt: Text(configuration.isOnThisMac ? "llm.apiKey.optional" : "llm.apiKey.required"))
                 }
                 .formStyle(.columns)
                 HStack(spacing: 10) {
-                    Button("llm.test", action: test).disabled(testing || configuration.endpoint == nil)
+                    Button("llm.test") { loadModels(choosing: false) }.disabled(testing || configuration.endpoint == nil)
                     if testing { ProgressView().controlSize(.small) }
                 }
                 if let testStatus { StatusLine(text: testStatus.text, isError: testStatus.isError) }
@@ -91,7 +95,8 @@ struct TranslationSettingsView: View {
         }
     }
 
-    private func test() {
+    /// Asks the service for its models, which also tests the connection; `choosing` then shows them to pick from.
+    private func loadModels(choosing: Bool) {
         let client = LLMTranslationClient(configuration: configuration, apiKey: apiKey)
         testing = true
         testStatus = nil
@@ -100,11 +105,67 @@ struct TranslationSettingsView: View {
             do {
                 let list = try await client.models()
                 models = list
-                if configuration.model.trimmingCharacters(in: .whitespaces).isEmpty, let first = list.first { configuration.model = first }
-                testStatus = (AppLocalization.format("llm.test.ok", list.count), false)
+                if list.isEmpty {
+                    testStatus = (AppLocalization.string("llm.model.none"), true)
+                } else if choosing {
+                    choosingModel = true
+                } else {
+                    if configuration.model.trimmingCharacters(in: .whitespaces).isEmpty, let first = list.first { configuration.model = first }
+                    testStatus = (AppLocalization.format("llm.test.ok", list.count), false)
+                }
             } catch {
                 testStatus = (error.localizedDescription, true)
             }
         }
+    }
+}
+
+/// The models a service offers, with a filter for long lists such as OpenAI's.
+private struct LLMModelPicker: View {
+    let models: [String]
+    let selection: String
+    let choose: (String) -> Void
+    @State private var filter = ""
+    @FocusState private var filterFocused: Bool
+
+    private static let rowHeight: CGFloat = 24
+
+    private var shown: [String] {
+        let query = filter.trimmingCharacters(in: .whitespaces)
+        return query.isEmpty ? models : models.filter { $0.localizedCaseInsensitiveContains(query) }
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if models.count > 8 {
+                TextField("llm.model.filter", text: $filter)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($filterFocused)
+                    .onSubmit { if let first = shown.first { choose(first) } }
+                    .padding(8)
+                Divider()
+            }
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(shown, id: \.self) { model in
+                        Button { choose(model) } label: {
+                            HStack {
+                                Text(verbatim: model).lineLimit(1).truncationMode(.middle)
+                                Spacer(minLength: 8)
+                                if model == selection { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                            }
+                            .padding(.horizontal, 10)
+                            .frame(height: Self.rowHeight)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.vertical, 4)
+            }
+            .frame(height: min(CGFloat(max(shown.count, 1)) * Self.rowHeight + 8, 320))
+        }
+        .frame(width: 300)
+        .onAppear { filterFocused = true }
     }
 }
