@@ -117,33 +117,51 @@ func showControlCenterPage(_ page: String) {
 struct SubtitleTimingCard: View {
     @EnvironmentObject private var manager: SubtitleManager
 
+    private var hasSecondTrack: Bool { manager.trackNames.count > 1 }
+
     var body: some View {
         SettingsCard(titleKey: "timing.title") {
             if manager.restoredTiming {
                 Label("timing.restored", systemImage: "clock.arrow.circlepath")
                     .font(.callout).foregroundStyle(.secondary)
             }
-            HStack(spacing: 10) {
-                Text("delay.field.primary")
-                TextField("0", value: $manager.timeOffsetMs, format: .number).frame(width: 80)
-                if manager.trackNames.count > 1 {
-                    Text("delay.field.secondary")
-                    TextField("0", value: $manager.secondaryOffsetMs, format: .number).frame(width: 80)
-                        .disabled(manager.linkSecondaryDelay)
+            Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
+                delayRow(hasSecondTrack && manager.linkSecondaryDelay ? "timing.both" : "nowPlaying.track.primary",
+                         value: $manager.timeOffsetMs, track: "primary")
+                if hasSecondTrack && !manager.linkSecondaryDelay {
+                    delayRow("nowPlaying.track.secondary", value: $manager.secondaryOffsetMs, track: "secondary")
                 }
-            }.textFieldStyle(.roundedBorder)
-            if manager.trackNames.count > 1 {
+            }
+            if hasSecondTrack {
                 Toggle("delay.link", isOn: Binding(get: { manager.linkSecondaryDelay }, set: { manager.setLink($0) }))
             }
             HStack {
-                Button("download.delay.resetPrimary") { manager.adjustDelay(track: "primary", delta: Int.min) }
-                if manager.trackNames.count > 1 {
-                    Button("download.delay.resetSecondary") { manager.adjustDelay(track: "secondary", delta: Int.min) }
-                }
+                SettingsHint(key: "timing.help")
                 Spacer()
                 Button("align.open") { showControlCenterPage("align") }
             }
-            SettingsHint(key: "download.delay.help")
+        }
+    }
+
+    /// Label, earlier / later steps around the typed value, and a reset; the steps follow the shortcut step.
+    private func delayRow(_ title: LocalizedStringKey, value: Binding<Int>, track: String) -> some View {
+        let step = SubtitleDelayStep.milliseconds
+        return GridRow {
+            Text(title).foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Button { manager.adjustDelay(track: track, delta: -step) } label: { Image(systemName: "minus") }
+                    .help(AppLocalization.format("bar.delay.earlier", "\(step) ms"))
+                    .accessibilityLabel(Text(verbatim: AppLocalization.format("bar.delay.earlier", "\(step) ms")))
+                TextField("0", value: value, format: .number)
+                    .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).monospacedDigit()
+                    .frame(width: 90)
+                Text(verbatim: "ms").foregroundStyle(.secondary)
+                Button { manager.adjustDelay(track: track, delta: step) } label: { Image(systemName: "plus") }
+                    .help(AppLocalization.format("bar.delay.later", "\(step) ms"))
+                    .accessibilityLabel(Text(verbatim: AppLocalization.format("bar.delay.later", "\(step) ms")))
+            }
+            Button("timing.reset") { manager.adjustDelay(track: track, delta: Int.min) }
+                .disabled(value.wrappedValue == 0)
         }
     }
 }

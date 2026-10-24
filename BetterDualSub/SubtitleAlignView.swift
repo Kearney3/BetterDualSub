@@ -19,57 +19,65 @@ struct SubtitleAlignView: View {
 
     var body: some View {
         let current = currentCue
-        SettingsPage(descriptionKey: "align.description") {
+        Group {
             if manager.trackNames.isEmpty {
-                SettingsCard { SettingsRow(symbol: "circle.dashed", tint: .secondary, titleKey: "guide.status.empty") { EmptyView() } }
+                ContentUnavailableView {
+                    Label("guide.status.empty", systemImage: "scope")
+                } description: {
+                    Text("align.empty")
+                } actions: {
+                    Button("nav.load") { showControlCenterPage("load") }.buttonStyle(.borderedProminent)
+                }
             } else {
-                SettingsCard {
-                    HStack {
-                        Text("align.now")
-                        Text(verbatim: ManualControlBar.format(manager.positionMs)).monospacedDigit().font(.title3.weight(.semibold))
-                        Text(AppLocalization.format("playback.speed", ManualControlBar.speedLabel(manager.playbackSpeed)))
-                            .monospacedDigit().foregroundStyle(.secondary)
-                        Spacer()
-                        if manager.cues(track: "secondary").isEmpty == false {
-                            Picker("align.track", selection: $track) {
-                                Text("manual.offset.primary").tag("primary")
-                                Text("manual.offset.secondary").tag("secondary")
-                            }
-                            .pickerStyle(.segmented).labelsHidden().fixedSize()
-                        }
-                    }
-                    TextField("align.search", text: $search).textFieldStyle(.roundedBorder)
-                    ScrollViewReader { proxy in
-                        ScrollView {
-                            LazyVStack(alignment: .leading, spacing: 2) {
-                                ForEach(cues, id: \.self) { cue in row(cue, isCurrent: cue == current) }
-                            }
-                        }
-                        .frame(height: 320)
-                        .overlay {
-                            if cues.isEmpty && !search.isEmpty {
-                                Text("align.noMatch").foregroundStyle(.secondary)
-                            }
-                        }
-                        .onAppear { scrollToCurrent(proxy, animated: false) }
-                        .onChange(of: track) { _, _ in scrollToCurrent(proxy, animated: false) }
-                        .onChange(of: manager.loadID) { _, _ in scrollToCurrent(proxy, animated: false) }
+                SettingsPage(descriptionKey: "align.description") {
+                    SettingsCard {
                         HStack {
-                            Button("align.apply") {
-                                guard let selected else { return }
-                                result = Self.message(forDelay: manager.align(track: track, to: selected))
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .disabled(selected == nil)
-                            if !result.isEmpty { Text(verbatim: result).foregroundStyle(.secondary) }
+                            Text("align.now")
+                            Text(verbatim: ManualControlBar.format(manager.positionMs)).monospacedDigit().font(.title3.weight(.semibold))
+                            Text(AppLocalization.format("playback.speed", ManualControlBar.speedLabel(manager.playbackSpeed)))
+                                .monospacedDigit().foregroundStyle(.secondary)
                             Spacer()
-                            Button { scrollToCurrent(proxy, animated: true) } label: {
-                                Label("align.jumpToCurrent", systemImage: "text.line.first.and.arrowtriangle.forward")
+                            if manager.cues(track: "secondary").isEmpty == false {
+                                Picker("align.track", selection: $track) {
+                                    Text("manual.offset.primary").tag("primary")
+                                    Text("manual.offset.secondary").tag("secondary")
+                                }
+                                .pickerStyle(.segmented).labelsHidden().fixedSize()
                             }
-                            .disabled(current == nil)
                         }
+                        TextField("align.search", text: $search).textFieldStyle(.roundedBorder)
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 2) {
+                                    ForEach(cues, id: \.self) { cue in row(cue, isCurrent: cue == current) }
+                                }
+                            }
+                            .frame(height: 320)
+                            .overlay {
+                                if cues.isEmpty && !search.isEmpty {
+                                    Text("align.noMatch").foregroundStyle(.secondary)
+                                }
+                            }
+                            .onAppear { scrollToCurrent(proxy, animated: false) }
+                            .onChange(of: track) { _, _ in scrollToCurrent(proxy, animated: false) }
+                            .onChange(of: manager.loadID) { _, _ in scrollToCurrent(proxy, animated: false) }
+                            HStack {
+                                Button("align.apply") {
+                                    guard let selected else { return }
+                                    result = Self.message(forDelay: manager.align(track: track, to: selected))
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .disabled(selected == nil)
+                                if !result.isEmpty { Text(verbatim: result).foregroundStyle(.secondary) }
+                                Spacer()
+                                Button { scrollToCurrent(proxy, animated: true) } label: {
+                                    Label("align.jumpToCurrent", systemImage: "text.line.first.and.arrowtriangle.forward")
+                                }
+                                .disabled(current == nil)
+                            }
+                        }
+                        SettingsHint(key: "align.hint")
                     }
-                    SettingsHint(key: "align.hint")
                 }
             }
         }

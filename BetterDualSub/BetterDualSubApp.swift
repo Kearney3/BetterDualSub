@@ -70,6 +70,16 @@ struct BetterDualSubApp: App {
                 .environment(\.locale, Locale(identifier: language))
         }
         .defaultSize(width: 1120, height: 760)
+        .commands {
+            CommandGroup(replacing: .help) {
+                Button("help.guide") { ViewingGuide.showWelcome() }
+                Button("help.shortcuts") { AppDelegate.shared?.showControlCenter(page: "shortcuts") }
+                Divider()
+                Button("help.readme") {
+                    if let url = URL(string: "https://github.com/Kearney3/BetterDualSub#readme") { NSWorkspace.shared.open(url) }
+                }
+            }
+        }
     }
 }
 

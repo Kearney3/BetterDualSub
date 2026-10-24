@@ -14,6 +14,7 @@ struct LocalSubtitleFileView: View {
     @State private var status = ""
     @State private var error = ""
     @State private var targeted = false
+    @State private var secondaryTargeted = false
     @State private var busy = false
     @State private var operation: Task<Void, Never>?
     @State private var generation = UUID()
@@ -28,15 +29,38 @@ struct LocalSubtitleFileView: View {
             }
             .overlay { if targeted { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor, lineWidth: 2) } }
             .dropDestination(for: URL.self) { urls, _ in
-                guard let url = urls.first(where: Self.isSubtitle) else { return false }
-                primaryURL = url
+                // Two files dropped together are the two tracks, in the order given.
+                let files = urls.filter(Self.isSubtitle)
+                guard let first = files.first else { return false }
+                primaryURL = first
+                if files.count > 1 { secondaryURL = files[1] }
                 return true
             } isTargeted: { targeted = $0 }
+
+            if primaryURL != nil, secondaryURL != nil {
+                HStack {
+                    Spacer()
+                    Button {
+                        let first = primaryURL
+                        primaryURL = secondaryURL
+                        secondaryURL = first
+                    } label: { Label("localFile.swap", systemImage: "arrow.up.arrow.down") }
+                    .controlSize(.small)
+                    Spacer()
+                }
+                .padding(.vertical, -10)
+            }
 
             SettingsCard(titleKey: "localFile.secondary.title") {
                 fileRow(url: secondaryURL, symbol: "text.bubble.fill", choose: { secondaryURL = pick() }, clear: { secondaryURL = nil })
                 SettingsHint(key: "localFile.secondary.help")
             }
+            .overlay { if secondaryTargeted { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor, lineWidth: 2) } }
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first(where: Self.isSubtitle) else { return false }
+                secondaryURL = url
+                return true
+            } isTargeted: { secondaryTargeted = $0 }
 
             SettingsCard(titleKey: "localFile.delay.title") {
                 HStack(spacing: 10) {

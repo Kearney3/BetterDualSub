@@ -5,13 +5,14 @@ import SwiftUI
 struct NowPlayingView: View {
     @EnvironmentObject private var manager: SubtitleManager
     @AppStorage(OverlayController.visibleKey) private var showWindow = true
+    @AppStorage(ViewingGuide.completedKey) private var guideCompleted = false
 
     private var hasSubtitles: Bool { !manager.trackNames.isEmpty }
 
     var body: some View {
         SettingsPage {
             if hasSubtitles { loadedHeader } else { welcome }
-            ViewingReadinessCard()
+            GettingStartedCard()
 
             SettingsCard {
                 SyncStatusDetail()
@@ -25,7 +26,6 @@ struct NowPlayingView: View {
                 SubtitleTimingCard()
                 SubtitleTranslationCard()
             } else {
-                steps
                 tips
             }
             RecentWatchingCard(limit: 3)
@@ -121,10 +121,13 @@ struct NowPlayingView: View {
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            HStack(spacing: 10) {
-                ForEach(LoadSource.allCases) { sourceButton($0) }
+            // While the Getting Started checklist is up, its first step offers the same sources.
+            if guideCompleted {
+                HStack(spacing: 10) {
+                    ForEach(LoadSource.allCases) { sourceButton($0) }
+                }
+                .controlSize(.large)
             }
-            .controlSize(.large)
         }
         .padding(28)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -135,37 +138,11 @@ struct NowPlayingView: View {
     @ViewBuilder
     private func sourceButton(_ source: LoadSource) -> some View {
         let button = Button {
-            showControlCenterPage(Self.pageName(for: source))
+            showControlCenterPage(source.pageName)
         } label: {
             Label(LocalizedStringKey(source.titleKey), systemImage: source.symbol)
         }
         if source == .file { button.buttonStyle(.glassProminent) } else { button.buttonStyle(.glass) }
-    }
-
-    /// The control center's name for the Load Subtitles page opened on `source`.
-    private static func pageName(for source: LoadSource) -> String {
-        switch source {
-        case .movie: "movie"
-        case .episode: "localPackage"
-        case .file: "localFile"
-        }
-    }
-
-    private var steps: some View {
-        SettingsCard(titleKey: "guide.steps.title") {
-            step(1, "film", "guide.step1.title", "guide.step1.body", complete: hasSubtitles) {
-                Button("nav.load") { showControlCenterPage("load") }
-            }
-            Divider()
-            step(2, "play.rectangle.on.rectangle", "guide.step2.title", "guide.step2.body", complete: manager.syncStatus.isFollowing) {
-                Button("nav.general") { showControlCenterPage("general") }
-            }
-            Divider()
-            step(3, "slider.horizontal.3", "guide.step3.title", "guide.step3.body", complete: false) {
-                Button("guide.step3.appearance") { showControlCenterPage("appearance") }
-                Button("guide.step3.shortcuts") { showControlCenterPage("shortcuts") }
-            }
-        }
     }
 
     private var tips: some View {
@@ -175,31 +152,6 @@ struct NowPlayingView: View {
             tip("rectangle.on.rectangle", "guide.tip.overlay")
             tip("hand.raised", "guide.tip.privacy")
         }
-    }
-
-    private func step<Actions: View>(_ number: Int, _ symbol: String, _ title: LocalizedStringKey,
-                                     _ body: LocalizedStringKey, complete: Bool,
-                                     @ViewBuilder actions: () -> Actions) -> some View {
-        HStack(alignment: .top, spacing: 14) {
-            Image(systemName: complete ? "checkmark.circle.fill" : symbol)
-                .font(.title3)
-                .foregroundStyle(complete ? Color.green : Color.accentColor)
-                .frame(width: 30)
-                .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 7) {
-                Text(title).font(.headline)
-                Text(body).font(.callout).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 10) { actions() }
-                    .controlSize(.small)
-            }
-            Spacer(minLength: 0)
-            Text("\(number)")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-        }
-        .padding(.vertical, 5)
     }
 
     private func tip(_ symbol: String, _ key: LocalizedStringKey) -> some View {

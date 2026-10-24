@@ -49,10 +49,10 @@ The Homebrew cask does the equivalent for you.
 
 ## Quick start
 
-1. Open **Load Subtitles**. Drop one or two subtitle files or a `.movpkg` package, or paste a movie link and click **Choose source**.
+1. On first launch a welcome screen walks through the three steps; **Load Subtitles** takes you to the loading page (reopen it any time from **Help** › **BetterDualSub Guide**). Open **Load Subtitles**. Drop one or two subtitle files or a `.movpkg` package, or paste a movie link and click **Choose source**.
 2. Load the selected tracks. For movie links, find subtitles first, then select the edition and languages.
 3. Play the same title and edition in TV.app, with its built-in subtitles turned off.
-4. On **Now Playing**, use **Ready to Watch** to confirm subtitles are loaded, the player is connected and the overlay is visible.
+4. On **Now Playing**, the **Getting Started** checklist ticks off loading, following the player and seeing the overlay as they happen, and offers the fix for whichever step is open.
 5. Adjust with Control-Option-← / → (250 ms), or **Align by Line**.
 
 ## Using BetterDualSub

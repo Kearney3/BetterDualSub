@@ -400,7 +400,13 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         // Loading subtitles means the user wants to see them, even if the window was hidden earlier.
         if !OverlayController.isVisible { OverlayController.setVisible(true) }
         updateSub()
-        if restoredTiming { showToast(AppLocalization.format("timing.restored.toast", timingSummary), seconds: 3) }
+        if !UserDefaults.standard.bool(forKey: ViewingGuide.overlayTipShownKey) {
+            // The overlay's controls only appear on hover; say so once, where the subtitles are.
+            UserDefaults.standard.set(true, forKey: ViewingGuide.overlayTipShownKey)
+            showToast(AppLocalization.string("overlay.tip.firstLoad"), seconds: 7)
+        } else if restoredTiming {
+            showToast(AppLocalization.format("timing.restored.toast", timingSummary), seconds: 3)
+        }
         recordDiagnostic(restoring == nil ? "loaded" : "restored")
         queueSessionSave()
     }

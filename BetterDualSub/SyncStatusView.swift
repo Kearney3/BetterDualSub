@@ -58,11 +58,16 @@ struct SyncStatusDetail: View {
                 }
                 action(for: status).controlSize(.small).padding(.top, 2)
                 if !manager.trackNames.isEmpty {
-                    Text(LocalizedStringKey(manager.subtitleHealthKey)).font(.caption).foregroundStyle(.secondary)
-                    HStack {
-                        Button("align.open") { showControlCenterPage("align") }
-                        Button("nav.load") { showControlCenterPage("load") }
-                    }.controlSize(.small)
+                    let health = manager.subtitleHealthKey
+                    Text(LocalizedStringKey(health)).font(.caption).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    // Fixes are offered only when the subtitles may not match what is playing.
+                    if health == "health.gap" || health == "health.outside" {
+                        HStack {
+                            Button("align.open") { showControlCenterPage("align") }
+                            Button("nav.load") { showControlCenterPage("load") }
+                        }.controlSize(.small)
+                    }
                 }
                 if showsDiagnostics {
                     Button("diagnostics.export") { manager.exportDiagnostics() }.controlSize(.small)

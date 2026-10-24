@@ -54,6 +54,8 @@ struct ControlCenterView: View {
     @AppStorage(LoadSource.storageKey) private var loadSource = LoadSource.file
     @EnvironmentObject private var manager: SubtitleManager
     @State private var searchText = ""
+    @AppStorage(ViewingGuide.welcomeShownKey) private var welcomeShown = false
+    @State private var showingWelcome = false
 
     private var selectedPage: ControlCenterPage {
         ControlCenterPage.resolve(selectedPageValue)?.page ?? .nowPlaying
@@ -95,7 +97,22 @@ struct ControlCenterView: View {
         .searchable(text: $searchText, placement: .sidebar, prompt: "nav.search")
         .frame(minWidth: 920, minHeight: 620)
         .environment(\.locale, Locale(identifier: language))
+        .sheet(isPresented: $showingWelcome) {
+            WelcomeView(onStart: {
+                closeWelcome()
+                navigate(to: "load")
+            }, onClose: closeWelcome)
+            .environment(\.locale, Locale(identifier: language))
+        }
+        .onChange(of: welcomeShown) { _, shown in if !shown { showingWelcome = true } }
         .onAppear {
+            if !welcomeShown {
+                if ViewingGuide.isReturningUser && UserDefaults.standard.object(forKey: ViewingGuide.welcomeShownKey) == nil {
+                    welcomeShown = true
+                } else {
+                    showingWelcome = true
+                }
+            }
             navigate(to: selectedPageValue)
             if let page = AppDelegate.pendingControlCenterPage {
                 navigate(to: page)
@@ -112,6 +129,11 @@ struct ControlCenterView: View {
         .onChange(of: language) { _, _ in
             NotificationCenter.default.post(name: .appLanguageChanged, object: nil)
         }
+    }
+
+    private func closeWelcome() {
+        welcomeShown = true
+        showingWelcome = false
     }
 
     /// Shows `name` (a page, or a merged page's old name), choosing its loading source if it has one.
@@ -132,9 +154,16 @@ struct ControlCenterView: View {
         case .load:
             LoadSubtitlesView()
         case .recent:
-            SettingsPage {
-                RecentWatchingCard()
-                if manager.recentSessions.isEmpty && manager.historyError == nil { SettingsHint(key: "recent.empty") }
+            if manager.recentSessions.isEmpty && manager.historyError == nil {
+                ContentUnavailableView {
+                    Label("recent.title", systemImage: "clock.arrow.circlepath")
+                } description: {
+                    Text("recent.empty")
+                } actions: {
+                    Button("nav.load") { navigate(to: "load") }.buttonStyle(.borderedProminent)
+                }
+            } else {
+                SettingsPage { RecentWatchingCard() }
             }
         case .bilingual:
             BilingualExportView()
@@ -150,9 +179,21 @@ struct ControlCenterView: View {
     }
 
     private func pageRow(_ page: ControlCenterPage) -> some View {
-        Label(LocalizedStringKey(page.titleKey), systemImage: page.symbol)
-            .tag(page)
-            .help(AppLocalization.string(page.titleKey))
+        HStack {
+            Label(LocalizedStringKey(page.titleKey), systemImage: page.symbol)
+            Spacer(minLength: 4)
+            // Whether the loaded subtitles are following a player, visible from every page.
+            if page == .nowPlaying, !manager.trackNames.isEmpty {
+                Circle().fill(manager.syncStatus.tint).frame(width: 7, height: 7)
+                    .help(manager.syncStatus.title)
+                    .accessibilityLabel(Text(verbatim: manager.syncStatus.title))
+            } else if page == .recent, !manager.recentSessions.isEmpty {
+                Text(verbatim: "\(manager.recentSessions.count)")
+                    .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            }
+        }
+        .tag(page)
+        .help(AppLocalization.string(page.titleKey))
     }
 
     private func matches(_ page: ControlCenterPage) -> Bool {
@@ -225,10 +266,11 @@ private struct GeneralSettingsView: View {
             }
             SubtitleScreenSettings()
             SettingsCard {
-                Button("ready.reset") {
-                    UserDefaults.standard.set(false, forKey: "viewingSetupCompleted")
-                    UserDefaults.standard.set(false, forKey: "subtitleVisibilityConfirmed")
-                    showControlCenterPage("nowPlaying")
+                SettingsRow(symbol: "sparkles", tint: .pink, titleKey: "onboarding.restart", subtitleKey: "onboarding.restart.help") {
+                    Button("onboarding.restart.action") {
+                        ViewingGuide.restart()
+                        showControlCenterPage("nowPlaying")
+                    }
                 }
             }
             SettingsCard {
