@@ -75,6 +75,14 @@ nonisolated struct TranslationGlossary: Codable, Equatable, Sendable {
         matches(in: source).filter { !$0.target.isEmpty && translation.range(of: $0.target, options: [.caseInsensitive]) == nil }
     }
 
+    /// The glossary without the entries of `kinds` that the translator found, for names the user wants left as they
+    /// are; the user's own entries stay.
+    func excludingAutomatic(_ kinds: Set<GlossaryEntry.Kind>) -> TranslationGlossary {
+        var glossary = self
+        if !kinds.isEmpty { glossary.entries.removeAll { $0.automatic && kinds.contains($0.kind) } }
+        return glossary
+    }
+
     /// Adds entries for terms not yet listed; returns how many were added. Existing entries, which the user may have
     /// corrected, are never replaced.
     @discardableResult

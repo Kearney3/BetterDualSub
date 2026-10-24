@@ -78,6 +78,14 @@ struct TranslationSettingsView: View {
                     .background(.quaternary.opacity(0.5), in: RoundedRectangle(cornerRadius: 8))
                 SettingsHint(key: "llm.instructions.help")
             }
+            SettingsCard(titleKey: "llm.style.title") {
+                Toggle("llm.translateNames", isOn: $configuration.translateNames)
+                Toggle("llm.translatePlaces", isOn: $configuration.translatePlaces)
+                SettingsHint(key: "llm.names.help")
+                Divider()
+                Toggle("llm.keepHonorifics", isOn: $configuration.keepHonorifics)
+                Toggle("llm.softenProfanity", isOn: $configuration.softenProfanity)
+            }
         }
         .onAppear { apiKey = configuration.apiKey ?? "" }
         .onChange(of: configuration) { old, new in

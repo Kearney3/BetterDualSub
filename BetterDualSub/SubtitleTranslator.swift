@@ -22,6 +22,9 @@ nonisolated struct SubtitleTranslationOptions: Sendable {
     var extractTerms = false
     /// Break translated lines too long for one cue into parts (`SubtitleTranslationSplitter.subdivide`).
     var subdivide = true
+    /// Chinese and Japanese subtitle punctuation (`SubtitleTranslationSplitter.subtitlePunctuation`); other target
+    /// languages are left alone.
+    var subtitlePunctuation = false
 }
 
 /// Creates Track 2 by translating Track 1, with the on-device macOS translator or a language model. It lives outside
@@ -260,13 +263,15 @@ final class SubtitleTranslator: ObservableObject {
         let session = makeSession(request.options.engine, request.source, request.target)
         self.session = session
         let units = request.plan.units
-        let batchSize: Int, contextLines: Int
+        let batchSize: Int, contextLines: Int, untranslated: Set<GlossaryEntry.Kind>
         if case .llm(let configuration) = request.options.engine {
             batchSize = min(max(configuration.batchSize, LLMConfiguration.batchSizes.lowerBound), LLMConfiguration.batchSizes.upperBound)
             contextLines = min(max(configuration.contextLines, 0), LLMConfiguration.contextSizes.upperBound)
+            untranslated = configuration.untranslatedKinds
         } else {
             batchSize = Self.batchSize
             contextLines = 0
+            untranslated = []
         }
         task = Task { [weak self] in
             defer { session.cancel() }
@@ -299,6 +304,8 @@ final class SubtitleTranslator: ObservableObject {
                         return
                     }
                 }
+                // Found names of kinds left untranslated stay in the saved glossary for later runs but are not used.
+                let applied = glossary.excludingAutomatic(untranslated)
                 var translations = [[String]?](repeating: nil, count: units.count)
                 self?.phase = .translating(done: 0, total: units.count)
                 var start = 0
@@ -311,11 +318,11 @@ final class SubtitleTranslator: ObservableObject {
                             translations[index].map { (source: units[index].text, translation: Self.joined($0)) }
                         }
                         context.following = units[end..<min(units.count, end + Self.followingContext)].map(\.text)
-                        context.glossary = glossary.matches(in: units[start..<end].map(\.text).joined(separator: "\n"))
+                        context.glossary = applied.matches(in: units[start..<end].map(\.text).joined(separator: "\n"))
                     }
                     let done = start
                     let batch = try await Self.translate(Array(start..<end), of: units, session: session, context: context,
-                                                         glossary: glossary, requireAll: true, ensureCurrent: ensureCurrent) { received in
+                                                         glossary: applied, requireAll: true, ensureCurrent: ensureCurrent) { received in
                         self?.phase = .translating(done: done + received, total: units.count)
                     }
                     for (index, lines) in batch { translations[index] = lines }
@@ -323,34 +330,41 @@ final class SubtitleTranslator: ObservableObject {
                     self?.phase = .translating(done: start, total: units.count)
                 }
                 var violating = units.indices.filter { index in
-                    translations[index].map { !glossary.violations(source: units[index].text, translation: Self.joined($0)).isEmpty } ?? false
+                    translations[index].map { !applied.violations(source: units[index].text, translation: Self.joined($0)).isEmpty } ?? false
                 }
                 if session.understandsContext, !violating.isEmpty {
                     self?.phase = .checking
                     for first in stride(from: 0, to: violating.count, by: batchSize) {
                         let indices = Array(violating[first..<min(violating.count, first + batchSize)])
                         var context = SubtitleTranslationContext(strict: true)
-                        context.glossary = glossary.matches(in: indices.map { units[$0].text }.joined(separator: "\n"))
+                        context.glossary = applied.matches(in: indices.map { units[$0].text }.joined(separator: "\n"))
                         let retried: [Int: [String]]
                         do {
-                            retried = try await Self.translate(indices, of: units, session: session, context: context, glossary: glossary,
+                            retried = try await Self.translate(indices, of: units, session: session, context: context, glossary: applied,
                                                                requireAll: false, ensureCurrent: ensureCurrent) { _ in }
                         } catch is SubtitleError {
                             // The first translation stands; a failed second opinion only leaves those lines unresolved.
                             continue
                         }
                         for (index, lines) in retried {
-                            let before = translations[index].map { glossary.violations(source: units[index].text, translation: Self.joined($0)).count } ?? .max
-                            if glossary.violations(source: units[index].text, translation: Self.joined(lines)).count < before { translations[index] = lines }
+                            let before = translations[index].map { applied.violations(source: units[index].text, translation: Self.joined($0)).count } ?? .max
+                            if applied.violations(source: units[index].text, translation: Self.joined(lines)).count < before { translations[index] = lines }
                         }
                     }
                     violating = violating.filter { index in
-                        translations[index].map { !glossary.violations(source: units[index].text, translation: Self.joined($0)).isEmpty } ?? false
+                        translations[index].map { !applied.violations(source: units[index].text, translation: Self.joined($0)).isEmpty } ?? false
                     }
                 }
                 try ensureCurrent()
                 var document = try request.plan.document(translations: translations.map { $0 ?? [] })
                 if request.options.subdivide { document = try SubtitleTranslationSplitter.subdivide(document) }
+                if request.options.subtitlePunctuation, [.chinese, .japanese].contains(request.target.languageCode) {
+                    let japanese = request.target.languageCode == .japanese
+                    document = try SubtitleDocument(items: document.items.map {
+                        SubtitleItem(startMs: $0.startMs, endMs: $0.endMs,
+                                     text: SubtitleTranslationSplitter.subtitlePunctuation($0.text, japanese: japanese))
+                    })
+                }
                 let language = Self.displayName(request.target)
                 if !request.preview { manager.setSecondary(document, name: AppLocalization.format("translate.trackName", language)) }
                 self?.unresolvedTerms = violating.count

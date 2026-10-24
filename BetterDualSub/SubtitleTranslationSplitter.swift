@@ -73,6 +73,22 @@ nonisolated enum SubtitleTranslationSplitter {
         return try SubtitleDocument(items: items)
     }
 
+    /// Chinese and Japanese subtitle style: no full stop or comma, a space where a pause falls inside a line. Question
+    /// and exclamation marks, ellipses and quotes stay; so does the Chinese enumeration comma "、".
+    static func subtitlePunctuation(_ text: String, japanese: Bool) -> String {
+        let pauses: Set<Character> = japanese ? ["，", "。", "、", "．"] : ["，", "。", "．"]
+        return text.components(separatedBy: "\n").map { line in
+            var result = String(line.map { pauses.contains($0) ? " " : $0 })
+            result = result.replacingOccurrences(of: #"[ \t]{2,}"#, with: " ", options: .regularExpression)
+            // A pause that ran into a quote or bracket leaves no space beside it: 「好。」 → 「好」.
+            result = result.replacingOccurrences(of: #" +(?=[”’」』）)》】？！?!…])"#, with: "", options: .regularExpression)
+            result = result.replacingOccurrences(of: #"(?<=[“‘「『（(《【]) +"#, with: "", options: .regularExpression)
+            return result.trimmingCharacters(in: .whitespaces)
+        }
+        .filter { !$0.isEmpty }
+        .joined(separator: "\n")
+    }
+
     /// Where a line may end, as a character offset, with a penalty: none after a full stop, a little after a comma,
     /// more between two words.
     private static func candidates(_ text: String, _ characters: [Character]) -> [(offset: Int, penalty: Double)] {

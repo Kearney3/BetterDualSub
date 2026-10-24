@@ -127,6 +127,32 @@ final class LLMTranslationClientTests: XCTestCase {
         let decoded = try? JSONDecoder().decode(LLMConfiguration.self, from: Data(#"{"model":"x"}"#.utf8))
         XCTAssertEqual(decoded?.model, "x")
         XCTAssertEqual(decoded?.batchSize, LLMConfiguration().batchSize)
+        XCTAssertEqual(decoded?.translateNames, true, "Settings saved before the option existed translate names.")
+        XCTAssertEqual(decoded?.untranslatedKinds, [])
+    }
+
+    func testStyleChoicesBecomeRulesOfTheTranslationPrompt() async throws {
+        func systemPrompt(_ change: (inout LLMConfiguration) -> Void) async throws -> String {
+            var configuration = configuration
+            change(&configuration)
+            let reply = chat(#"{"translations":[{"id":0,"segments":["好。"]}]}"#)
+            let client = LLMTranslationClient(configuration: configuration, apiKey: nil, session: StubURLProtocol.session([(200, reply)]))
+            let session = LLMSubtitleTranslationSession(client: client, source: Locale.Language(identifier: "en"),
+                                                        target: Locale.Language(identifier: "zh-Hans"))
+            try await session.translate([SubtitleTranslationInput(index: 0, text: "Fine.")], context: SubtitleTranslationContext()) { _ in }
+            return try XCTUnwrap((StubURLProtocol.body(0)["messages"] as? [[String: String]])?.first?["content"])
+        }
+        let plain = try await systemPrompt { _ in }
+        for rule in ["people's names", "place names", "honorifics", "swearing"] { XCTAssertFalse(plain.contains(rule), rule) }
+        let styled = try await systemPrompt {
+            $0.translateNames = false
+            $0.translatePlaces = false
+            $0.keepHonorifics = true
+            $0.softenProfanity = true
+        }
+        for rule in ["people's names", "place names", "honorifics", "swearing"] { XCTAssertTrue(styled.contains(rule), rule) }
+        XCTAssertLessThan(try XCTUnwrap(styled.range(of: "swearing")).lowerBound, try XCTUnwrap(styled.range(of: "Reply with JSON")).lowerBound,
+                          "The rules come before the reply format.")
     }
 
     func testSessionKeepsSegmentsRetriesMissingLinesAndDropsJSONModeWhenRefused() async throws {

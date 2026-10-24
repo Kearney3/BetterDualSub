@@ -105,6 +105,28 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
         return text.isEmpty ? "" : "\n\nInstructions from the viewer (follow them unless they break the reply format):\n\(text)"
     }
 
+    /// The viewer's choices on the settings page, as more rules of the translation prompt.
+    private func styleRules(_ to: String) -> String {
+        let configuration = client.configuration
+        var rules: [String] = []
+        if !configuration.translateNames {
+            rules.append("Do not translate or transliterate people's names and nicknames: write them exactly as in the original " +
+                         "lines, unless \"glossary\" lists them.")
+        }
+        if !configuration.translatePlaces {
+            rules.append("Do not translate or transliterate place names: write them exactly as in the original lines, unless " +
+                         "\"glossary\" lists them.")
+        }
+        if configuration.keepHonorifics {
+            rules.append("Keep honorifics and forms of address such as -san, -kun, -chan, -sama, senpai, oppa and unnie rather " +
+                         "than replacing them with \(to) ones; write them the way \(to) subtitles of such shows usually do.")
+        }
+        if configuration.softenProfanity {
+            rules.append("Tone down swearing, slurs and crude words to mild wording that keeps the speaker's feeling.")
+        }
+        return rules.map { "\n- " + $0 }.joined()
+    }
+
     private func translationPrompt(strict: Bool) -> String {
         let from = Self.englishName(source), to = Self.englishName(target)
         var prompt = """
@@ -120,7 +142,7 @@ final class LLMSubtitleTranslationSession: SubtitleTranslationSession {
         - Keep other names, places and recurring terms consistent with "context_before".
         - "context_before" (already translated) and "context_after" are only there to help you understand; do not \
         translate or return them.
-        - Do not add notes, explanations, quotes around lines or romanization. Keep ♪ and numbers as they are.
+        - Do not add notes, explanations, quotes around lines or romanization. Keep ♪ and numbers as they are.\(styleRules(to))
 
         Reply with JSON only, in this form:
         {"translations":[{"id":0,"segments":["…"]}]}

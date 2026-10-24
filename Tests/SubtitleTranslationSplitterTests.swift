@@ -6,6 +6,17 @@ final class SubtitleTranslationSplitterTests: XCTestCase {
         XCTAssertEqual(SubtitleTranslationSplitter.split("我觉得我们不该去，太危险了。", weights: [10, 10]), ["我觉得我们不该去，", "太危险了。"])
     }
 
+    func testSubtitlePunctuationDropsStopsAndCommasButKeepsOtherMarks() {
+        let punctuate = { SubtitleTranslationSplitter.subtitlePunctuation($0, japanese: $1) }
+        XCTAssertEqual(punctuate("我觉得，我们不该去。", false), "我觉得 我们不该去")
+        XCTAssertEqual(punctuate("真的吗？太好了！", false), "真的吗？太好了！")
+        XCTAssertEqual(punctuate("苹果、香蕉，还有……", false), "苹果、香蕉 还有……")
+        XCTAssertEqual(punctuate("“好。”他说。", false), "“好”他说")
+        XCTAssertEqual(punctuate("第一行，\n。\n第二行。", false), "第一行\n第二行", "Lines left empty are dropped.")
+        XCTAssertEqual(punctuate("そうか、わかった。", true), "そうか わかった")
+        XCTAssertEqual(punctuate("「行こう。」", true), "「行こう」")
+    }
+
     func testLatinSplitsBetweenWordsInProportion() {
         let lines = SubtitleTranslationSplitter.split("Je ne pense pas que nous devrions y aller ce soir.", weights: [13, 13])
         XCTAssertEqual(lines.count, 2)

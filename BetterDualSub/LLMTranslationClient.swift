@@ -43,6 +43,13 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
     var contextLines = 8
     /// The user's own instructions: style, the show's premise, how to address people.
     var instructions = ""
+    /// Off: people's names stay as written in the original, as do place names below; glossary entries the user wrote
+    /// are still followed.
+    var translateNames = true
+    var translatePlaces = true
+    /// Keep -san, -kun, oppa and the like rather than replacing them with forms of address of the target language.
+    var keepHonorifics = false
+    var softenProfanity = false
 
     init() {}
 
@@ -56,6 +63,10 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
         batchSize = try container.decodeIfPresent(Int.self, forKey: .batchSize) ?? defaults.batchSize
         contextLines = try container.decodeIfPresent(Int.self, forKey: .contextLines) ?? defaults.contextLines
         instructions = try container.decodeIfPresent(String.self, forKey: .instructions) ?? defaults.instructions
+        translateNames = try container.decodeIfPresent(Bool.self, forKey: .translateNames) ?? defaults.translateNames
+        translatePlaces = try container.decodeIfPresent(Bool.self, forKey: .translatePlaces) ?? defaults.translatePlaces
+        keepHonorifics = try container.decodeIfPresent(Bool.self, forKey: .keepHonorifics) ?? defaults.keepHonorifics
+        softenProfanity = try container.decodeIfPresent(Bool.self, forKey: .softenProfanity) ?? defaults.softenProfanity
     }
 
     static func load(from defaults: UserDefaults = .standard) -> LLMConfiguration {
@@ -71,6 +82,11 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
         guard let url = URL(string: baseURL.trimmingCharacters(in: .whitespacesAndNewlines)),
               ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil else { return nil }
         return url
+    }
+
+    /// Kinds of glossary entry left untranslated, whose entries found by the model are not used.
+    var untranslatedKinds: Set<GlossaryEntry.Kind> {
+        Set([translateNames ? nil : GlossaryEntry.Kind.person, translatePlaces ? nil : .place].compactMap { $0 })
     }
 
     var isComplete: Bool { endpoint != nil && !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }

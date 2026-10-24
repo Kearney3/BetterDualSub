@@ -149,6 +149,39 @@ final class SubtitleTranslationPipelineTests: XCTestCase {
         XCTAssertEqual(manager.replacements.count, 1)
     }
 
+    func testNamesKeptInTheOriginalSetFoundEntriesAsideButKeepTheUsersOwn() async throws {
+        let session = ContextSessionStub(), manager = PipelineTarget()
+        session.terms = [GlossaryEntry(source: "Walter", target: "沃尔特", kind: .person),
+                         GlossaryEntry(source: "Albuquerque", target: "阿尔伯克基", kind: .place)]
+        session.reply = { _, context in "Walter " + context.glossary.map(\.target).sorted().joined(separator: " ") }
+        var saved: [TranslationGlossary] = []
+        let translator = translator(session) { saved.append($0) }
+        var configuration = model
+        configuration.translateNames = false
+        var glossary = glossary()
+        glossary.entries = [GlossaryEntry(source: "Skyler", target: "斯凯勒", kind: .person)]
+        let options = SubtitleTranslationOptions(engine: .llm(configuration), glossary: glossary, extractTerms: true)
+        _ = await translator.start(plan: try plan(["Walter and Skyler live in Albuquerque."]), source: source, target: target,
+                                   manager: manager, options: options)
+        await settle { !translator.isBusy }
+        XCTAssertEqual(saved.last?.entries.map(\.source), ["Skyler", "Walter", "Albuquerque"], "Found names are kept for later runs.")
+        XCTAssertEqual(Set(session.contexts.first?.glossary.map(\.source) ?? []), ["Skyler", "Albuquerque"])
+        XCTAssertEqual(session.contexts.count, 1, "A name left in the original is not a glossary miss.")
+    }
+
+    func testSubtitlePunctuationAppliesToChineseAndJapaneseOnly() async throws {
+        for (language, expected) in [("zh-Hans", "好 走吧"), ("ja", "好 走吧"), ("fr", "好，走吧。")] {
+            let session = SentenceSessionStub(), manager = PipelineTarget()
+            session.reply = { _ in "好，走吧。" }
+            let translator = SubtitleTranslator(availability: { _, _ in .installed }, makeSession: { _, _, _ in session })
+            let options = SubtitleTranslationOptions(subtitlePunctuation: true)
+            _ = await translator.start(plan: try plan(["Fine, let's go."]), source: source, target: Locale.Language(identifier: language),
+                                       manager: manager, options: options)
+            await settle { !translator.isBusy }
+            XCTAssertEqual(manager.replacements.first?.items.first?.text, expected, language)
+        }
+    }
+
     func testIncompleteLanguageModelSetupFailsBeforeAnyRequest() async throws {
         var created = 0
         let translator = SubtitleTranslator(availability: { _, _ in .installed }, makeSession: { _, _, _ in

@@ -109,17 +109,18 @@ On **Now Playing**, **Translate Track 2** creates a second track from Track 1. T
 Choose the **Engine**:
 
 - **On-device (macOS)**: the system translator. Languages that are not installed yet are offered as a system download. Subtitle text never leaves your Mac.
-- **Language model**: set it up under **Settings** › **Translation**. Pick **Ollama** or **LM Studio** for a model running on this Mac, or **OpenAI**, **DeepSeek** or **Custom** for any service with an OpenAI-compatible `/v1/chat/completions` API (OpenRouter, SiliconFlow, Qwen, llama.cpp…). **Test Connection** lists the service's models. The API key is kept in your login keychain, for that address only. Requests carry a batch of sentences together with the sentences before and after it, so names and tone stay consistent; you can add your own instructions, such as the show's premise.
+- **Language model**: set it up under **Settings** › **Translation**. Pick **Ollama** or **LM Studio** for a model running on this Mac, or **OpenAI**, **DeepSeek** or **Custom** for any service with an OpenAI-compatible `/v1/chat/completions` API (OpenRouter, SiliconFlow, Qwen, llama.cpp…). **Fetch Models** next to the model field lists the service's models to pick from. The API key is kept in your login keychain, for that address only. Requests carry a batch of sentences together with the sentences before and after it, so names and tone stay consistent; you can add your own instructions, such as the show's premise. Under **Names and Style**, people's names and place names can be kept as written in the original instead of translated, honorifics such as -san, -kun and oppa kept, and swearing toned down.
 
 Timing:
 
 - A sentence split over several cues ("I don't think" / "we should go.") is translated as one sentence and shared back over the same cues. A language model returns the parts itself; the on-device translator's result is split at punctuation or between words, in proportion to the original lines.
 - **Split long translated lines over their time** breaks a translation longer than two lines into parts shown one after another within the original cue.
+- **Subtitle punctuation**, for Chinese and Japanese, drops full stops and commas from the translation and puts a space where a pause falls inside a line, as subtitles in those languages usually do.
 
 Glossary:
 
 - Each show has a glossary per target language, named after the title without episode numbers (`Show.Name.S01E02` → `Show Name`), so every episode uses it. **Edit…** opens it; entries can be imported and exported as tab-separated text (`original<TAB>translation<TAB>kind<TAB>note`, `#` for comments; `original → translation` lines are also read).
-- With a language model, **Find Terms**, or **Find names and terms before translating**, collects the names of people, places and organizations and the show's own terms. Entries you have written or edited are never replaced.
+- With a language model, **Find Terms**, or **Find names and terms before translating**, collects the names of people, places and organizations and the show's own terms. Entries you have written or edited are never replaced. When people's or place names are kept in the original, the ones it found stay in the glossary but are not used; your own entries still are.
 - Glossary translations are sent with every request that uses them. After translating, lines that still miss a glossary term are translated once more; any left are reported. With the on-device translator, glossary translations are written into the source text before translating, which works best for names.
 
 ### Overlay

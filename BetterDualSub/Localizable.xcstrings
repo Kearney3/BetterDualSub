@@ -7589,6 +7589,108 @@
         }
       }
     },
+    "llm.style.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Names and Style"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "人名与风格"
+          }
+        }
+      }
+    },
+    "llm.translateNames" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate people’s names"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译人名"
+          }
+        }
+      }
+    },
+    "llm.translatePlaces" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate place names"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "翻译地名"
+          }
+        }
+      }
+    },
+    "llm.names.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "When off, these names stay as written in the original, which makes Track 1 easier to follow along. Names you added to the glossary yourself are still translated as listed there."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭后，这类名称保留原文写法，方便与原文对照。你在术语表中亲自填写的条目仍按术语表翻译。"
+          }
+        }
+      }
+    },
+    "llm.keepHonorifics" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keep honorifics such as -san, -kun and oppa"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留敬称（如 -san、-kun、oppa）"
+          }
+        }
+      }
+    },
+    "llm.softenProfanity" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tone down swearing"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "弱化粗口和脏话"
+          }
+        }
+      }
+    },
     "llm.model.prompt" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7976,6 +8078,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "设置模型…"
+          }
+        }
+      }
+    },
+    "translate.punctuation" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Subtitle punctuation: no full stops, spaces instead of commas"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "字幕式标点：去掉句号，逗号改为空格"
           }
         }
       }

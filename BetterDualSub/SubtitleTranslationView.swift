@@ -11,6 +11,7 @@ struct SubtitleTranslationCard: View {
     @AppStorage("translationEngine") private var engineID = "system"
     @AppStorage("translationExtractTerms") private var extractTerms = true
     @AppStorage("translationSubdivide") private var subdivide = true
+    @AppStorage("translationSubtitlePunctuation") private var subtitlePunctuation = false
     @AppStorage(LLMConfiguration.storageKey) private var llmData = Data()
     @State private var glossary: TranslationGlossary?
     @State private var glossaryName = ""
@@ -79,6 +80,9 @@ struct SubtitleTranslationCard: View {
             }
             glossaryRow
             Toggle("translate.subdivide", isOn: $subdivide).disabled(translator.isBusy)
+            if [.chinese, .japanese].contains(Locale.Language(identifier: target).languageCode) {
+                Toggle("translate.punctuation", isOn: $subtitlePunctuation).disabled(translator.isBusy)
+            }
             HStack(spacing: 10) {
                 Button("translate.sample") { start(preview: true) }
                     .disabled(!canStart)
@@ -221,7 +225,8 @@ struct SubtitleTranslationCard: View {
     private func options(preview: Bool) async -> SubtitleTranslationOptions {
         if glossary?.name != glossaryName || glossary?.targetLanguage != target { await loadGlossary() }
         return SubtitleTranslationOptions(engine: engine, glossary: glossary ?? TranslationGlossary(name: glossaryName, targetLanguage: target),
-                                          extractTerms: usesLLM && extractTerms && !preview, subdivide: subdivide)
+                                          extractTerms: usesLLM && extractTerms && !preview, subdivide: subdivide,
+                                          subtitlePunctuation: subtitlePunctuation)
     }
 
     private func loadGlossary() async {
