@@ -134,10 +134,12 @@ nonisolated enum ViewingDisplaySettings {
 }
 
 nonisolated enum SubtitleInput: Equatable {
+    /// `package` is an Apple TV .movpkg or a video file with embedded subtitle tracks.
     case movie(URL), package(URL), files([URL]), unsupported
 
     init(urls: [URL]) {
-        if urls.count == 1, let url = urls.first, url.isFileURL, url.pathExtension.lowercased() == "movpkg" {
+        if urls.count == 1, let url = urls.first, url.isFileURL,
+           (["movpkg"] + VideoSubtitleExtractor.fileExtensions).contains(url.pathExtension.lowercased()) {
             self = .package(url)
         } else if (1...2).contains(urls.count), urls.allSatisfy({ $0.isFileURL && (SubtitleFileReader.fileExtensions + ["txt"]).contains($0.pathExtension.lowercased()) }) {
             self = .files(Array(urls.prefix(2)))

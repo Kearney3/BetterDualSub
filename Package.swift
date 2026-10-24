@@ -16,7 +16,7 @@ let package = Package(
                           "SyncStatusView.swift", "SubtitleTranslationView.swift", "TranslationSettingsView.swift", "GlossaryEditorView.swift",
                           "UpdateChecker.swift", "ViewingSessionViews.swift", "SubtitleScreenSettings.swift",
                           "MediaRemotePlaybackClient.swift", "SubtitleManager.swift", "OnboardingViews.swift"],
-                sources: ["SubtitleDocument.swift", "MovieSubtitleDownloader.swift", "MovpkgSubtitleExtractor.swift",
+                sources: ["SubtitleDocument.swift", "MovieSubtitleDownloader.swift", "MovpkgSubtitleExtractor.swift", "VideoSubtitleExtractor.swift",
                            "SubtitleTranslationPlan.swift", "PlaybackTracking.swift",
                            "AppVersion.swift", "ViewingSession.swift", "PlaybackCoordinator.swift",
                            "Localization.swift", "SubtitleTranslator.swift", "SubtitleTranslationSession.swift",

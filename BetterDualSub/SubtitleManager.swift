@@ -466,7 +466,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
             if newPrimary != nil { secondaryID = oldPrimary } else { primaryID = oldSecondary }
         }
         guard primaryID != oldPrimary || secondaryID != oldSecondary, choice.label(primaryID) != nil else { return }
-        var loaded: [String: SubtitleDocument] = [:]
+        var loaded = choice.documents
         loaded[oldPrimary] = primary
         if let oldSecondary, !oldSecondary.isEmpty { loaded[oldSecondary] = secondary }
         let missing = choice.tracks.filter { [primaryID, secondaryID].contains($0.id) && loaded[$0.id] == nil }
@@ -475,9 +475,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         trackSwitchError = nil
         trackSwitchTask = Task {
             do {
-                let extracted = try await SubtitleBackgroundWork.run {
-                    try missing.map { ($0.id, try MovpkgSubtitleExtractor.document(for: $0, packageTimeline: packageTimeline)) }
-                }
+                let extracted = try await LocalSubtitleExtractor.documents(for: missing, packageTimeline: packageTimeline)
                 guard !Task.isCancelled, loadID == initialLoad else { return }
                 let documents = current.merging(extracted) { $1 }
                 guard let first = documents[primaryID] else { return }

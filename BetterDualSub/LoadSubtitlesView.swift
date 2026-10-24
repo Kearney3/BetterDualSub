@@ -18,7 +18,7 @@ enum LoadSource: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .movie: "link"
-        case .episode: "film.stack"
+        case .episode: "film"
         case .file: "doc.text"
         }
     }

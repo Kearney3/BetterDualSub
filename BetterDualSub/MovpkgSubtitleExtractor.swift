@@ -6,27 +6,64 @@ nonisolated struct LocalSubtitleTrack: Identifiable, Sendable {
     let name: String
     let forced: Bool
     let sdh: Bool
-    let streamDirectory: URL
-    let playlistURL: URL
-    let segments: [LocalSubtitleSegment]
-    let episodeSegment: Int
+    let source: Source
+
+    enum Source: Sendable {
+        /// An HLS rendition saved in an Apple TV .movpkg.
+        case package(MovpkgSubtitleStream)
+        /// A text track muxed into a video file such as .mkv or .mp4.
+        case video(VideoSubtitleStream)
+    }
 
     var label: String {
         "\(name) [\(language)]"
             + (forced ? " · " + subtitleLocalizedString("track.forced") : "")
             + (sdh ? " · " + subtitleLocalizedString("track.sdhCc") : "")
     }
+
+    /// Full dialogue first, then by language, with SDH after the plain track of the same language.
+    static func sortedForPicking(_ tracks: [LocalSubtitleTrack]) -> [LocalSubtitleTrack] {
+        tracks.sorted {
+            if $0.forced != $1.forced { return !$0.forced }
+            if $0.language != $1.language { return $0.language < $1.language }
+            if $0.sdh != $1.sdh { return !$0.sdh }
+            return $0.name < $1.name
+        }
+    }
 }
 
-/// The tracks of the package the loaded subtitles came from, so their languages can be switched while watching.
+nonisolated struct MovpkgSubtitleStream: Sendable {
+    let streamDirectory: URL
+    let playlistURL: URL
+    let segments: [LocalSubtitleSegment]
+    let episodeSegment: Int
+}
+
+/// The tracks of the package or video the loaded subtitles came from, so their languages can be switched while watching.
 nonisolated struct PackageTrackChoice: Sendable {
     let tracks: [LocalSubtitleTrack]
     let packageTimeline: Bool
     var primaryID: String
     /// "" for no Track 2; nil while Track 2 is not one of the package's tracks (a translation).
     var secondaryID: String?
+    /// Tracks already extracted: a video file is read once for all of its tracks, so switching needs no second pass.
+    var documents: [String: SubtitleDocument] = [:]
 
     func label(_ id: String) -> String? { tracks.first { $0.id == id }?.label }
+}
+
+/// Extracts tracks from a .movpkg or a video file, whichever they came from.
+nonisolated enum LocalSubtitleExtractor {
+    @concurrent static func documents(for tracks: [LocalSubtitleTrack], packageTimeline: Bool) async throws -> [String: SubtitleDocument] {
+        var documents = try await VideoSubtitleExtractor.documents(for: tracks)
+        for track in tracks where documents[track.id] == nil {
+            try Task.checkCancellation()
+            // A video track left out of the result had no cues.
+            guard case .package = track.source else { throw SubtitleError.message("error.subtitle.empty") }
+            documents[track.id] = try MovpkgSubtitleExtractor.document(for: track, packageTimeline: packageTimeline)
+        }
+        return documents
+    }
 }
 
 nonisolated struct LocalSubtitleSegment: Sendable {
@@ -115,27 +152,21 @@ nonisolated enum MovpkgSubtitleExtractor {
                 tracks.append(LocalSubtitleTrack(id: stableID, language: language,
                                                  name: fields["NAME"] ?? language, forced: fields["FORCED"] == "YES",
                                                  sdh: fields["CHARACTERISTICS"]?.contains("public.accessibility") == true,
-                                                 streamDirectory: directory, playlistURL: masterURL, segments: segments,
-                                                 episodeSegment: episodeSegment))
+                                                 source: .package(MovpkgSubtitleStream(streamDirectory: directory, playlistURL: masterURL,
+                                                                                       segments: segments, episodeSegment: episodeSegment))))
             }
-            if !tracks.isEmpty {
-                return tracks.sorted {
-                    if $0.forced != $1.forced { return !$0.forced }
-                    if $0.language != $1.language { return $0.language < $1.language }
-                    if $0.sdh != $1.sdh { return !$0.sdh }
-                    return $0.name < $1.name
-                }
-            }
+            if !tracks.isEmpty { return LocalSubtitleTrack.sortedForPicking(tracks) }
         }
         throw SubtitleError.message("error.movpkg.noTracks")
     }
 
     static func document(for track: LocalSubtitleTrack, packageTimeline: Bool) throws -> SubtitleDocument {
+        guard case .package(let stream) = track.source else { throw SubtitleError.message("error.movpkg.notSelected") }
         var items: [SubtitleItem] = []
-        let selected = packageTimeline ? Array(track.segments.indices) : [track.episodeSegment]
+        let selected = packageTimeline ? Array(stream.segments.indices) : [stream.episodeSegment]
         for index in selected {
             try Task.checkCancellation()
-            let segment = track.segments[index]
+            let segment = stream.segments[index]
             let data = try Data(contentsOf: segment.file, options: .mappedIfSafe)
             let range = segment.offset..<(segment.offset + segment.length)
             guard range.upperBound <= data.count,

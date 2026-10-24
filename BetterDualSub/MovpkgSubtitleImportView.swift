@@ -2,6 +2,7 @@ import SwiftUI
 import AppKit
 import UniformTypeIdentifiers
 
+/// Extracts subtitle tracks from an Apple TV .movpkg or from a video file with embedded text subtitles (.mkv, .mp4 …).
 struct MovpkgSubtitleImportView: View {
     @Binding var inputURLs: [URL]
 
@@ -22,11 +23,22 @@ struct MovpkgSubtitleImportView: View {
     @AppStorage("preferredSecondarySubtitleLanguage") private var preferredSecondary = "zh"
     /// Track 2 is made by translating Track 1 after extraction, rather than taken from the package.
     @AppStorage("movpkgTranslateSecondary") private var translateSecondary = false
+    /// Folder of the last package or video chosen, where the next panel opens.
+    @AppStorage("localVideoFolder") private var lastFolder = ""
 
     /// Picker tag of "translate Track 1" for Track 2.
     private static let translateTag = "\u{0}translate"
 
     fileprivate var primary: LocalSubtitleTrack? { tracks.first { $0.id == primaryID } }
+
+    /// The tracks come from a video file rather than a .movpkg: one timeline, and all tracks are read in one pass.
+    private var isVideo: Bool {
+        packageURL.map { VideoSubtitleExtractor.fileExtensions.contains($0.pathExtension.lowercased()) } ?? false
+    }
+
+    private var readStatus: String {
+        AppLocalization.format(isVideo ? "movpkg.status.readVideo" : "movpkg.status.read", tracks.count)
+    }
 
     /// The package track chosen for Track 2, or "" for none (also when Track 2 is to be translated).
     private var secondaryTrackID: String { secondaryID == Self.translateTag ? "" : secondaryID }
@@ -62,11 +74,13 @@ struct MovpkgSubtitleImportView: View {
                     }.disabled(busy)
                     if secondaryID == Self.translateTag { SettingsHint(key: "movpkg.secondary.translateHelp") }
                     Divider()
-                    Picker("movpkg.timeline.section", selection: $usePackageTimeline) {
-                        Text("movpkg.timeline.episode").tag(false)
-                        Text("movpkg.timeline.package").tag(true)
-                    }.pickerStyle(.segmented).disabled(busy)
-                    SettingsHint(key: usePackageTimeline ? "movpkg.timeline.packageHelp" : "movpkg.timeline.episodeHelp")
+                    if !isVideo {
+                        Picker("movpkg.timeline.section", selection: $usePackageTimeline) {
+                            Text("movpkg.timeline.episode").tag(false)
+                            Text("movpkg.timeline.package").tag(true)
+                        }.pickerStyle(.segmented).disabled(busy)
+                        SettingsHint(key: usePackageTimeline ? "movpkg.timeline.packageHelp" : "movpkg.timeline.episodeHelp")
+                    }
                     Button("movpkg.extract", action: extract)
                         .buttonStyle(.borderedProminent)
                         .disabled(busy || primaryID.isEmpty || primaryID == secondaryID)
@@ -94,9 +108,7 @@ struct MovpkgSubtitleImportView: View {
         .frame(minWidth: 560)
         .onReceive(NotificationCenter.default.publisher(for: .appLanguageChanged)) { _ in
             error = ""
-            status = packageURL == nil
-                ? AppLocalization.string("movpkg.panelMessage")
-                : AppLocalization.format("movpkg.status.read", tracks.count)
+            status = packageURL == nil ? AppLocalization.string("movpkg.panelMessage") : readStatus
         }
         .onDisappear(perform: cancel)
         .onAppear(perform: consumeInput)
@@ -155,9 +167,11 @@ struct MovpkgSubtitleImportView: View {
         // any content-type filter greys it out. Leave the panel unfiltered; inspect()
         // validates the extension and package structure after selection.
         panel.treatsFilePackagesAsDirectories = false
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Movies/Videos/Media.localized/TV Shows", isDirectory: true)
+        panel.directoryURL = lastFolder.isEmpty
+            ? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Movies/Videos/Media.localized/TV Shows", isDirectory: true)
+            : URL(fileURLWithPath: lastFolder, isDirectory: true)
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        lastFolder = url.deletingLastPathComponent().path
         inspect(url)
     }
 
@@ -175,7 +189,9 @@ struct MovpkgSubtitleImportView: View {
         secondaryID = ""
         run {
             status = AppLocalization.string("movpkg.status.inspecting")
-            let available = try await background { try MovpkgSubtitleExtractor.inspect(url) }
+            let available = VideoSubtitleExtractor.fileExtensions.contains(url.pathExtension.lowercased())
+                ? try await VideoSubtitleExtractor.inspect(url)
+                : try await background { try MovpkgSubtitleExtractor.inspect(url) }
             packageURL = url
             tracks = available
             primaryID = available.first(where: { !$0.forced && !$0.sdh && SubtitleLanguagePreference.matches($0.language, preferredPrimary) })?.id
@@ -185,7 +201,7 @@ struct MovpkgSubtitleImportView: View {
                 !$0.forced && !$0.sdh && $0.id != primaryID
                     && SubtitleLanguagePreference.matches($0.language, preferredSecondary)
             })?.id ?? ""
-            status = AppLocalization.format("movpkg.status.read", available.count)
+            status = readStatus
             error = ""
             outputFolder = nil
         }
@@ -195,28 +211,22 @@ struct MovpkgSubtitleImportView: View {
         guard let packageURL, let primary,
               secondaryID.isEmpty || secondaryID != primaryID else { return }
         let selected = [primary] + tracks.filter { $0.id == secondaryID }
-        let packageTimeline = usePackageTimeline
+        let packageTimeline = !isVideo && usePackageTimeline
+        let timeline: Bool? = isVideo ? nil : packageTimeline
         let translate = secondaryID == Self.translateTag
         let secondaryTrackID = secondaryTrackID
         run {
-            var documents: [SubtitleDocument] = []
-            for (index, track) in selected.enumerated() {
-                status = AppLocalization.format("movpkg.status.progress", index + 1, selected.count)
-                documents.append(try await background {
-                    try MovpkgSubtitleExtractor.document(for: track, packageTimeline: packageTimeline)
-                })
-            }
+            let (documents, extracted) = try await extractDocuments(selected, packageTimeline: packageTimeline)
             status = AppLocalization.string("movpkg.status.saving")
-            let savedDocuments = documents
             let folder = try await background {
-                try LocalSubtitleCache.save(savedDocuments, tracks: selected, package: packageURL,
-                                            packageTimeline: packageTimeline)
+                try LocalSubtitleCache.save(documents, tracks: selected, package: packageURL, packageTimeline: timeline)
             }
             manager.load(primary: documents[0], secondary: documents.count > 1 ? documents[1] : nil,
                          title: packageURL.deletingPathExtension().lastPathComponent, names: selected.map(\.label),
-                         sourceID: "package:\(packageURL.lastPathComponent):\(packageTimeline)",
+                         sourceID: timeline.map { "package:\(packageURL.lastPathComponent):\($0)" } ?? "video:\(packageURL.lastPathComponent)",
                          packageTracks: PackageTrackChoice(tracks: tracks, packageTimeline: packageTimeline,
-                                                           primaryID: primary.id, secondaryID: secondaryTrackID))
+                                                           primaryID: primary.id, secondaryID: secondaryTrackID,
+                                                           documents: extracted))
             if translate { SubtitleTranslator.shared.requestAutomaticStart(loadID: manager.loadID) }
             outputFolder = folder
             status = AppLocalization.format(translate ? "movpkg.status.extractedTranslating" : "movpkg.status.extracted",
@@ -226,6 +236,29 @@ struct MovpkgSubtitleImportView: View {
 }
 
 extension MovpkgSubtitleImportView {
+    /// The documents of `selected`, in order, and every track extracted along the way: a video file is read once for
+    /// all of its tracks, so later switches need no second pass.
+    private func extractDocuments(_ selected: [LocalSubtitleTrack],
+                                  packageTimeline: Bool) async throws -> ([SubtitleDocument], [String: SubtitleDocument]) {
+        if isVideo {
+            status = AppLocalization.string("movpkg.status.readingVideo")
+            let all = try await VideoSubtitleExtractor.documents(for: tracks)
+            let documents = try selected.map { track in
+                guard let document = all[track.id] else { throw SubtitleError.message("error.subtitle.empty") }
+                return document
+            }
+            return (documents, all)
+        }
+        var documents: [SubtitleDocument] = []
+        for (index, track) in selected.enumerated() {
+            status = AppLocalization.format("movpkg.status.progress", index + 1, selected.count)
+            documents.append(try await background {
+                try MovpkgSubtitleExtractor.document(for: track, packageTimeline: packageTimeline)
+            })
+        }
+        return (documents, [:])
+    }
+
     private func exportTracks() {
         guard let packageURL, let primary else { return }
         let panel = NSOpenPanel()
@@ -236,20 +269,14 @@ extension MovpkgSubtitleImportView {
         panel.directoryURL = LocalSubtitleCache.defaultFolder
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         let selected = [primary] + tracks.filter { $0.id == secondaryID }
-        let packageTimeline = usePackageTimeline
+        let packageTimeline = !isVideo && usePackageTimeline
+        let timeline: Bool? = isVideo ? nil : packageTimeline
         run {
-            var documents: [SubtitleDocument] = []
-            for (index, track) in selected.enumerated() {
-                status = AppLocalization.format("movpkg.status.progress", index + 1, selected.count)
-                documents.append(try await background {
-                    try MovpkgSubtitleExtractor.document(for: track, packageTimeline: packageTimeline)
-                })
-            }
+            let (documents, _) = try await extractDocuments(selected, packageTimeline: packageTimeline)
             status = AppLocalization.string("movpkg.status.saving")
-            let exportedDocuments = documents
             try await background {
-                try LocalSubtitleCache.export(exportedDocuments, tracks: selected, package: packageURL,
-                                              packageTimeline: packageTimeline, to: folder)
+                try LocalSubtitleCache.export(documents, tracks: selected, package: packageURL,
+                                              packageTimeline: timeline, to: folder)
             }
             outputFolder = folder
             status = AppLocalization.format("movpkg.status.exported", selected.count)
@@ -267,13 +294,14 @@ private nonisolated enum LocalSubtitleCache {
             .filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }
     }
 
-    static func suffix(_ track: LocalSubtitleTrack, index: Int, packageTimeline: Bool) -> String {
+    /// `packageTimeline` is nil for a video file, which has only its own timeline.
+    static func suffix(_ track: LocalSubtitleTrack, index: Int, packageTimeline: Bool?) -> String {
         let language = track.language.filter { $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-") }
-        return "-\(index + 1)-\(language)\(track.sdh ? "-SDH" : "")-\(packageTimeline ? "package" : "episode")"
+        return "-\(index + 1)-\(language)\(track.sdh ? "-SDH" : "")" + (packageTimeline.map { $0 ? "-package" : "-episode" } ?? "")
     }
 
     static func save(_ documents: [SubtitleDocument], tracks: [LocalSubtitleTrack], package: URL,
-                     packageTimeline: Bool) throws -> URL {
+                     packageTimeline: Bool?) throws -> URL {
         let basename = basename(package)
         let folder = try SubtitleCache.root().appendingPathComponent("Local/\(basename)-\(UUID().uuidString)", isDirectory: true)
         try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
@@ -292,7 +320,7 @@ private nonisolated enum LocalSubtitleCache {
     }
 
     static func export(_ documents: [SubtitleDocument], tracks: [LocalSubtitleTrack], package: URL,
-                       packageTimeline: Bool, to folder: URL) throws {
+                       packageTimeline: Bool?, to folder: URL) throws {
         let base = basename(package)
         for (index, pair) in zip(documents, tracks).enumerated() {
             try Task.checkCancellation()

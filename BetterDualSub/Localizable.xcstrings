@@ -483,13 +483,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Or drop one or two subtitle files, or a .movpkg package here. Movie links support iTunes purchase/rental editions."
+            "value" : "Or drop one or two subtitle files, a video file (.mkv, .mp4 …) or a .movpkg package here. Movie links support iTunes purchase/rental editions."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "也可拖入一到两个字幕文件或 .movpkg 包。影片链接支持含 iTunes 购买或租赁版本的电影。"
+            "value" : "也可拖入一到两个字幕文件、视频文件（.mkv、.mp4 等）或 .movpkg 包。影片链接支持含 iTunes 购买或租赁版本的电影。"
           }
         }
       }
@@ -3479,13 +3479,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Local episode"
+            "value" : "Local video"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本地剧集"
+            "value" : "本地视频"
           }
         }
       }
@@ -4174,49 +4174,52 @@
       }
     },
     "movpkg.choose" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose .movpkg…"
+            "value" : "Choose Video or .movpkg…"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择 .movpkg…"
+            "value" : "选择视频或 .movpkg…"
           }
         }
       }
     },
     "movpkg.chooseTitle" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose a fully downloaded .movpkg package"
+            "value" : "Choose a video file or a fully downloaded .movpkg package"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择已完整下载的 .movpkg 文件夹"
+            "value" : "选择视频文件或已完整下载的 .movpkg 文件夹"
           }
         }
       }
     },
     "movpkg.description" : {
+      "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reads external WebVTT tracks from an Apple TV download package. Embedded video subtitles cannot be extracted here."
+            "value" : "Reads the subtitle tracks of a video file (.mkv, .webm, .mp4, .m4v, .mov) or the external WebVTT tracks of an Apple TV download package (.movpkg). Image-based subtitles such as PGS or VobSub cannot be read as text."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "本地读取 Apple TV 离线包中的外挂 WebVTT 轨道；视频内嵌字幕不在这里提取。"
+            "value" : "本地读取视频文件（.mkv、.webm、.mp4、.m4v、.mov）中的内嵌字幕轨，或 Apple TV 离线包（.movpkg）中的外挂 WebVTT 轨道。PGS、VobSub 等图形字幕无法作为文字读取。"
           }
         }
       }
@@ -4308,13 +4311,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose an Apple TV .movpkg downloaded to this Mac."
+            "value" : "Choose a video file with subtitle tracks, or an Apple TV .movpkg downloaded to this Mac."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择一个已下载到本机的 Apple TV .movpkg。"
+            "value" : "选择带字幕轨的视频文件，或已下载到本机的 Apple TV .movpkg。"
           }
         }
       }
@@ -4325,13 +4328,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choose Apple TV movpkg"
+            "value" : "Choose a video or movpkg"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "选择 Apple TV movpkg"
+            "value" : "选择视频或 movpkg"
           }
         }
       }
@@ -4608,13 +4611,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Complete subtitle tracks: %d"
+            "value" : "Available subtitle tracks: %d"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "可用的完整字幕轨：%d"
+            "value" : "可用字幕轨：%d"
           }
         }
       }
@@ -8483,6 +8486,125 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "第二轨尚未翻译：请先设置语言模型，或改用端侧翻译。"
+          }
+        }
+      }
+    },
+    "movpkg.status.readVideo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Found %d text subtitle tracks in this video. Choose one track or add a second for bilingual subtitles."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在此视频中找到 %d 条文字字幕轨。选择一轨单独显示，或再选择第二轨作双语字幕。"
+          }
+        }
+      }
+    },
+    "movpkg.status.readingVideo" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading subtitles from the video…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从视频中读取字幕…"
+          }
+        }
+      }
+    },
+    "error.video.notSelected" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose an .mkv, .webm, .mp4, .m4v or .mov video file."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选择 .mkv、.webm、.mp4、.m4v 或 .mov 视频文件。"
+          }
+        }
+      }
+    },
+    "error.video.invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This file is not a readable Matroska or MP4 video."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件不是可读取的 Matroska 或 MP4 视频。"
+          }
+        }
+      }
+    },
+    "error.video.unreadable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Could not read the video file."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取视频文件。"
+          }
+        }
+      }
+    },
+    "error.video.noTracks" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video has no embedded subtitle tracks."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此视频没有内嵌字幕轨。"
+          }
+        }
+      }
+    },
+    "error.video.noTextTracks" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This video only has image-based subtitles (such as PGS or VobSub) or subtitle formats that cannot be read as text."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此视频只有图形字幕（如 PGS、VobSub）或无法作为文字读取的字幕格式。"
           }
         }
       }

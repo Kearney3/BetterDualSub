@@ -167,6 +167,8 @@ final class ViewingSessionTests: XCTestCase {
         XCTAssertEqual(SubtitleInput(urls: [movie]), .movie(movie))
         let package = URL(fileURLWithPath: "/tmp/episode.movpkg")
         XCTAssertEqual(SubtitleInput(urls: [package]), .package(package))
+        let video = URL(fileURLWithPath: "/tmp/Episode.MKV")
+        XCTAssertEqual(SubtitleInput(urls: [video]), .package(video))
         let files = [URL(fileURLWithPath: "/tmp/a.ass"), URL(fileURLWithPath: "/tmp/b.vtt")]
         XCTAssertEqual(SubtitleInput(urls: files), .files(files))
         XCTAssertEqual(SubtitleInput(urls: files + files), .unsupported)

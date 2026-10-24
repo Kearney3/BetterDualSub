@@ -10,7 +10,7 @@ Mac 上的 Apple TV 应用（TV.app）一次只能显示一种字幕，也不能
 
 ## 功能
 
-- **三种字幕来源**：从 Apple TV 电影链接下载、从 TV.app 下载的剧集（`.movpkg`）中提取，或打开自己的 `.srt`、`.vtt`、`.ass`、`.ssa` 文件。
+- **三种字幕来源**：从 Apple TV 电影链接下载、从 TV.app 下载的剧集（`.movpkg`）或视频文件的内嵌文字字幕轨（`.mkv`、`.webm`、`.mp4`、`.m4v`、`.mov`）中提取，或打开自己的 `.srt`、`.vtt`、`.ass`、`.ssa` 文件。
 - **两条字幕同时显示**，各自设置字体、颜色、描边和换行方式。
 - **跟随播放**：跟随 TV.app，或任何会上报“正在播放”信息的播放器（IINA、VLC、QuickTime Player、浏览器等），包括暂停、拖动进度和倍速。没有播放时改用手动时钟。
 - **同步状态可见**：菜单栏、字幕浮层和控制窗口都会显示同步状态；没有跟随正确的播放器时，可一键修正。
@@ -49,7 +49,7 @@ Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行
 
 ## 快速开始
 
-1. 首次启动时，欢迎页会介绍三个步骤，点击 **加载字幕** 即进入加载页（之后可从 **帮助** › **BetterDualSub 使用引导** 再次打开）。选择 **加载字幕**。可拖入一到两个字幕文件或 `.movpkg` 包，也可粘贴影片链接并点击 **识别来源**。
+1. 首次启动时，欢迎页会介绍三个步骤，点击 **加载字幕** 即进入加载页（之后可从 **帮助** › **BetterDualSub 使用引导** 再次打开）。选择 **加载字幕**。可拖入一到两个字幕文件、视频文件或 `.movpkg` 包，也可粘贴影片链接并点击 **识别来源**。
 2. 按识别出的来源选择轨道并加载；影片链接需要先查找字幕，再选择版本与语言。
 3. 在 TV.app 中播放同一片名、同一版本，并关闭其自带字幕。
 4. **正在播放** 页的「开始使用」清单会在加载字幕、跟随到播放器、确认看到浮层后自动勾选，并为当前未完成的步骤给出对应操作。
@@ -72,10 +72,10 @@ Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行
 | 来源 | 需要提供 | 说明 |
 | --- | --- | --- |
 | 影片链接 | Apple TV 电影页面链接 | 列出所选版本的字幕轨道。**仅下载保存…** 只保存 SRT 文件，不显示。 |
-| 本地剧集 | TV.app 下载的 `.movpkg` 包，通常位于 `~/Movies/Videos/Media.localized/TV Shows` | 可选择单集时间线或整个包的时间线。第二轨可选其他轨道、不显示，或 **由第一轨翻译生成**：只提取第一轨，随后在 **正在播放** 中直接翻译出第二语言。**导出 SRT 文件…** 只保存副本，不显示。 |
+| 本地视频 | 带内嵌文字字幕的视频文件（`.mkv`、`.webm`、`.mp4`、`.m4v`、`.mov`，支持 SRT、ASS/SSA、WebVTT、tx3g 字幕轨），或 TV.app 下载的 `.movpkg` 包（通常位于 `~/Movies/Videos/Media.localized/TV Shows`） | `.movpkg` 可选择单集时间线或整个包的时间线。视频文件只需读取一遍即可取得全部字幕轨，在 **正在播放** 中切换轨道无需等待；不支持 PGS、VobSub 等图形字幕。第二轨可选其他轨道、不显示，或 **由第一轨翻译生成**：只提取第一轨，随后在 **正在播放** 中直接翻译出第二语言。**导出 SRT 文件…** 只保存副本，不显示。 |
 | 字幕文件 | 一到两个 `.srt`、`.vtt`、`.ass`、`.ssa` 文件 | 自动识别 UTF-8、UTF-16 及常见旧编码（GB18030、Big5、Shift JIS、EUC-KR）。ASS/SSA 的样式会被忽略；字幕正文中的粗体、斜体、下划线和颜色（HTML 风格标签、WebVTT 类、`{\i1}` 一类的覆盖标记）会正常显示。文件名以 `(-1500ms)` 结尾时会自动设置延迟。 |
 
-加载成功后，窗口会切换到 **正在播放**。电影下载与本地提取会记住你选择的语言组合；不支持的链接会给出本地字幕和本地剧集入口。
+加载成功后，窗口会切换到 **正在播放**。电影下载与本地提取会记住你选择的语言组合；不支持的链接会给出本地字幕和本地视频入口。
 
 ### 最近观看
 
@@ -145,7 +145,7 @@ Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行
 
 ## 限制
 
-- 在线下载仅支持带有 iTunes 购买或租赁选项的 Apple TV **电影页面**。不支持 Apple TV+ 订阅内容，也不支持剧集、季或单集链接；TV.app 中下载的剧集请使用 **本地剧集**。
+- 在线下载仅支持带有 iTunes 购买或租赁选项的 Apple TV **电影页面**。不支持 Apple TV+ 订阅内容，也不支持剧集、季或单集链接；TV.app 中下载的剧集请使用 **本地视频**。
 - 可用语言取决于页面所在的国家或地区以及影片版本。只会列出外挂文本字幕轨道，无法下载视频内嵌的字幕。强制字幕通常只包含部分对白。
 - 加密、不连续、字节范围以及带初始化映射的字幕播放列表会被拒绝并报错。
 - BetterDualSub 不会识别正在播放的影片，请加载同一片名、同一版本的字幕。版本不同时可能仍需调整延迟。
@@ -230,7 +230,7 @@ BETTERDUALSUB_LIVE_MOVIE_URL='https://tv.apple.com/hk/movie/spider-man-into-the-
 | --- | --- |
 | `BetterDualSub/SubtitleDocument.swift` | 字幕模型、SRT/WebVTT/ASS 解析、时间计算 |
 | `BetterDualSub/PlaybackTracking.swift` | “正在播放”跟踪、同步状态、校准保存 |
-| `BetterDualSub/MovieSubtitleDownloader.swift`、`MovpkgSubtitleExtractor.swift` | Apple TV 下载与 `.movpkg` 提取 |
+| `BetterDualSub/MovieSubtitleDownloader.swift`、`MovpkgSubtitleExtractor.swift`、`VideoSubtitleExtractor.swift` | Apple TV 下载、`.movpkg` 提取，以及 Matroska / MP4 内嵌字幕提取 |
 | `BetterDualSub/SubtitleManager.swift`、`PlaybackCoordinator.swift` | 字幕会话、播放协调与监听器恢复 |
 | `BetterDualSub/ContentView.swift` | 字幕渲染与浮层交互 |
 | `BetterDualSub/*View.swift` | 控制窗口各页面 |
