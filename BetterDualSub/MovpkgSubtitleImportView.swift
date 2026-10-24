@@ -20,8 +20,16 @@ struct MovpkgSubtitleImportView: View {
     @State private var generation = UUID()
     @AppStorage("preferredPrimarySubtitleLanguage") private var preferredPrimary = "en"
     @AppStorage("preferredSecondarySubtitleLanguage") private var preferredSecondary = "zh"
+    /// Track 2 is made by translating Track 1 after extraction, rather than taken from the package.
+    @AppStorage("movpkgTranslateSecondary") private var translateSecondary = false
+
+    /// Picker tag of "translate Track 1" for Track 2.
+    private static let translateTag = "\u{0}translate"
 
     fileprivate var primary: LocalSubtitleTrack? { tracks.first { $0.id == primaryID } }
+
+    /// The package track chosen for Track 2, or "" for none (also when Track 2 is to be translated).
+    private var secondaryTrackID: String { secondaryID == Self.translateTag ? "" : secondaryID }
 
     var body: some View {
         SettingsPage(descriptionKey: "movpkg.description") {
@@ -43,11 +51,16 @@ struct MovpkgSubtitleImportView: View {
                     }.disabled(busy)
                     Picker("download.secondary", selection: Binding(get: { secondaryID }, set: { id in
                         secondaryID = id
-                        preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? ""
+                        translateSecondary = id == Self.translateTag
+                        // Translating keeps the language Track 2 is otherwise taken in.
+                        if !translateSecondary { preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? "" }
                     })) {
                         Text("download.noSecondary").tag("")
+                        Text("movpkg.secondary.translate").tag(Self.translateTag)
+                        Divider()
                         ForEach(tracks) { Text($0.label).tag($0.id) }
                     }.disabled(busy)
+                    if secondaryID == Self.translateTag { SettingsHint(key: "movpkg.secondary.translateHelp") }
                     Divider()
                     Picker("movpkg.timeline.section", selection: $usePackageTimeline) {
                         Text("movpkg.timeline.episode").tag(false)
@@ -168,7 +181,7 @@ struct MovpkgSubtitleImportView: View {
             primaryID = available.first(where: { !$0.forced && !$0.sdh && SubtitleLanguagePreference.matches($0.language, preferredPrimary) })?.id
                 ?? available.first(where: { !$0.forced && SubtitleLanguagePreference.matches($0.language, preferredPrimary) })?.id
                 ?? available.first(where: { !$0.forced && !$0.sdh })?.id ?? available.first(where: { !$0.forced })?.id ?? available[0].id
-            secondaryID = preferredSecondary.isEmpty ? "" : available.first(where: {
+            secondaryID = translateSecondary ? Self.translateTag : preferredSecondary.isEmpty ? "" : available.first(where: {
                 !$0.forced && !$0.sdh && $0.id != primaryID
                     && SubtitleLanguagePreference.matches($0.language, preferredSecondary)
             })?.id ?? ""
@@ -183,6 +196,8 @@ struct MovpkgSubtitleImportView: View {
               secondaryID.isEmpty || secondaryID != primaryID else { return }
         let selected = [primary] + tracks.filter { $0.id == secondaryID }
         let packageTimeline = usePackageTimeline
+        let translate = secondaryID == Self.translateTag
+        let secondaryTrackID = secondaryTrackID
         run {
             var documents: [SubtitleDocument] = []
             for (index, track) in selected.enumerated() {
@@ -201,9 +216,10 @@ struct MovpkgSubtitleImportView: View {
                          title: packageURL.deletingPathExtension().lastPathComponent, names: selected.map(\.label),
                          sourceID: "package:\(packageURL.lastPathComponent):\(packageTimeline)",
                          packageTracks: PackageTrackChoice(tracks: tracks, packageTimeline: packageTimeline,
-                                                           primaryID: primary.id, secondaryID: secondaryID))
+                                                           primaryID: primary.id, secondaryID: secondaryTrackID))
+            if translate { SubtitleTranslator.shared.requestAutomaticStart(loadID: manager.loadID) }
             outputFolder = folder
-            status = AppLocalization.format("movpkg.status.extracted",
+            status = AppLocalization.format(translate ? "movpkg.status.extractedTranslating" : "movpkg.status.extracted",
                                             documents.map(\.items.count).map(String.init).joined(separator: " + "))
         }
     }

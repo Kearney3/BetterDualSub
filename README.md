@@ -72,7 +72,7 @@ The menu bar icon offers the same loading, timing and display commands.
 | Source | What you provide | Notes |
 | --- | --- | --- |
 | Movie link | An Apple TV movie page link | Lists the subtitle tracks of the chosen version. **Download only…** saves SRT files without showing them. |
-| Local episode | A `.movpkg` package downloaded by the TV app, usually in `~/Movies/Videos/Media.localized/TV Shows` | Choose the episode timeline or the whole package's. **Export SRT files…** saves copies without showing them. |
+| Local episode | A `.movpkg` package downloaded by the TV app, usually in `~/Movies/Videos/Media.localized/TV Shows` | Choose the episode timeline or the whole package's. For Track 2, pick another track, none, or **Translate from Track 1** to extract only Track 1 and translate the second language right away on Now Playing. **Export SRT files…** saves copies without showing them. |
 | Subtitle file | One or two `.srt`, `.vtt`, `.ass` or `.ssa` files | UTF-8, UTF-16 and common legacy encodings (GB18030, Big5, Shift JIS, EUC-KR) are detected. ASS/SSA styling is ignored; bold, italic, underline and colors written in the cue text (HTML-style tags, WebVTT classes, `{\i1}`-style overrides) are shown. A file name ending in `(-1500ms)` sets the delay. |
 
 After a successful load the window switches to **Now Playing**. Movie downloads and local extraction remember your chosen languages. Unsupported links offer local file and local episode alternatives.

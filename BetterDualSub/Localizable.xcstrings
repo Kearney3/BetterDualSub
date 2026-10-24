@@ -8401,6 +8401,91 @@
           }
         }
       }
+    },
+    "movpkg.secondary.translate" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Translate from Track 1"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "由第一轨翻译生成"
+          }
+        }
+      }
+    },
+    "movpkg.secondary.translateHelp" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Only Track 1 is extracted. Track 2 is then translated from it on Now Playing, with the engine and language chosen there."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只提取第一轨，随后在“正在播放”中用那里选择的引擎和语言由第一轨翻译生成第二轨。"
+          }
+        }
+      }
+    },
+    "movpkg.status.extractedTranslating" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extracted and loaded %@ subtitle cues. Track 2 is being translated on Now Playing."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已提取 %@ 条字幕并加载，正在“正在播放”中翻译生成第二轨。"
+          }
+        }
+      }
+    },
+    "translate.auto.needsLanguage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 2 was not translated yet: choose the source and target languages, then create it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨尚未翻译：请选择源语言和目标语言后再生成。"
+          }
+        }
+      }
+    },
+    "translate.auto.needsModel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 2 was not translated yet: set up the language model first, or switch to on-device translation."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨尚未翻译：请先设置语言模型，或改用端侧翻译。"
+          }
+        }
+      }
     }
   },
   "version" : "1.3"

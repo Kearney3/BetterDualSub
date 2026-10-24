@@ -16,6 +16,8 @@ struct SubtitleTranslationCard: View {
     @State private var glossaryName = ""
     @State private var glossaryNames: [String] = []
     @State private var editingGlossary = false
+    /// Track 2 was to be translated right after loading, but a language or the model still has to be chosen.
+    @State private var automaticStartBlocked = false
     @State private var languages: [TranslationLanguage] = []
     @State private var plan: SubtitleTranslationPlan?
     @State private var source: Locale.Language?
@@ -90,6 +92,9 @@ struct SubtitleTranslationCard: View {
                     Button("common.cancel") { translator.cancel() }
                 }
             }
+            if automaticStartBlocked, phase == .idle {
+                StatusLine(text: AppLocalization.string(usesLLM && !llm.isComplete ? "translate.auto.needsModel" : "translate.auto.needsLanguage"))
+            }
             status
         }
         .translationTask(download, action: SubtitleTranslationDownload(requestID: downloadRequestID, translator: translator, target: manager).prepare)
@@ -112,6 +117,10 @@ struct SubtitleTranslationCard: View {
                 target = SubtitleTranslator.defaultTarget(source: source)
             }
             glossaryName = TranslationGlossary.seriesName(from: manager.loadedTitle.isEmpty ? "subtitle" : manager.loadedTitle)
+            automaticStartBlocked = false
+            if translator.takeAutomaticStart(loadID: manager.loadID) {
+                if canStart { start(preview: false) } else { automaticStartBlocked = true }
+            }
         }
         .task(id: "\(glossaryName)\u{0}\(target)") { await loadGlossary() }
         .onChange(of: translator.glossary) { _, updated in
@@ -207,9 +216,12 @@ struct SubtitleTranslationCard: View {
         }
     }
 
-    private func options(preview: Bool) -> SubtitleTranslationOptions {
-        SubtitleTranslationOptions(engine: engine, glossary: glossary ?? TranslationGlossary(name: glossaryName, targetLanguage: target),
-                                   extractTerms: usesLLM && extractTerms && !preview, subdivide: subdivide)
+    /// The run's options, once the show's saved glossary is loaded: terms found during the run are merged into it and
+    /// saved, so starting with an empty stand-in would replace the saved one.
+    private func options(preview: Bool) async -> SubtitleTranslationOptions {
+        if glossary?.name != glossaryName || glossary?.targetLanguage != target { await loadGlossary() }
+        return SubtitleTranslationOptions(engine: engine, glossary: glossary ?? TranslationGlossary(name: glossaryName, targetLanguage: target),
+                                          extractTerms: usesLLM && extractTerms && !preview, subdivide: subdivide)
     }
 
     private func loadGlossary() async {
@@ -225,17 +237,19 @@ struct SubtitleTranslationCard: View {
     private func extract() {
         guard let plan, !sourceID.isEmpty, !target.isEmpty else { return }
         let source = Locale.Language(identifier: sourceID), target = Locale.Language(identifier: target)
-        let options = options(preview: false)
-        Task { await translator.extractTerms(plan: plan, source: source, target: target, manager: manager, options: options) }
+        Task {
+            let options = await options(preview: false)
+            await translator.extractTerms(plan: plan, source: source, target: target, manager: manager, options: options)
+        }
     }
 
     private func start(preview: Bool) {
         guard let fullPlan = plan, !sourceID.isEmpty, !target.isEmpty else { return }
         let source = Locale.Language(identifier: sourceID)
         let target = Locale.Language(identifier: target)
-        let options = options(preview: preview)
         Task {
             do {
+                let options = await options(preview: preview)
                 let plan = try (preview ? fullPlan.preview() : fullPlan)
                 guard let configuration = await translator.start(plan: plan, source: source, target: target, manager: manager,
                                                                  preview: preview, options: options) else { return }

@@ -186,3 +186,16 @@ final class SubtitleTranslationPipelineTests: XCTestCase {
         XCTFail("Translation event did not complete")
     }
 }
+
+@MainActor
+final class SubtitleTranslatorAutomaticStartTests: XCTestCase {
+    func testAutomaticStartIsTakenOnceAndOnlyForItsLoad() {
+        let translator = SubtitleTranslator()
+        let load = UUID()
+        XCTAssertFalse(translator.takeAutomaticStart(loadID: load))
+        translator.requestAutomaticStart(loadID: load)
+        XCTAssertFalse(translator.takeAutomaticStart(loadID: UUID()), "Another load does not start it.")
+        XCTAssertTrue(translator.takeAutomaticStart(loadID: load))
+        XCTAssertFalse(translator.takeAutomaticStart(loadID: load), "It is taken once.")
+    }
+}

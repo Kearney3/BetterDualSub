@@ -79,6 +79,8 @@ final class SubtitleTranslator: ObservableObject {
     /// A request waiting for a language download, which only a view's translation session can offer.
     private var pending: Request?
     var pendingID: UUID? { pending?.token }
+    /// A load whose Track 2 is to be translated as soon as the translation card has its languages ready.
+    private var automaticLoadID: UUID?
     private var task: Task<Void, Never>?
     private var session: (any SubtitleTranslationSession)?
     private var generation = UUID()
@@ -218,6 +220,19 @@ final class SubtitleTranslator: ObservableObject {
             return
         }
         run(request, manager: manager)
+    }
+
+    /// Asks for Track 2 of the subtitles just loaded to be translated without a click, as when only one track of a
+    /// package was extracted on purpose.
+    func requestAutomaticStart(loadID: UUID) {
+        automaticLoadID = loadID
+    }
+
+    /// Whether `requestAutomaticStart` asked for `loadID`; answers yes once.
+    func takeAutomaticStart(loadID: UUID) -> Bool {
+        guard automaticLoadID == loadID else { return false }
+        automaticLoadID = nil
+        return true
     }
 
     func cancel() {
