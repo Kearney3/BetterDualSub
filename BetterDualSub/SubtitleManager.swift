@@ -421,7 +421,8 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     /// The loaded Track 1, as the source for a translated Track 2.
     var primaryDocument: SubtitleDocument? { primary }
 
-    /// Replaces Track 2 with `document`, which has Track 1's timing (a translation of it), so it also takes Track 1's delay.
+    /// Replaces Track 2 with `document`, which is timed within Track 1's cues (a translation of it), so it also takes
+    /// Track 1's delay.
     func setSecondary(_ document: SubtitleDocument, name: String) {
         guard !trackNames.isEmpty else { return }
         previousSecondary = (secondary, trackNames.count > 1 ? trackNames[1] : nil, packageTracks?.secondaryID,

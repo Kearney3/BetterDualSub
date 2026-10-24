@@ -495,12 +495,12 @@ nonisolated enum SubtitleLineMode: String, CaseIterable, Sendable {
     static let defaultValue = SubtitleLineMode.original
 
     /// Terminal width of a line, counting CJK characters double and markup not at all.
-    private static func width(_ text: String) -> Int {
+    static func width(_ text: String) -> Int {
         let visible = text.contains("<") || text.contains("{") ? SubtitleMarkup.plainText(text) : text
         return visible.unicodeScalars.reduce(0) { $0 + (isWide($1) ? 2 : 1) }
     }
 
-    private static func isWide(_ scalar: Unicode.Scalar) -> Bool {
+    static func isWide(_ scalar: Unicode.Scalar) -> Bool {
         switch scalar.value {
         case 0x1100...0x115F, 0x2E80...0xA4CF, 0xAC00...0xD7A3, 0xF900...0xFAFF, 0xFE30...0xFE6F, 0xFF00...0xFF60, 0xFFE0...0xFFE6: true
         default: false
@@ -508,7 +508,7 @@ nonisolated enum SubtitleLineMode: String, CaseIterable, Sendable {
     }
 
     /// Joins two lines, with a space unless the seam is between CJK characters.
-    private static func join(_ a: String, _ b: String) -> String {
+    static func join(_ a: String, _ b: String) -> String {
         guard let last = a.unicodeScalars.last, let first = b.unicodeScalars.first else { return a + b }
         return isWide(last) || isWide(first) ? a + b : a + " " + b
     }

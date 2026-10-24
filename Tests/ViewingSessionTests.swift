@@ -187,7 +187,7 @@ final class ViewingSessionTests: XCTestCase {
         })
         let plan = try SubtitleTranslationPlan(document: document).preview()
         XCTAssertEqual(plan.sources.count, 8)
-        let sample = try plan.document(translations: plan.sources.map { "Translated \($0)" })
+        let sample = try plan.document(translations: plan.sources.map { ["Translated \($0)"] })
         XCTAssertEqual(sample.items.count, 8)
         XCTAssertEqual(sample.items[7].startMs, document.items[7].startMs)
         XCTAssertEqual(sample.items[7].endMs, document.items[7].endMs)

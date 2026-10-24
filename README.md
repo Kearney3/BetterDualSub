@@ -15,7 +15,7 @@ The Apple TV app on the Mac shows one subtitle language at a time and cannot loa
 - **Follows playback** of the Apple TV app, or of any other player that reports Now Playing (IINA, VLC, QuickTime Player, browsers…), including pauses, seeks and playback speed. A manual clock takes over when nothing is playing.
 - **Visible sync status** in the menu bar, on the overlay and in the app, with a one-click fix when subtitles are not following the right player.
 - **Timing tools**: per-track delays, global shortcuts, and alignment by picking the line you hear. Timing is remembered per title.
-- **On-device translation**: create a second language from the first with macOS translation. Subtitle text never leaves your Mac.
+- **Translation**: create a second language from the first with macOS on-device translation, a local language model (Ollama, LM Studio) or any OpenAI-compatible service. Sentences split over several lines are translated whole and shared back over their timing, and a per-show glossary keeps names and terms consistent.
 - **Bilingual export**: merge two subtitle files into one bilingual SRT.
 - Interface in English and Simplified Chinese.
 
@@ -63,7 +63,7 @@ The control window has three groups:
 | --- | --- |
 | Subtitles | **Now Playing**: tracks, sync status, timing and translation for what is loaded. **Load Subtitles**: every way to load subtitles. |
 | Tools | **Align by Line**, **Bilingual Export** |
-| Settings | **Appearance**, **Keyboard Shortcuts**, **General** |
+| Settings | **Appearance**, **Translation**, **Keyboard Shortcuts**, **General** |
 
 The menu bar icon offers the same loading, timing and display commands.
 
@@ -104,7 +104,23 @@ Choose which player to follow under **General** › **Sync source**. A connected
 
 ### Translating a second language
 
-On **Now Playing**, **Translate Track 2** creates a second track from Track 1 with the macOS on-device translator. The source language is detected automatically. Languages that are not installed yet are offered as a system download. You can correct the source language and **Preview 8 cues** without replacing Track 2. After a full translation, **Undo track replacement** restores the previous track. Results keep line timing, can be exported as SRT and are retained in Recent Watching.
+On **Now Playing**, **Translate Track 2** creates a second track from Track 1. The source language is detected automatically. You can correct the source language and **Preview 8 cues** without replacing Track 2. After a full translation, **Undo track replacement** restores the previous track. Results can be exported as SRT and are retained in Recent Watching.
+
+Choose the **Engine**:
+
+- **On-device (macOS)**: the system translator. Languages that are not installed yet are offered as a system download. Subtitle text never leaves your Mac.
+- **Language model**: set it up under **Settings** › **Translation**. Pick **Ollama** or **LM Studio** for a model running on this Mac, or **OpenAI**, **DeepSeek** or **Custom** for any service with an OpenAI-compatible `/v1/chat/completions` API (OpenRouter, SiliconFlow, Qwen, llama.cpp…). **Test Connection** lists the service's models. The API key is kept in your login keychain, for that address only. Requests carry a batch of sentences together with the sentences before and after it, so names and tone stay consistent; you can add your own instructions, such as the show's premise.
+
+Timing:
+
+- A sentence split over several cues ("I don't think" / "we should go.") is translated as one sentence and shared back over the same cues. A language model returns the parts itself; the on-device translator's result is split at punctuation or between words, in proportion to the original lines.
+- **Split long translated lines over their time** breaks a translation longer than two lines into parts shown one after another within the original cue.
+
+Glossary:
+
+- Each show has a glossary per target language, named after the title without episode numbers (`Show.Name.S01E02` → `Show Name`), so every episode uses it. **Edit…** opens it; entries can be imported and exported as tab-separated text (`original<TAB>translation<TAB>kind<TAB>note`, `#` for comments; `original → translation` lines are also read).
+- With a language model, **Find Terms**, or **Find names and terms before translating**, collects the names of people, places and organizations and the show's own terms. Entries you have written or edited are never replaced.
+- Glossary translations are sent with every request that uses them. After translating, lines that still miss a glossary term are translated once more; any left are reported. With the on-device translator, glossary translations are written into the source text before translating, which works best for names.
 
 ### Overlay
 
@@ -138,7 +154,7 @@ Play, pause and seeking control the followed player, or the manual clock when no
 
 - **Network**: BetterDualSub contacts Apple's TV website only when you look up or download subtitles, and GitHub at most once a day for the latest version number (turn this off under **General**). Nothing else is sent.
 - **Account**: requests are anonymous. The optional DSID field is used only after an eligible request fails and is kept in memory only.
-- **Translation** runs on device.
+- **Translation** runs on device with the macOS translator or a language model on this Mac. With an online language model service, the subtitle text is sent to that service, as the translation card and **Settings** › **Translation** point out. API keys are stored in the login keychain. Glossaries are stored in `~/Library/Application Support/BetterDualSub/Glossaries/`.
 - **Files**: downloaded and extracted subtitles are kept in `~/Library/Application Support/BetterDualSub/Subtitles/`; **General** can move this folder to the Trash. Files you export yourself are never touched. Settings and timing are stored in the app's preferences. Self-contained recent subtitles, translations and configuration are stored in `~/Library/Application Support/BetterDualSub/RecentWatching.json`; clear these using Recent Watching. Clearing the download cache keeps recent-session copies.
 
 To remove everything installed with Homebrew, run `brew uninstall --zap --cask betterdualsub`.
@@ -173,6 +189,8 @@ See [Limitations](#limitations). Apple TV+ titles and TV show links are not supp
 <summary>Translation asks for a download or fails</summary>
 
 macOS needs the language pair installed. Accept the download offer, or manage languages in System Settings › General › Language & Region › Translation Languages.
+
+With a language model, use **Test Connection** under **Settings** › **Translation**. A local server must be running with the model downloaded (`ollama pull <model>`). If a small model often leaves out lines, lower **Sentences per request**.
 </details>
 
 ## Development

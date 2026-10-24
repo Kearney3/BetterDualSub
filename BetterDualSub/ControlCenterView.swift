@@ -2,12 +2,12 @@ import SwiftUI
 import AppKit
 
 private enum ControlCenterPage: String, CaseIterable, Identifiable {
-    case nowPlaying, load, recent, align, bilingual, appearance, shortcuts, general
+    case nowPlaying, load, recent, align, bilingual, appearance, translation, shortcuts, general
 
     var id: String { rawValue }
     static let subtitlePages: [Self] = [.nowPlaying, .load, .recent]
     static let toolPages: [Self] = [.align, .bilingual]
-    static let settingPages: [Self] = [.appearance, .shortcuts, .general]
+    static let settingPages: [Self] = [.appearance, .translation, .shortcuts, .general]
 
     /// Resolves a page name, including the names of pages that were merged: the guide became Now Playing,
     /// and the three loading pages became sources of Load Subtitles.
@@ -29,6 +29,7 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
         case .align: "nav.align"
         case .bilingual: "nav.bilingual"
         case .appearance: "nav.appearance"
+        case .translation: "nav.translation"
         case .shortcuts: "nav.shortcuts"
         case .general: "nav.general"
         }
@@ -42,6 +43,7 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
         case .align: "scope"
         case .bilingual: "character.bubble"
         case .appearance: "textformat"
+        case .translation: "translate"
         case .shortcuts: "keyboard"
         case .general: "gearshape"
         }
@@ -171,6 +173,8 @@ struct ControlCenterView: View {
             SubtitleAlignView()
         case .appearance:
             SubtitleAppearanceView()
+        case .translation:
+            TranslationSettingsView()
         case .shortcuts:
             ShortcutSettingsView()
         case .general:

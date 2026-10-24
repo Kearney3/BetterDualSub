@@ -8,18 +8,47 @@ struct TranslationLanguage: Identifiable, Hashable {
     let name: String
 }
 
-/// Creates Track 2 by translating Track 1 with the on-device macOS translator. It lives outside any view so a long
-/// translation keeps going when the user leaves the page; only a language download needs a view (see `pending`).
+/// What translates: the macOS on-device translator, or a language model behind an OpenAI-compatible API.
+nonisolated enum SubtitleTranslationEngine: Equatable, Sendable {
+    case system
+    case llm(LLMConfiguration)
+}
+
+nonisolated struct SubtitleTranslationOptions: Sendable {
+    var engine = SubtitleTranslationEngine.system
+    /// Names and terms to translate the same way throughout; terms found before translating are added to it.
+    var glossary: TranslationGlossary?
+    /// Let the language model find the show's names and terms before translating.
+    var extractTerms = false
+    /// Break translated lines too long for one cue into parts (`SubtitleTranslationSplitter.subdivide`).
+    var subdivide = true
+}
+
+/// Creates Track 2 by translating Track 1, with the on-device macOS translator or a language model. It lives outside
+/// any view so a long translation keeps going when the user leaves the page; only a language download needs a view
+/// (see `pending`).
+///
+/// A sentence spread over several cues is translated whole and shared out over the same cues again. With a language
+/// model the show's names and terms can be gathered into its glossary first, each batch is sent with the lines around
+/// it and the glossary terms it uses, and lines that still ignore the glossary are asked for once more.
 @MainActor
 final class SubtitleTranslator: ObservableObject {
     static let shared = SubtitleTranslator()
     private static let batchSize = 40
+    /// Sentences per term-extraction request.
+    private static let termChunkSize = 300
+    /// Untranslated sentences after a batch sent along for context.
+    private static let followingContext = 3
 
     enum Phase: Equatable {
         case idle
         /// Checking languages, or waiting for the user to accept a language download.
         case preparing
+        case extractingTerms(done: Int, total: Int)
+        case termsExtracted(added: Int)
         case translating(done: Int, total: Int)
+        /// Asking again for lines that did not use the glossary.
+        case checking
         case finished(lines: Int, language: String)
         case failed(String)
         case cancelled
@@ -32,6 +61,9 @@ final class SubtitleTranslator: ObservableObject {
         let loadID: UUID
         let token: UUID
         let preview: Bool
+        let options: SubtitleTranslationOptions
+        /// Only gather glossary terms, without translating.
+        let extractOnly: Bool
     }
 
     @Published private(set) var phase: Phase = .idle
@@ -40,6 +72,10 @@ final class SubtitleTranslator: ObservableObject {
     /// The finished translation and its language, for export.
     private(set) var result: (document: SubtitleDocument, language: Locale.Language)?
     private(set) var previewOnly = false
+    /// Sentences of the finished translation that still do not use a glossary term.
+    private(set) var unresolvedTerms = 0
+    /// The glossary as the last run left it, with the terms it found.
+    @Published private(set) var glossary: TranslationGlossary?
     /// A request waiting for a language download, which only a view's translation session can offer.
     private var pending: Request?
     var pendingID: UUID? { pending?.token }
@@ -47,19 +83,31 @@ final class SubtitleTranslator: ObservableObject {
     private var session: (any SubtitleTranslationSession)?
     private var generation = UUID()
     private let availability: (Locale.Language, Locale.Language) async -> LanguageAvailability.Status
-    private let makeSession: (Locale.Language, Locale.Language) -> any SubtitleTranslationSession
+    private let makeSession: (SubtitleTranslationEngine, Locale.Language, Locale.Language) -> any SubtitleTranslationSession
+    private let saveGlossary: (TranslationGlossary) async -> Void
 
     init(availability: @escaping (Locale.Language, Locale.Language) async -> LanguageAvailability.Status = systemAvailability,
-         makeSession: @escaping (Locale.Language, Locale.Language) -> any SubtitleTranslationSession = {
-             SystemSubtitleTranslationSession(source: $0, target: $1)
-         }) {
+         makeSession: ((SubtitleTranslationEngine, Locale.Language, Locale.Language) -> any SubtitleTranslationSession)? = nil,
+         saveGlossary: ((TranslationGlossary) async -> Void)? = nil) {
         self.availability = availability
-        self.makeSession = makeSession
+        self.makeSession = makeSession ?? { Self.defaultSession(engine: $0, source: $1, target: $2) }
+        self.saveGlossary = saveGlossary ?? { try? await GlossaryStore.shared.save($0) }
+    }
+
+    static func defaultSession(engine: SubtitleTranslationEngine, source: Locale.Language,
+                               target: Locale.Language) -> any SubtitleTranslationSession {
+        switch engine {
+        case .system:
+            SystemSubtitleTranslationSession(source: source, target: target)
+        case .llm(let configuration):
+            LLMSubtitleTranslationSession(client: LLMTranslationClient(configuration: configuration, apiKey: configuration.apiKey),
+                                          source: source, target: target)
+        }
     }
 
     var isBusy: Bool {
         switch phase {
-        case .preparing, .translating: true
+        case .preparing, .extractingTerms, .translating, .checking: true
         default: false
         }
     }
@@ -98,16 +146,43 @@ final class SubtitleTranslator: ObservableObject {
     /// Starts translating. Returns a configuration when a language must be downloaded first: the view runs it with
     /// `.translationTask`, then calls `downloadFinished`.
     func start(plan: SubtitleTranslationPlan, source: Locale.Language, target: Locale.Language,
-               manager: any SubtitleTranslationTarget, preview: Bool = false) async -> TranslationSession.Configuration? {
+               manager: any SubtitleTranslationTarget, preview: Bool = false,
+               options: SubtitleTranslationOptions = SubtitleTranslationOptions()) async -> TranslationSession.Configuration? {
+        await begin(plan: plan, source: source, target: target, manager: manager, preview: preview, options: options, extractOnly: false)
+    }
+
+    /// Gathers the show's names and terms into `options.glossary` with the language model, without translating.
+    func extractTerms(plan: SubtitleTranslationPlan, source: Locale.Language, target: Locale.Language,
+                      manager: any SubtitleTranslationTarget, options: SubtitleTranslationOptions) async {
+        guard case .llm = options.engine else { return }
+        _ = await begin(plan: plan, source: source, target: target, manager: manager, preview: false, options: options, extractOnly: true)
+    }
+
+    private func begin(plan: SubtitleTranslationPlan, source: Locale.Language, target: Locale.Language,
+                       manager: any SubtitleTranslationTarget, preview: Bool, options: SubtitleTranslationOptions,
+                       extractOnly: Bool) async -> TranslationSession.Configuration? {
         guard !isBusy else { return nil }
         generation = UUID()
         let token = generation
         loadID = manager.loadID
         previewOnly = preview
         result = nil
+        unresolvedTerms = 0
+        glossary = options.glossary
         guard !plan.sources.isEmpty else { fail(AppLocalization.string("translate.error.empty")); return nil }
         phase = .preparing
-        let request = Request(plan: plan, source: source, target: target, loadID: manager.loadID, token: token, preview: preview)
+        let request = Request(plan: plan, source: source, target: target, loadID: manager.loadID, token: token, preview: preview,
+                              options: options, extractOnly: extractOnly)
+        if case .llm(let configuration) = options.engine {
+            // A language model needs no language download; it only needs to be set up.
+            guard configuration.isComplete else { fail(AppLocalization.string("llm.error.notConfigured")); return nil }
+            if source.languageCode == target.languageCode, source.script == target.script {
+                fail(AppLocalization.format("translate.error.same", Self.displayName(target)))
+                return nil
+            }
+            run(request, manager: manager)
+            return nil
+        }
         let availability = await availability(source, target)
         guard generation == token, manager.loadID == request.loadID else { return nil }
         switch availability {
@@ -167,36 +242,103 @@ final class SubtitleTranslator: ObservableObject {
 
     private func run(_ request: Request, manager: any SubtitleTranslationTarget) {
         guard request.token == generation, request.loadID == manager.loadID else { return }
-        let session = makeSession(request.source, request.target)
+        let session = makeSession(request.options.engine, request.source, request.target)
         self.session = session
-        let sources = request.plan.sources
-        phase = .translating(done: 0, total: sources.count)
+        let units = request.plan.units
+        let batchSize: Int, contextLines: Int
+        if case .llm(let configuration) = request.options.engine {
+            batchSize = min(max(configuration.batchSize, LLMConfiguration.batchSizes.lowerBound), LLMConfiguration.batchSizes.upperBound)
+            contextLines = min(max(configuration.contextLines, 0), LLMConfiguration.contextSizes.upperBound)
+        } else {
+            batchSize = Self.batchSize
+            contextLines = 0
+        }
         task = Task { [weak self] in
             defer { session.cancel() }
+            @MainActor func ensureCurrent() throws {
+                guard !Task.isCancelled, manager.loadID == request.loadID, self?.generation == request.token else { throw CancellationError() }
+            }
             do {
-                var translations = [String](repeating: "", count: sources.count)
+                var glossary = request.options.glossary ?? TranslationGlossary(name: "", targetLanguage: request.target.maximalIdentifier)
+                if session.understandsContext, request.options.extractTerms || request.extractOnly {
+                    let chunks = stride(from: 0, to: units.count, by: Self.termChunkSize).map {
+                        units[$0..<min(units.count, $0 + Self.termChunkSize)].map(\.text)
+                    }
+                    self?.phase = .extractingTerms(done: 0, total: chunks.count)
+                    var added = 0
+                    for (index, lines) in chunks.enumerated() {
+                        let found = try await session.extractTerms(lines, known: glossary.matches(in: lines.joined(separator: "\n")))
+                        try ensureCurrent()
+                        added += glossary.merge(found)
+                        self?.phase = .extractingTerms(done: index + 1, total: chunks.count)
+                    }
+                    self?.glossary = glossary
+                    if added > 0, !glossary.name.isEmpty {
+                        await self?.saveGlossary(glossary)
+                        try ensureCurrent()
+                    }
+                    if request.extractOnly {
+                        self?.phase = .termsExtracted(added: added)
+                        self?.session = nil
+                        self?.task = nil
+                        return
+                    }
+                }
+                var translations = [[String]?](repeating: nil, count: units.count)
+                self?.phase = .translating(done: 0, total: units.count)
                 var start = 0
                 // Batches keep the progress moving and let a cancel or a new subtitle load stop the work early.
-                while start < sources.count {
-                    let end = min(sources.count, start + Self.batchSize)
-                    let batch = (start..<end).map { SubtitleTranslationInput(index: $0, text: sources[$0]) }
-                    var received = Set<Int>()
-                    try await session.translate(batch) { response in
-                        guard !Task.isCancelled, manager.loadID == request.loadID, self?.generation == request.token else { throw CancellationError() }
-                        guard let index = response.identifier.flatMap(Int.init), (start..<end).contains(index),
-                              !response.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                              received.insert(index).inserted else { throw SubtitleError.message("error.translation.incomplete") }
-                        translations[index] = response.text
-                        self?.phase = .translating(done: start + received.count, total: sources.count)
+                while start < units.count {
+                    let end = min(units.count, start + batchSize)
+                    var context = SubtitleTranslationContext()
+                    if session.understandsContext {
+                        context.preceding = (max(0, start - contextLines)..<start).compactMap { index in
+                            translations[index].map { (source: units[index].text, translation: Self.joined($0)) }
+                        }
+                        context.following = units[end..<min(units.count, end + Self.followingContext)].map(\.text)
+                        context.glossary = glossary.matches(in: units[start..<end].map(\.text).joined(separator: "\n"))
                     }
-                    guard !Task.isCancelled, manager.loadID == request.loadID, self?.generation == request.token else { throw CancellationError() }
-                    guard received.count == end - start else { throw SubtitleError.message("error.translation.incomplete") }
+                    let done = start
+                    let batch = try await Self.translate(Array(start..<end), of: units, session: session, context: context,
+                                                         glossary: glossary, requireAll: true, ensureCurrent: ensureCurrent) { received in
+                        self?.phase = .translating(done: done + received, total: units.count)
+                    }
+                    for (index, lines) in batch { translations[index] = lines }
                     start = end
-                    self?.phase = .translating(done: start, total: sources.count)
+                    self?.phase = .translating(done: start, total: units.count)
                 }
-                let document = try request.plan.document(translations: translations)
+                var violating = units.indices.filter { index in
+                    translations[index].map { !glossary.violations(source: units[index].text, translation: Self.joined($0)).isEmpty } ?? false
+                }
+                if session.understandsContext, !violating.isEmpty {
+                    self?.phase = .checking
+                    for first in stride(from: 0, to: violating.count, by: batchSize) {
+                        let indices = Array(violating[first..<min(violating.count, first + batchSize)])
+                        var context = SubtitleTranslationContext(strict: true)
+                        context.glossary = glossary.matches(in: indices.map { units[$0].text }.joined(separator: "\n"))
+                        let retried: [Int: [String]]
+                        do {
+                            retried = try await Self.translate(indices, of: units, session: session, context: context, glossary: glossary,
+                                                               requireAll: false, ensureCurrent: ensureCurrent) { _ in }
+                        } catch is SubtitleError {
+                            // The first translation stands; a failed second opinion only leaves those lines unresolved.
+                            continue
+                        }
+                        for (index, lines) in retried {
+                            let before = translations[index].map { glossary.violations(source: units[index].text, translation: Self.joined($0)).count } ?? .max
+                            if glossary.violations(source: units[index].text, translation: Self.joined(lines)).count < before { translations[index] = lines }
+                        }
+                    }
+                    violating = violating.filter { index in
+                        translations[index].map { !glossary.violations(source: units[index].text, translation: Self.joined($0)).isEmpty } ?? false
+                    }
+                }
+                try ensureCurrent()
+                var document = try request.plan.document(translations: translations.map { $0 ?? [] })
+                if request.options.subdivide { document = try SubtitleTranslationSplitter.subdivide(document) }
                 let language = Self.displayName(request.target)
                 if !request.preview { manager.setSecondary(document, name: AppLocalization.format("translate.trackName", language)) }
+                self?.unresolvedTerms = violating.count
                 self?.result = (document, request.target)
                 self?.phase = .finished(lines: document.items.count, language: language)
             } catch {
@@ -211,5 +353,41 @@ final class SubtitleTranslator: ObservableObject {
             self?.session = nil
             self?.task = nil
         }
+    }
+
+    /// Translates `indices` of `units` in one request. Each result has one line per segment of its unit: kept from a
+    /// translator that understands segments, otherwise shared out by `SubtitleTranslationSplitter`. Late, unknown,
+    /// repeated or empty responses fail the request; so do missing ones when `requireAll` is set.
+    private static func translate(_ indices: [Int], of units: [SubtitleTranslationUnit], session: any SubtitleTranslationSession,
+                                  context: SubtitleTranslationContext, glossary: TranslationGlossary, requireAll: Bool,
+                                  ensureCurrent: () throws -> Void, progress: (Int) -> Void) async throws -> [Int: [String]] {
+        let wanted = Set(indices)
+        let aware = session.understandsContext
+        let inputs = indices.map { index in
+            aware ? SubtitleTranslationInput(index: index, text: units[index].text, segments: units[index].segments)
+                // Translators that cannot be told about a glossary get its translations written into the source.
+                : SubtitleTranslationInput(index: index, text: glossary.substitute(in: units[index].text))
+        }
+        var results: [Int: [String]] = [:]
+        try await session.translate(inputs, context: context) { response in
+            try ensureCurrent()
+            guard let index = response.identifier.flatMap(Int.init), wanted.contains(index),
+                  !response.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                  results[index] == nil else { throw SubtitleError.message("error.translation.incomplete") }
+            let segments = units[index].segments
+            if let lines = response.segments, lines.count == segments.count {
+                results[index] = lines
+            } else {
+                results[index] = SubtitleTranslationSplitter.split(response.text, weights: segments.map(SubtitleLineMode.width))
+            }
+            progress(results.count)
+        }
+        try ensureCurrent()
+        guard !requireAll || results.count == indices.count else { throw SubtitleError.message("error.translation.incomplete") }
+        return results
+    }
+
+    private static func joined(_ lines: [String]) -> String {
+        lines.filter { !$0.isEmpty }.reduce("") { $0.isEmpty ? $1 : SubtitleLineMode.join($0, $1) }
     }
 }

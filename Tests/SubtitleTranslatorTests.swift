@@ -22,7 +22,8 @@ private final class TranslationSessionStub: SubtitleTranslationSession {
     private var continuation: CheckedContinuation<Void, Never>?
     var waiting: Bool { continuation != nil }
 
-    func translate(_ inputs: [SubtitleTranslationInput], receive: (SubtitleTranslationOutput) throws -> Void) async throws {
+    func translate(_ inputs: [SubtitleTranslationInput], context: SubtitleTranslationContext,
+                   receive: (SubtitleTranslationOutput) throws -> Void) async throws {
         batches.append(inputs)
         defer { finished = true }
         if blocked { await withCheckedContinuation { continuation = $0 } }
@@ -46,7 +47,7 @@ final class SubtitleTranslatorTests: XCTestCase {
     }
 
     private func translator(_ session: TranslationSessionStub) -> SubtitleTranslator {
-        SubtitleTranslator(availability: { _, _ in .installed }, makeSession: { _, _ in session })
+        SubtitleTranslator(availability: { _, _ in .installed }, makeSession: { _, _, _ in session })
     }
 
     func testOutOfOrderStreamingAcrossBatchesPreservesAllCueTiming() async throws {
@@ -80,7 +81,7 @@ final class SubtitleTranslatorTests: XCTestCase {
         old.blocked = true
         fresh.blocked = true
         var created = 0
-        let translator = SubtitleTranslator(availability: { _, _ in .installed }, makeSession: { _, _ in
+        let translator = SubtitleTranslator(availability: { _, _ in .installed }, makeSession: { _, _, _ in
             created += 1
             return created == 1 ? old : fresh
         })
@@ -154,7 +155,7 @@ final class SubtitleTranslatorTests: XCTestCase {
     func testOldLanguageDownloadCannotCompleteANewRequestForTheSamePair() async throws {
         let session = TranslationSessionStub(), target = TranslationTarget()
         var installed = false, created = 0
-        let translator = SubtitleTranslator(availability: { _, _ in installed ? .installed : .supported }, makeSession: { _, _ in
+        let translator = SubtitleTranslator(availability: { _, _ in installed ? .installed : .supported }, makeSession: { _, _, _ in
             created += 1
             return session
         })
@@ -184,7 +185,7 @@ final class SubtitleTranslatorTests: XCTestCase {
             checks += 1
             if checks == 1 { return await withCheckedContinuation { waiting = $0 } }
             return .installed
-        }, makeSession: { _, _ in session })
+        }, makeSession: { _, _, _ in session })
         let prepared = try plan()
         let old = Task { await translator.start(plan: prepared, source: source, target: targetLanguage, manager: target) == nil }
         await settle { waiting != nil }
