@@ -52,6 +52,14 @@ nonisolated struct SubtitleTranslationPlan: Sendable {
         return recognizer.dominantLanguage.map(\.rawValue)
     }
 
+    /// Indices of `units` in the order they are next spoken from `ms` (Track 1 time) on, then those spoken before it:
+    /// the order to translate in while someone is watching.
+    func unitOrder(from ms: Int) -> [Int] {
+        let split = groups.firstIndex { $0.cues.contains { items[$0].endMs > ms } } ?? groups.count
+        var seen = Set<Int>()
+        return (groups[split...] + groups[..<split]).map(\.unit).filter { seen.insert($0).inserted }
+    }
+
     func preview(maximumCues: Int = 8) throws -> SubtitleTranslationPlan {
         SubtitleTranslationPlan(document: try SubtitleDocument(items: Array(items.prefix(max(1, maximumCues)))))
     }
@@ -60,17 +68,25 @@ nonisolated struct SubtitleTranslationPlan: Sendable {
     /// its time to the line before it in the same sentence (or after it, for the first), a sentence that came back
     /// empty is dropped, and cues without words keep their text.
     func document(translations: [[String]]) throws -> SubtitleDocument {
+        guard translations.count == units.count else { throw SubtitleError.message("error.translation.incomplete") }
+        return try partialDocument(translations: translations)
+    }
+
+    /// The track so far while translating: as `document(translations:)`, except that the cues of a sentence not yet
+    /// translated (nil) are left out.
+    func partialDocument(translations: [[String]?]) throws -> SubtitleDocument {
         guard translations.count == units.count,
-              zip(translations, units).allSatisfy({ $0.count == $1.segments.count }) else {
+              zip(translations, units).allSatisfy({ lines, unit in lines.map { $0.count == unit.segments.count } ?? true }) else {
             throw SubtitleError.message("error.translation.incomplete")
         }
         var translated: [SubtitleItem] = []
         var grouped = Set<Int>()
         for (cues, unit) in groups {
             grouped.formUnion(cues)
+            guard let lines = translations[unit] else { continue }
             var spans: [(start: Int, end: Int, text: String)] = []
             var leadingStart: Int?
-            for (cue, line) in zip(cues, translations[unit]) {
+            for (cue, line) in zip(cues, lines) {
                 let item = items[cue], text = line.trimmingCharacters(in: .whitespacesAndNewlines)
                 if !text.isEmpty {
                     spans.append((leadingStart ?? item.startMs, item.endMs, text))

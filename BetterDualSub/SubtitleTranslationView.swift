@@ -27,6 +27,8 @@ struct SubtitleTranslationCard: View {
     @State private var download: TranslationSession.Configuration?
     @State private var downloadRequestID: UUID?
     @State private var showPreview = false
+    /// The load whose languages and plan are ready, so a translation asked for from elsewhere can start.
+    @State private var readyLoadID: UUID?
 
     /// The translator's state, unless it belongs to subtitles that have since been replaced.
     private var phase: SubtitleTranslator.Phase {
@@ -107,6 +109,7 @@ struct SubtitleTranslationCard: View {
         }
         .task(id: manager.loadID) {
             showPreview = false
+            readyLoadID = nil
             guard let document = manager.primaryDocument else { plan = nil; source = nil; return }
             let plan = SubtitleTranslationPlan(document: document)
             self.plan = plan
@@ -122,10 +125,11 @@ struct SubtitleTranslationCard: View {
             }
             glossaryName = TranslationGlossary.seriesName(from: manager.loadedTitle.isEmpty ? "subtitle" : manager.loadedTitle)
             automaticStartBlocked = false
-            if translator.takeAutomaticStart(loadID: manager.loadID) {
-                if canStart { start(preview: false) } else { automaticStartBlocked = true }
-            }
+            readyLoadID = manager.loadID
+            startIfRequested()
         }
+        // Track 2 set to "translate" on Now Playing while these subtitles are already loaded.
+        .onChange(of: translator.automaticLoadID) { _, _ in startIfRequested() }
         .task(id: "\(glossaryName)\u{0}\(target)") { await loadGlossary() }
         .onChange(of: translator.glossary) { _, updated in
             if let updated, updated.name == glossaryName, updated.targetLanguage == target { glossary = updated }
@@ -195,6 +199,7 @@ struct SubtitleTranslationCard: View {
             ProgressView(value: Double(done), total: Double(max(total, 1))) {
                 Text(AppLocalization.format("translate.status.progress", done, total)).font(.callout).foregroundStyle(.secondary)
             }
+            if !translator.previewOnly, done > 0 { SettingsHint(key: "translate.status.live") }
         case .checking:
             HStack(spacing: 8) {
                 ProgressView().controlSize(.small)
@@ -246,6 +251,11 @@ struct SubtitleTranslationCard: View {
             let options = await options(preview: false)
             await translator.extractTerms(plan: plan, source: source, target: target, manager: manager, options: options)
         }
+    }
+
+    private func startIfRequested() {
+        guard readyLoadID == manager.loadID, translator.takeAutomaticStart(loadID: manager.loadID), !translator.isBusy else { return }
+        if canStart { start(preview: false) } else { automaticStartBlocked = true }
     }
 
     private func start(preview: Bool) {

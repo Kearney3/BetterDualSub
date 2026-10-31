@@ -4,7 +4,11 @@ import Translation
 @MainActor
 protocol SubtitleTranslationTarget: AnyObject, Sendable {
     var loadID: UUID { get }
+    /// Where Track 1 is being watched, in its own time (after its delay), so translation starts there.
+    var translationPositionMs: Int { get }
     func setSecondary(_ document: SubtitleDocument, name: String)
+    /// Replaces the Track 2 that `setSecondary` set as more of it is translated; undo still returns to the one before.
+    func updateSecondary(_ document: SubtitleDocument)
 }
 
 nonisolated struct SubtitleTranslationInput: Sendable {

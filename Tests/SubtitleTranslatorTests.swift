@@ -7,6 +7,9 @@ private final class TranslationTarget: SubtitleTranslationTarget {
     var loadID = UUID()
     var replacements: [SubtitleDocument] = []
     func setSecondary(_ document: SubtitleDocument, name: String) { replacements.append(document) }
+    var translationPositionMs = 0
+    /// Later parts of the same translation replace the last one, so `replacements` holds one entry per translation.
+    func updateSecondary(_ document: SubtitleDocument) { replacements[replacements.count - 1] = document }
 }
 
 @MainActor
@@ -119,28 +122,29 @@ final class SubtitleTranslatorTests: XCTestCase {
         XCTAssertTrue(session.cancelled)
     }
 
-    func testIncompleteDuplicateEmptyAndInvalidStreamResponsesNeverReplaceATrack() async throws {
-        let cases: [[SubtitleTranslationOutput]] = [
-            [.init(identifier: "0", text: "Only one")],
-            [.init(identifier: "0", text: "One"), .init(identifier: "0", text: "Duplicate")],
-            [.init(identifier: "0", text: "   ")],
-            [.init(identifier: "99", text: "Wrong batch")],
-            [.init(identifier: nil, text: "Missing identifier")]
+    func testIncompleteDuplicateEmptyAndInvalidStreamResponsesFailKeepingOnlyValidLines() async throws {
+        let cases: [(responses: [SubtitleTranslationOutput], shown: [String])] = [
+            ([.init(identifier: "0", text: "Only one")], ["Only one"]),
+            ([.init(identifier: "0", text: "One"), .init(identifier: "0", text: "Duplicate")], ["One"]),
+            ([.init(identifier: "0", text: "   ")], []),
+            ([.init(identifier: "99", text: "Wrong batch")], []),
+            ([.init(identifier: nil, text: "Missing identifier")], [])
         ]
-        for responses in cases {
+        for (responses, shown) in cases {
             let session = TranslationSessionStub(), target = TranslationTarget()
             session.outputs = { _ in responses }
             let translator = translator(session)
             _ = await translator.start(plan: try plan(), source: source, target: targetLanguage, manager: target)
             await settle { !translator.isBusy }
             guard case .failed = translator.phase else { return XCTFail("Expected a failed stream") }
-            XCTAssertTrue(target.replacements.isEmpty)
+            // Lines received before the stream went wrong stay on Track 2 for whoever is watching; nothing else does.
+            XCTAssertEqual(target.replacements.first?.items.map(\.text) ?? [], shown)
             XCTAssertNil(translator.result)
             XCTAssertTrue(session.cancelled)
         }
     }
 
-    func testStreamErrorDoesNotApplyPartialResults() async throws {
+    func testStreamErrorKeepsLinesShownSoFarWithoutAResult() async throws {
         let session = TranslationSessionStub(), target = TranslationTarget()
         session.outputs = { [.init(identifier: String($0[0].index), text: "Partial")] }
         session.failure = URLError(.networkConnectionLost)
@@ -148,8 +152,27 @@ final class SubtitleTranslatorTests: XCTestCase {
         _ = await translator.start(plan: try plan(), source: source, target: targetLanguage, manager: target)
         await settle { !translator.isBusy }
         guard case .failed = translator.phase else { return XCTFail("Expected the stream failure") }
-        XCTAssertTrue(target.replacements.isEmpty)
+        XCTAssertEqual(target.replacements.count, 1)
+        XCTAssertEqual(target.replacements.first?.items.map(\.text), ["Partial"])
         XCTAssertNil(translator.result)
+    }
+
+    func testTranslationStartsWhereTrackOneIsWatchedAndShowsEachBatch() async throws {
+        let session = TranslationSessionStub(), target = TranslationTarget()
+        target.translationPositionMs = 50 * 2000 + 500
+        var shownCounts: [Int] = []
+        session.outputs = { inputs in
+            shownCounts.append(target.replacements.first?.items.count ?? 0)
+            return inputs.map { SubtitleTranslationOutput(identifier: String($0.index), text: "Translated \($0.index)") }
+        }
+        let translator = translator(session)
+        _ = await translator.start(plan: try plan(85), source: source, target: targetLanguage, manager: target)
+        await settle { !translator.isBusy }
+        XCTAssertEqual(session.batches.map { $0.map(\.index) }, [Array(50..<85), Array(0..<40), Array(40..<50)])
+        // Track 2 is set once and grows before the run is over.
+        XCTAssertEqual(target.replacements.count, 1)
+        XCTAssertEqual(shownCounts, [0, 35, 75])
+        XCTAssertEqual(target.replacements.first?.items.map(\.text), (0..<85).map { "Translated \($0)" })
     }
 
     func testOldLanguageDownloadCannotCompleteANewRequestForTheSamePair() async throws {

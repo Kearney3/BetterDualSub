@@ -74,9 +74,16 @@ struct NowPlayingView: View {
                 }
                 GridRow {
                     Text("nowPlaying.track.secondary").foregroundStyle(.secondary)
-                    Picker("nowPlaying.track.secondary", selection: Binding(get: { choice.secondaryID ?? Self.otherTrackTag },
-                                                                             set: { manager.switchPackageTracks(secondaryID: $0) })) {
+                    Picker("nowPlaying.track.secondary", selection: Binding(get: { choice.secondaryID ?? Self.otherTrackTag }, set: { id in
+                        if id == SubtitleTranslator.translateTag {
+                            SubtitleTranslator.shared.requestAutomaticStart(loadID: manager.loadID)
+                        } else {
+                            manager.switchPackageTracks(secondaryID: id)
+                        }
+                    })) {
                         Text("download.noSecondary").tag("")
+                        Text("movpkg.secondary.translate").tag(SubtitleTranslator.translateTag)
+                        Divider()
                         if choice.secondaryID == nil, manager.trackNames.count > 1 {
                             Text(verbatim: manager.trackNames[1]).tag(Self.otherTrackTag)
                         }

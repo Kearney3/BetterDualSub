@@ -22,12 +22,11 @@ struct MovpkgSubtitleImportView: View {
     @AppStorage("preferredPrimarySubtitleLanguage") private var preferredPrimary = "en"
     @AppStorage("preferredSecondarySubtitleLanguage") private var preferredSecondary = "zh"
     /// Track 2 is made by translating Track 1 after extraction, rather than taken from the package.
-    @AppStorage("movpkgTranslateSecondary") private var translateSecondary = false
+    @AppStorage(SubtitleTranslator.translateSecondaryKey) private var translateSecondary = false
     /// Folder of the last package or video chosen, where the next panel opens.
     @AppStorage("localVideoFolder") private var lastFolder = ""
 
-    /// Picker tag of "translate Track 1" for Track 2.
-    private static let translateTag = "\u{0}translate"
+    private static let translateTag = SubtitleTranslator.translateTag
 
     fileprivate var primary: LocalSubtitleTrack? { tracks.first { $0.id == primaryID } }
 

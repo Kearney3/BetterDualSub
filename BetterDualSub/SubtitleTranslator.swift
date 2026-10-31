@@ -42,6 +42,8 @@ final class SubtitleTranslator: ObservableObject {
     private static let termChunkSize = 300
     /// Untranslated sentences after a batch sent along for context.
     private static let followingContext = 3
+    /// Least time between two updates of Track 2 while a batch comes back line by line.
+    private static let publishInterval = Duration.milliseconds(800)
 
     enum Phase: Equatable {
         case idle
@@ -82,8 +84,12 @@ final class SubtitleTranslator: ObservableObject {
     /// A request waiting for a language download, which only a view's translation session can offer.
     private var pending: Request?
     var pendingID: UUID? { pending?.token }
+    /// Preference: Track 2 is made by translating Track 1 rather than taken from a file or package.
+    static let translateSecondaryKey = "movpkgTranslateSecondary"
+    /// Picker tag of "translate Track 1" for Track 2.
+    static let translateTag = "\u{0}translate"
     /// A load whose Track 2 is to be translated as soon as the translation card has its languages ready.
-    private var automaticLoadID: UUID?
+    @Published private(set) var automaticLoadID: UUID?
     private var task: Task<Void, Never>?
     private var session: (any SubtitleTranslationSession)?
     private var generation = UUID()
@@ -225,8 +231,8 @@ final class SubtitleTranslator: ObservableObject {
         run(request, manager: manager)
     }
 
-    /// Asks for Track 2 of the subtitles just loaded to be translated without a click, as when only one track of a
-    /// package was extracted on purpose.
+    /// Asks for Track 2 of the subtitles just loaded (or now playing) to be translated without a click, as when Track 2
+    /// was set to be translated from Track 1.
     func requestAutomaticStart(loadID: UUID) {
         automaticLoadID = loadID
     }
@@ -307,27 +313,45 @@ final class SubtitleTranslator: ObservableObject {
                 // Found names of kinds left untranslated stay in the saved glossary for later runs but are not used.
                 let applied = glossary.excludingAutomatic(untranslated)
                 var translations = [[String]?](repeating: nil, count: units.count)
+                let trackName = AppLocalization.format("translate.trackName", Self.displayName(request.target))
+                var published = false
+                var lastPublished = ContinuousClock.now
+                // Track 2 grows as lines come back, so it can be watched while the rest is translated.
+                @MainActor func publish(_ document: SubtitleDocument) {
+                    lastPublished = .now
+                    if published { manager.updateSecondary(document) } else { manager.setSecondary(document, name: trackName) }
+                    published = true
+                }
+                @MainActor func publishPartial(force: Bool) {
+                    guard !request.preview, force || !published || ContinuousClock.now - lastPublished >= Self.publishInterval,
+                          let document = try? Self.finished(request.plan.partialDocument(translations: translations), request: request)
+                    else { return }
+                    publish(document)
+                }
                 self?.phase = .translating(done: 0, total: units.count)
-                var start = 0
-                // Batches keep the progress moving and let a cancel or a new subtitle load stop the work early.
-                while start < units.count {
-                    let end = min(units.count, start + batchSize)
+                // Each batch is a run of untranslated sentences from the next one spoken where Track 1 is being watched,
+                // so a seek moves the work along with it; batches also let a cancel or a new subtitle load stop it early.
+                while let first = request.plan.unitOrder(from: manager.translationPositionMs).first(where: { translations[$0] == nil }) {
+                    let indices = Array((first..<units.count).prefix { translations[$0] == nil }.prefix(batchSize))
+                    let last = indices[indices.count - 1]
                     var context = SubtitleTranslationContext()
                     if session.understandsContext {
-                        context.preceding = (max(0, start - contextLines)..<start).compactMap { index in
+                        context.preceding = (max(0, first - contextLines)..<first).compactMap { index in
                             translations[index].map { (source: units[index].text, translation: Self.joined($0)) }
                         }
-                        context.following = units[end..<min(units.count, end + Self.followingContext)].map(\.text)
-                        context.glossary = applied.matches(in: units[start..<end].map(\.text).joined(separator: "\n"))
+                        context.following = units[last + 1..<min(units.count, last + 1 + Self.followingContext)].map(\.text)
+                        context.glossary = applied.matches(in: indices.map { units[$0].text }.joined(separator: "\n"))
                     }
-                    let done = start
-                    let batch = try await Self.translate(Array(start..<end), of: units, session: session, context: context,
-                                                         glossary: applied, requireAll: true, ensureCurrent: ensureCurrent) { received in
+                    let done = translations.filter { $0 != nil }.count
+                    let batch = try await Self.translate(indices, of: units, session: session, context: context,
+                                                         glossary: applied, requireAll: true, ensureCurrent: ensureCurrent) { received, index, lines in
+                        translations[index] = lines
                         self?.phase = .translating(done: done + received, total: units.count)
+                        publishPartial(force: false)
                     }
                     for (index, lines) in batch { translations[index] = lines }
-                    start = end
-                    self?.phase = .translating(done: start, total: units.count)
+                    self?.phase = .translating(done: done + indices.count, total: units.count)
+                    publishPartial(force: true)
                 }
                 var violating = units.indices.filter { index in
                     translations[index].map { !applied.violations(source: units[index].text, translation: Self.joined($0)).isEmpty } ?? false
@@ -341,7 +365,7 @@ final class SubtitleTranslator: ObservableObject {
                         let retried: [Int: [String]]
                         do {
                             retried = try await Self.translate(indices, of: units, session: session, context: context, glossary: applied,
-                                                               requireAll: false, ensureCurrent: ensureCurrent) { _ in }
+                                                               requireAll: false, ensureCurrent: ensureCurrent) { _, _, _ in }
                         } catch is SubtitleError {
                             // The first translation stands; a failed second opinion only leaves those lines unresolved.
                             continue
@@ -356,17 +380,9 @@ final class SubtitleTranslator: ObservableObject {
                     }
                 }
                 try ensureCurrent()
-                var document = try request.plan.document(translations: translations.map { $0 ?? [] })
-                if request.options.subdivide { document = try SubtitleTranslationSplitter.subdivide(document) }
-                if request.options.subtitlePunctuation, [.chinese, .japanese].contains(request.target.languageCode) {
-                    let japanese = request.target.languageCode == .japanese
-                    document = try SubtitleDocument(items: document.items.map {
-                        SubtitleItem(startMs: $0.startMs, endMs: $0.endMs,
-                                     text: SubtitleTranslationSplitter.subtitlePunctuation($0.text, japanese: japanese))
-                    })
-                }
+                let document = try Self.finished(request.plan.document(translations: translations.map { $0 ?? [] }), request: request)
                 let language = Self.displayName(request.target)
-                if !request.preview { manager.setSecondary(document, name: AppLocalization.format("translate.trackName", language)) }
+                if !request.preview { publish(document) }
                 self?.unresolvedTerms = violating.count
                 self?.result = (document, request.target)
                 self?.phase = .finished(lines: document.items.count, language: language)
@@ -389,7 +405,8 @@ final class SubtitleTranslator: ObservableObject {
     /// repeated or empty responses fail the request; so do missing ones when `requireAll` is set.
     private static func translate(_ indices: [Int], of units: [SubtitleTranslationUnit], session: any SubtitleTranslationSession,
                                   context: SubtitleTranslationContext, glossary: TranslationGlossary, requireAll: Bool,
-                                  ensureCurrent: () throws -> Void, progress: (Int) -> Void) async throws -> [Int: [String]] {
+                                  ensureCurrent: () throws -> Void,
+                                  progress: (_ received: Int, _ index: Int, _ lines: [String]) -> Void) async throws -> [Int: [String]] {
         let wanted = Set(indices)
         let aware = session.understandsContext
         let inputs = indices.map { index in
@@ -409,11 +426,25 @@ final class SubtitleTranslator: ObservableObject {
             } else {
                 results[index] = SubtitleTranslationSplitter.split(response.text, weights: segments.map(SubtitleLineMode.width))
             }
-            progress(results.count)
+            progress(results.count, index, results[index] ?? [])
         }
         try ensureCurrent()
         guard !requireAll || results.count == indices.count else { throw SubtitleError.message("error.translation.incomplete") }
         return results
+    }
+
+    /// `document` with the options that apply to the whole track: long lines subdivided, subtitle punctuation.
+    private static func finished(_ document: SubtitleDocument, request: Request) throws -> SubtitleDocument {
+        var document = document
+        if request.options.subdivide { document = try SubtitleTranslationSplitter.subdivide(document) }
+        if request.options.subtitlePunctuation, [.chinese, .japanese].contains(request.target.languageCode) {
+            let japanese = request.target.languageCode == .japanese
+            document = try SubtitleDocument(items: document.items.map {
+                SubtitleItem(startMs: $0.startMs, endMs: $0.endMs,
+                             text: SubtitleTranslationSplitter.subtitlePunctuation($0.text, japanese: japanese))
+            })
+        }
+        return document
     }
 
     private static func joined(_ lines: [String]) -> String {

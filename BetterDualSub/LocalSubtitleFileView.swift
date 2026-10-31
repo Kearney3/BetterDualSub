@@ -18,6 +18,7 @@ struct LocalSubtitleFileView: View {
     @State private var busy = false
     @State private var operation: Task<Void, Never>?
     @State private var generation = UUID()
+    @AppStorage(SubtitleTranslator.translateSecondaryKey) private var translateSecondary = false
 
     private static let types: [UTType] = SubtitleFileReader.fileExtensions.compactMap { UTType(filenameExtension: $0) } + [.plainText]
 
@@ -53,7 +54,10 @@ struct LocalSubtitleFileView: View {
 
             SettingsCard(titleKey: "localFile.secondary.title") {
                 fileRow(url: secondaryURL, symbol: "text.bubble.fill", choose: { secondaryURL = pick() }, clear: { secondaryURL = nil })
-                SettingsHint(key: "localFile.secondary.help")
+                if secondaryURL == nil {
+                    Toggle("movpkg.secondary.translate", isOn: $translateSecondary)
+                }
+                SettingsHint(key: secondaryURL == nil && translateSecondary ? "translate.secondary.help" : "localFile.secondary.help")
             }
             .overlay { if secondaryTargeted { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor, lineWidth: 2) } }
             .dropDestination(for: URL.self) { urls, _ in
@@ -135,6 +139,7 @@ struct LocalSubtitleFileView: View {
     private func load() {
         guard let primaryURL, !busy else { return }
         let secondaryURL = secondaryURL, firstDelay = primaryDelay, secondDelay = secondaryDelay
+        let translate = secondaryURL == nil && translateSecondary
         let token = UUID(), loadID = manager.loadID
         generation = token
         busy = true
@@ -153,7 +158,9 @@ struct LocalSubtitleFileView: View {
                 if firstDelay != 0 || secondDelay != 0 {
                     manager.applyDelays(primary: firstDelay, secondaryExtra: secondDelay)
                 }
-                status = AppLocalization.format("localFile.status.loaded", first.items.count)
+                if translate { SubtitleTranslator.shared.requestAutomaticStart(loadID: manager.loadID) }
+                status = AppLocalization.format(translate ? "localFile.status.loadedTranslating" : "localFile.status.loaded",
+                                                first.items.count)
             } catch {
                 guard generation == token, !Task.isCancelled else { return }
                 self.error = error.localizedDescription

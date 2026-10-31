@@ -22,6 +22,9 @@ struct MovieSubtitleDownloadView: View {
     @State private var downloader = MovieSubtitleDownloader()
     @AppStorage("preferredPrimarySubtitleLanguage") private var preferredPrimary = "en"
     @AppStorage("preferredSecondarySubtitleLanguage") private var preferredSecondary = "zh"
+    @AppStorage(SubtitleTranslator.translateSecondaryKey) private var translateSecondary = false
+
+    private static let translateTag = SubtitleTranslator.translateTag
 
     private var movie: MovieVersion? { versions.first { $0.id == selectedVersion } }
 
@@ -62,11 +65,16 @@ struct MovieSubtitleDownloadView: View {
                     }.disabled(busy)
                     Picker("download.secondary", selection: Binding(get: { secondaryID }, set: { id in
                         secondaryID = id
-                        preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? ""
+                        translateSecondary = id == Self.translateTag
+                        // Translating keeps the language Track 2 is otherwise taken in.
+                        if !translateSecondary { preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? "" }
                     })) {
                         Text("download.noSecondary").tag("")
+                        Text("movpkg.secondary.translate").tag(Self.translateTag)
+                        Divider()
                         ForEach(tracks) { Text($0.label).tag($0.id) }
                     }.disabled(busy)
+                    if secondaryID == Self.translateTag { SettingsHint(key: "translate.secondary.help") }
                     SettingsHint(key: "download.tracks.help")
                     HStack {
                         Button("download.action") { download(show: true) }
@@ -148,7 +156,7 @@ struct MovieSubtitleDownloadView: View {
         let full = available.filter { !$0.forced }.sorted { !$0.accessibility && $1.accessibility }
         let first = full.first { SubtitleLanguagePreference.matches($0.language, preferredPrimary) } ?? full.first ?? available.first!
         primaryID = first.id
-        secondaryID = preferredSecondary.isEmpty ? "" : full.first {
+        secondaryID = translateSecondary ? Self.translateTag : preferredSecondary.isEmpty ? "" : full.first {
             $0.id != first.id && SubtitleLanguagePreference.matches($0.language, preferredSecondary)
         }?.id ?? ""
     }
@@ -191,6 +199,8 @@ struct MovieSubtitleDownloadView: View {
     private func download(show: Bool) {
         guard let movie, let first = tracks.first(where: { $0.id == primaryID }), primaryID != secondaryID else { return }
         let selected = [first] + tracks.filter { $0.id == secondaryID }
+        // Saving files has nothing to translate into; the translation is made on Now Playing.
+        let translate = show && secondaryID == Self.translateTag
         var exportFolder: URL?
         if !show {
             let panel = NSOpenPanel()
@@ -232,8 +242,9 @@ struct MovieSubtitleDownloadView: View {
             let folder = try SubtitleCache.save(documents, tracks: selected, movie: movie)
             manager.load(primary: documents[0], secondary: documents.count > 1 ? documents[1] : nil,
                          title: movie.title, names: selected.map(\.label), sourceID: "movie:\(movie.id)")
+            if translate { SubtitleTranslator.shared.requestAutomaticStart(loadID: manager.loadID) }
             cacheFolder = folder
-            status = AppLocalization.string("download.status.loaded")
+            status = AppLocalization.string(translate ? "download.status.loadedTranslating" : "download.status.loaded")
         }
     }
 }

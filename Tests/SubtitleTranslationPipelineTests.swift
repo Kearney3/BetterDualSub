@@ -7,6 +7,9 @@ private final class PipelineTarget: SubtitleTranslationTarget {
     var loadID = UUID()
     var replacements: [SubtitleDocument] = []
     func setSecondary(_ document: SubtitleDocument, name: String) { replacements.append(document) }
+    var translationPositionMs = 0
+    /// Later parts of the same translation replace the last one, so `replacements` holds one entry per translation.
+    func updateSecondary(_ document: SubtitleDocument) { replacements[replacements.count - 1] = document }
 }
 
 /// A translator that, like a language model, reads context and keeps each sentence's split over its cues.

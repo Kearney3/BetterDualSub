@@ -1,6 +1,74 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "translate.secondary.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 2 is translated from Track 1 on Now Playing, with the engine and language chosen there. Lines appear as they are translated, starting where you are watching."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "随后在“正在播放”中用那里选择的引擎和语言由第一轨翻译生成第二轨。译好一句显示一句，从当前播放位置开始翻译。"
+          }
+        }
+      }
+    },
+    "download.status.loadedTranslating" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 1 is loaded and Track 2 is being translated on Now Playing. You can start the movie in TV.app now; translated lines appear as they are ready."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第一轨已加载，正在“正在播放”中翻译生成第二轨。现在即可在 TV.app 播放影片，译好的字幕会陆续显示。"
+          }
+        }
+      }
+    },
+    "localFile.status.loadedTranslating" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Loaded %d subtitle cues; Track 2 is being translated on Now Playing. You can start the movie now; translated lines appear as they are ready."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已加载 %d 条字幕，正在“正在播放”中翻译生成第二轨。现在即可播放影片，译好的字幕会陆续显示。"
+          }
+        }
+      }
+    },
+    "translate.status.live" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 2 is already showing the lines translated so far, starting where you are watching. You can keep watching."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨已显示已译好的字幕，并从当前播放位置开始翻译，可以边看边译。"
+          }
+        }
+      }
+    },
     "nowPlaying.tracks.help" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9057,13 +9125,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Only Track 1 is extracted. Track 2 is then translated from it on Now Playing, with the engine and language chosen there."
+            "value" : "Only Track 1 is extracted. Track 2 is then translated from it on Now Playing, with the engine and language chosen there. Lines appear as they are translated, starting where you are watching."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "只提取第一轨，随后在“正在播放”中用那里选择的引擎和语言由第一轨翻译生成第二轨。"
+            "value" : "只提取第一轨，随后在“正在播放”中用那里选择的引擎和语言由第一轨翻译生成第二轨。译好一句显示一句，从当前播放位置开始翻译。"
           }
         }
       }

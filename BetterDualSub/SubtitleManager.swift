@@ -438,6 +438,19 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         queueSessionSave()
     }
 
+    /// Replaces the translated Track 2 that `setSecondary` set with more of it, keeping its delay and the undo.
+    func updateSecondary(_ document: SubtitleDocument) {
+        guard canUndoSecondary, !trackNames.isEmpty else { return }
+        secondary = document
+        currentSession?.secondarySRT = document.srt
+        durationMs = max(durationMs, documentDurationMs)
+        updateSub()
+        queueSessionSave()
+    }
+
+    /// Track 1's position in its own time, where a translation of it should start.
+    var translationPositionMs: Int { currentPositionMs() - timeOffsetMs }
+
     func undoSecondary() {
         guard let previousSecondary else { return }
         secondary = previousSecondary.document
