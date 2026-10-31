@@ -111,6 +111,8 @@ struct TranslationOptionsSection: View {
     var canExtract = false
     /// Offers saving the glossary under another name, for a later season.
     var allowsSaveAs = false
+    /// Describes translating files rather than making Track 2.
+    var forFiles = false
     @AppStorage(TranslationOptionsModel.targetKey) private var target = ""
     @AppStorage(TranslationOptionsModel.engineKey) private var engineID = "system"
     @AppStorage(TranslationOptionsModel.extractTermsKey) private var extractTerms = true
@@ -127,9 +129,20 @@ struct TranslationOptionsSection: View {
 
     private var usesLLM: Bool { engineID == "llm" }
 
+    private var hintKey: LocalizedStringKey {
+        switch (usesLLM, llm.isOnThisMac, forFiles) {
+        case (false, _, false): "translate.help"
+        case (true, true, false): "translate.help.llmLocal"
+        case (true, false, false): "translate.help.llmRemote"
+        case (false, _, true): "batch.help"
+        case (true, true, true): "batch.help.llmLocal"
+        case (true, false, true): "batch.help.llmRemote"
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            SettingsHint(key: usesLLM ? (llm.isOnThisMac ? "translate.help.llmLocal" : "translate.help.llmRemote") : "translate.help")
+            SettingsHint(key: hintKey)
             HStack(spacing: 10) {
                 Picker("translate.engine", selection: $engineID) {
                     Text("translate.engine.system").tag("system")

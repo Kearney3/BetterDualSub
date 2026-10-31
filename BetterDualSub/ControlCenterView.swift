@@ -2,11 +2,11 @@ import SwiftUI
 import AppKit
 
 private enum ControlCenterPage: String, CaseIterable, Identifiable {
-    case nowPlaying, load, recent, align, bilingual, appearance, translation, shortcuts, general
+    case nowPlaying, load, recent, align, bilingual, batchTranslate, appearance, translation, shortcuts, general
 
     var id: String { rawValue }
     static let subtitlePages: [Self] = [.nowPlaying, .load, .recent]
-    static let toolPages: [Self] = [.align, .bilingual]
+    static let toolPages: [Self] = [.align, .bilingual, .batchTranslate]
     static let settingPages: [Self] = [.appearance, .translation, .shortcuts, .general]
 
     /// Resolves a page name, including the names of pages that were merged: the guide became Now Playing,
@@ -28,6 +28,7 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
         case .recent: "recent.title"
         case .align: "nav.align"
         case .bilingual: "nav.bilingual"
+        case .batchTranslate: "nav.batchTranslate"
         case .appearance: "nav.appearance"
         case .translation: "nav.translation"
         case .shortcuts: "nav.shortcuts"
@@ -42,6 +43,7 @@ private enum ControlCenterPage: String, CaseIterable, Identifiable {
         case .recent: "clock.arrow.circlepath"
         case .align: "scope"
         case .bilingual: "character.bubble"
+        case .batchTranslate: "doc.on.doc"
         case .appearance: "textformat"
         case .translation: "translate"
         case .shortcuts: "keyboard"
@@ -169,6 +171,8 @@ struct ControlCenterView: View {
             }
         case .bilingual:
             BilingualExportView()
+        case .batchTranslate:
+            BatchTranslationView()
         case .align:
             SubtitleAlignView()
         case .appearance:

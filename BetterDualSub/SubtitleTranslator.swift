@@ -116,11 +116,19 @@ final class SubtitleTranslator: ObservableObject {
         }
     }
 
-    var isBusy: Bool {
+    var isBusy: Bool { Self.isBusy(phase) }
+
+    private static func isBusy(_ phase: Phase) -> Bool {
         switch phase {
         case .preparing, .extractingTerms, .translating, .checking: true
         default: false
         }
+    }
+
+    /// Returns once the current run is over (finished, failed or cancelled), including any language download it
+    /// waits for, or when the calling task is cancelled.
+    func waitUntilIdle() async {
+        for await phase in $phase.values where !Self.isBusy(phase) { return }
     }
 
     static func languages() async -> [TranslationLanguage] {
@@ -144,6 +152,13 @@ final class SubtitleTranslator: ObservableObject {
         let maximal = Locale.Language(identifier: language.maximalIdentifier)
         let identifier = maximal.languageCode == .chinese ? "zh-\(maximal.script?.identifier ?? "Hans")" : language.minimalIdentifier
         return locale.localizedString(forIdentifier: identifier) ?? identifier
+    }
+
+    /// The language as file names write it: "en", "ja", and for Chinese its script, "zh-Hans" or "zh-Hant".
+    static func fileCode(_ language: Locale.Language) -> String {
+        let maximal = Locale.Language(identifier: language.maximalIdentifier)
+        guard let code = maximal.languageCode?.identifier else { return language.minimalIdentifier }
+        return maximal.languageCode == .chinese ? "\(code)-\(maximal.script?.identifier ?? "Hans")" : code
     }
 
     /// The app's interface language, or the other one of Chinese / English when the track is already in it.

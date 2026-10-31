@@ -16,7 +16,8 @@ The Apple TV app on the Mac shows one subtitle language at a time and cannot loa
 - **Visible sync status** in the menu bar, on the overlay and in the app, with a one-click fix when subtitles are not following the right player.
 - **Timing tools**: per-track delays, global shortcuts, and alignment by picking the line you hear. Timing is remembered per title.
 - **Translation**: create a second language from the first with macOS on-device translation, a local language model (Ollama, LM Studio) or any OpenAI-compatible service. Sentences split over several lines are translated whole and shared back over their timing, and a per-show glossary keeps names and terms consistent.
-- **Bilingual export**: merge two subtitle files into one bilingual SRT.
+- **Merge subtitles**: merge two subtitle files, or a whole season paired by episode, into bilingual SRT or ASS files, with the timing lined up and a constant offset detected.
+- **Batch translation**: translate a season's subtitle files in one go with a shared glossary that is saved for the next season, writing translated and/or bilingual files.
 - Interface in English and Simplified Chinese.
 
 ## Requirements
@@ -64,7 +65,7 @@ The control window has three groups:
 | Group | Pages |
 | --- | --- |
 | Subtitles | **Now Playing**: tracks, sync status, timing and translation for what is loaded. **Load Subtitles**: every way to load subtitles. |
-| Tools | **Align by Line**, **Bilingual Export** |
+| Tools | **Align by Line**, **Merge Subtitles**, **Batch Translate** |
 | Settings | **Appearance**, **Translation**, **Keyboard Shortcuts**, **General** |
 
 The menu bar icon offers the same loading, timing and display commands.
@@ -124,6 +125,24 @@ Glossary:
 - Each show has a glossary per target language, named after the title without episode numbers (`Show.Name.S01E02` → `Show Name`), so every episode uses it. **Edit…** opens it; entries can be imported and exported as tab-separated text (`original<TAB>translation<TAB>kind<TAB>note`, `#` for comments; `original → translation` lines are also read).
 - With a language model, **Find Terms**, or **Find names and terms before translating**, collects the names of people, places and organizations and the show's own terms. Entries you have written or edited are never replaced. When people's or place names are kept in the original, the ones it found stay in the glossary but are not used; your own entries still are.
 - Glossary translations are sent with every request that uses them. After translating, lines that still miss a glossary term are translated once more; any left are reported. With the on-device translator, glossary translations are written into the source text before translating, which works best for names.
+- **Save As…** keeps a copy of a glossary under a new name, for example to start the next season from this one's names.
+
+### Merging subtitles
+
+**Tools** › **Merge Subtitles** writes two subtitle files as one, without loading them for playback. Drop files or choose them; **Swap Tracks** exchanges the two.
+
+- **Season** takes two lists of files or folders and pairs them by the episode in their names (`S01E02`, `1x02`, `EP02`, `第2集`); files without a partner are listed and left out.
+- **Additional secondary delay** moves Track 2; **Auto-detect** finds a constant offset from the lines that match (for a season, each episode is detected on its own). **Line up with Track 1** moves Track 2 lines that start or end within that many milliseconds of a Track 1 line onto it.
+- **Write** one bilingual file, or two synced files: Track 1 as it is and Track 2 with its delay and line-up applied, each in its own file. **Format** SRT or ASS; ASS keeps each language in its own style, Track 2 smaller. The preview shows the merged lines of the first pair.
+- A season is saved next to its sources or in a chosen folder, named by a pattern (`{name}`, `{lang}`, `{episode}`). An existing file is skipped, kept beside the new one or replaced as you choose; the source files are never replaced.
+
+### Batch translation
+
+**Tools** › **Batch Translate** translates many subtitle files with the engine, languages and options of the Now Playing translation card; a change on either page applies to both. The source language is detected from the first file.
+
+- One glossary is shared by every file, named after the show. With a language model and **Find names and terms before translating**, each file's names are found before it is translated and added to the glossary, so later episodes use them, and the glossary is saved as it grows.
+- Write the **Translated subtitles**, **Bilingual subtitles** (SRT or ASS, either language on top), or both, next to the sources or in a chosen folder. Files whose outputs already exist are skipped unless you choose otherwise, so a run can be resumed.
+- A file that fails does not stop the run; **Retry Failed** translates only those again. The run keeps going when you leave the page.
 
 ### Overlay
 
