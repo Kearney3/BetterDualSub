@@ -1,6 +1,74 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "translate.glossary.saveAs" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save As…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "另存为…"
+          }
+        }
+      }
+    },
+    "translate.glossary.saveAs.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Save Glossary As"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将术语库另存为"
+          }
+        }
+      }
+    },
+    "translate.glossary.saveAs.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Glossary name"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "术语库名称"
+          }
+        }
+      }
+    },
+    "translate.glossary.saveAs.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Keeps a copy of these names and terms under a new name, for example for the next season. The copy becomes the chosen glossary."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以新名称保存这些名称和术语的副本，例如留给下一季使用。副本将成为当前选中的术语库。"
+          }
+        }
+      }
+    },
     "files.panelTitle" : {
       "extractionState" : "manual",
       "localizations" : {

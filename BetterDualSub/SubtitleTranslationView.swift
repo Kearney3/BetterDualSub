@@ -7,22 +7,10 @@ import UniformTypeIdentifiers
 struct SubtitleTranslationCard: View {
     @EnvironmentObject private var manager: SubtitleManager
     @ObservedObject private var translator = SubtitleTranslator.shared
-    @AppStorage("translationTarget") private var target = ""
-    @AppStorage("translationEngine") private var engineID = "system"
-    @AppStorage("translationExtractTerms") private var extractTerms = true
-    @AppStorage("translationSubdivide") private var subdivide = true
-    @AppStorage("translationSubtitlePunctuation") private var subtitlePunctuation = false
-    @AppStorage(LLMConfiguration.storageKey) private var llmData = Data()
-    @State private var glossary: TranslationGlossary?
-    @State private var glossaryName = ""
-    @State private var glossaryNames: [String] = []
-    @State private var editingGlossary = false
+    @StateObject private var settings = TranslationOptionsModel()
     /// Track 2 was to be translated right after loading, but a language or the model still has to be chosen.
     @State private var automaticStartBlocked = false
-    @State private var languages: [TranslationLanguage] = []
     @State private var plan: SubtitleTranslationPlan?
-    @State private var source: Locale.Language?
-    @State private var sourceID = ""
     /// Set only when a language download is needed; `.translationTask` then offers it.
     @State private var download: TranslationSession.Configuration?
     @State private var downloadRequestID: UUID?
@@ -35,56 +23,14 @@ struct SubtitleTranslationCard: View {
         translator.loadID == manager.loadID ? translator.phase : .idle
     }
 
-    private var llm: LLMConfiguration {
-        (try? JSONDecoder().decode(LLMConfiguration.self, from: llmData)) ?? LLMConfiguration()
-    }
-
-    private var usesLLM: Bool { engineID == "llm" }
-
-    private var engine: SubtitleTranslationEngine { usesLLM ? .llm(llm) : .system }
-
     /// Translation can start: languages chosen, something to translate, and a language model set up if one is used.
     private var canStart: Bool {
-        !translator.isBusy && !sourceID.isEmpty && plan?.sources.isEmpty == false && !target.isEmpty && (!usesLLM || llm.isComplete)
+        !translator.isBusy && plan?.sources.isEmpty == false && settings.isReady
     }
 
     var body: some View {
         SettingsCard(titleKey: "translate.title") {
-            SettingsHint(key: usesLLM ? (llm.isOnThisMac ? "translate.help.llmLocal" : "translate.help.llmRemote") : "translate.help")
-            HStack(spacing: 10) {
-                Picker("translate.engine", selection: $engineID) {
-                    Text("translate.engine.system").tag("system")
-                    Text(verbatim: AppLocalization.format("translate.engine.llm", llm.model.isEmpty ? llm.preset.name : "\(llm.preset.name) · \(llm.model)"))
-                        .tag("llm")
-                }
-                .fixedSize()
-                .disabled(translator.isBusy)
-                Spacer()
-                if usesLLM {
-                    Button(llm.isComplete ? "translate.engine.settings" : "translate.engine.configure") { showControlCenterPage("translation") }
-                }
-            }
-            if usesLLM, llm.isComplete, !llm.isOnThisMac {
-                StatusLine(text: AppLocalization.format("translate.privacy.remote", llm.keychainAccount))
-            }
-            HStack(spacing: 10) {
-                Picker("translate.source.choose", selection: $sourceID) {
-                    Text("translate.source.unknown").tag("")
-                    ForEach(languages) { Text(verbatim: $0.name).tag($0.id) }
-                }
-                .disabled(translator.isBusy || languages.isEmpty)
-                Spacer()
-                Picker("translate.target", selection: $target) {
-                    ForEach(languages) { Text(verbatim: $0.name).tag($0.id) }
-                }
-                .fixedSize()
-                .disabled(translator.isBusy || languages.isEmpty)
-            }
-            glossaryRow
-            Toggle("translate.subdivide", isOn: $subdivide).disabled(translator.isBusy)
-            if [.chinese, .japanese].contains(Locale.Language(identifier: target).languageCode) {
-                Toggle("translate.punctuation", isOn: $subtitlePunctuation).disabled(translator.isBusy)
-            }
+            TranslationOptionsSection(model: settings, disabled: translator.isBusy, extract: extract, canExtract: canStart)
             HStack(spacing: 10) {
                 Button("translate.sample") { start(preview: true) }
                     .disabled(!canStart)
@@ -99,7 +45,8 @@ struct SubtitleTranslationCard: View {
                 }
             }
             if automaticStartBlocked, phase == .idle {
-                StatusLine(text: AppLocalization.string(usesLLM && !llm.isComplete ? "translate.auto.needsModel" : "translate.auto.needsLanguage"))
+                StatusLine(text: AppLocalization.string(settings.usesLLM && !settings.llm.isComplete
+                                                        ? "translate.auto.needsModel" : "translate.auto.needsLanguage"))
             }
             status
         }
@@ -110,72 +57,23 @@ struct SubtitleTranslationCard: View {
         .task(id: manager.loadID) {
             showPreview = false
             readyLoadID = nil
-            guard let document = manager.primaryDocument else { plan = nil; source = nil; return }
+            guard let document = manager.primaryDocument else { plan = nil; return }
             let plan = SubtitleTranslationPlan(document: document)
             self.plan = plan
-            source = plan.dominantLanguage.map(Locale.Language.init(identifier:))
-            if languages.isEmpty { languages = await SubtitleTranslator.languages() }
-            sourceID = source.flatMap { detected in
-                languages.first { Locale.Language(identifier: $0.id).languageCode == detected.languageCode
-                    && Locale.Language(identifier: $0.id).script == Locale.Language(identifier: detected.maximalIdentifier).script }?.id
-                ?? languages.first { Locale.Language(identifier: $0.id).languageCode == detected.languageCode }?.id
-            } ?? ""
-            if !languages.contains(where: { $0.id == target }) || source?.languageCode == Locale.Language(identifier: target).languageCode {
-                target = SubtitleTranslator.defaultTarget(source: source)
-            }
-            glossaryName = TranslationGlossary.seriesName(from: manager.loadedTitle.isEmpty ? "subtitle" : manager.loadedTitle)
+            await settings.adopt(detected: plan.dominantLanguage.map(Locale.Language.init(identifier:)))
+            settings.glossaryName = TranslationGlossary.seriesName(from: manager.loadedTitle.isEmpty ? "subtitle" : manager.loadedTitle)
             automaticStartBlocked = false
             readyLoadID = manager.loadID
             startIfRequested()
         }
         // Track 2 set to "translate" on Now Playing while these subtitles are already loaded.
         .onChange(of: translator.automaticLoadID) { _, _ in startIfRequested() }
-        .task(id: "\(glossaryName)\u{0}\(target)") { await loadGlossary() }
-        .onChange(of: translator.glossary) { _, updated in
-            if let updated, updated.name == glossaryName, updated.targetLanguage == target { glossary = updated }
-        }
-        .sheet(isPresented: $editingGlossary) {
-            GlossaryEditorView(glossary: glossary ?? TranslationGlossary(name: glossaryName, targetLanguage: target)) { edited in
-                Task {
-                    do {
-                        try await GlossaryStore.shared.save(edited)
-                        glossaryName = edited.name
-                        glossary = edited
-                        await loadGlossary()
-                    } catch { NSAlert(error: error).runModal() }
-                }
-            }
-        }
+        .onChange(of: translator.glossary) { _, updated in settings.adopt(glossary: updated) }
         .onDisappear {
             // The download offer belongs to this view; without it the request could never finish.
             if download != nil, phase == .preparing { translator.cancel() }
             download = nil
             downloadRequestID = nil
-        }
-    }
-
-    /// The show's glossary for the target language: its name, size, and the ways to fill it.
-    private var glossaryRow: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Picker("translate.glossary", selection: $glossaryName) {
-                    ForEach(Array(Set(glossaryNames + [glossaryName])).sorted { $0.localizedStandardCompare($1) == .orderedAscending }, id: \.self) {
-                        Text(verbatim: $0).tag($0)
-                    }
-                }
-                .fixedSize()
-                .disabled(translator.isBusy)
-                Text(AppLocalization.format("glossary.count", glossary?.entries.count ?? 0)).font(.callout).foregroundStyle(.secondary)
-                Spacer()
-                Button("translate.glossary.edit") { editingGlossary = true }.disabled(translator.isBusy || glossaryName.isEmpty)
-                if usesLLM {
-                    Button("translate.glossary.extract", action: extract).disabled(!canStart)
-                }
-            }
-            .help(Text("translate.glossary.help"))
-            if usesLLM {
-                Toggle("translate.glossary.auto", isOn: $extractTerms).disabled(translator.isBusy)
-            }
         }
     }
 
@@ -225,30 +123,10 @@ struct SubtitleTranslationCard: View {
         }
     }
 
-    /// The run's options, once the show's saved glossary is loaded: terms found during the run are merged into it and
-    /// saved, so starting with an empty stand-in would replace the saved one.
-    private func options(preview: Bool) async -> SubtitleTranslationOptions {
-        if glossary?.name != glossaryName || glossary?.targetLanguage != target { await loadGlossary() }
-        return SubtitleTranslationOptions(engine: engine, glossary: glossary ?? TranslationGlossary(name: glossaryName, targetLanguage: target),
-                                          extractTerms: usesLLM && extractTerms && !preview, subdivide: subdivide,
-                                          subtitlePunctuation: subtitlePunctuation)
-    }
-
-    private func loadGlossary() async {
-        guard !glossaryName.isEmpty, !target.isEmpty else { glossary = nil; return }
-        let name = glossaryName, language = target
-        let loaded = try? await GlossaryStore.shared.load(name: name, targetLanguage: language)
-        let names = await GlossaryStore.shared.names(targetLanguage: language)
-        guard name == glossaryName, language == target else { return }
-        glossary = loaded ?? TranslationGlossary(name: name, targetLanguage: language)
-        glossaryNames = names
-    }
-
     private func extract() {
-        guard let plan, !sourceID.isEmpty, !target.isEmpty else { return }
-        let source = Locale.Language(identifier: sourceID), target = Locale.Language(identifier: target)
+        guard let plan, let source = settings.sourceLanguage, let target = settings.targetLanguage else { return }
         Task {
-            let options = await options(preview: false)
+            let options = await settings.options(preview: false)
             await translator.extractTerms(plan: plan, source: source, target: target, manager: manager, options: options)
         }
     }
@@ -259,12 +137,10 @@ struct SubtitleTranslationCard: View {
     }
 
     private func start(preview: Bool) {
-        guard let fullPlan = plan, !sourceID.isEmpty, !target.isEmpty else { return }
-        let source = Locale.Language(identifier: sourceID)
-        let target = Locale.Language(identifier: target)
+        guard let fullPlan = plan, let source = settings.sourceLanguage, let target = settings.targetLanguage else { return }
         Task {
             do {
-                let options = await options(preview: preview)
+                let options = await settings.options(preview: preview)
                 let plan = try (preview ? fullPlan.preview() : fullPlan)
                 guard let configuration = await translator.start(plan: plan, source: source, target: target, manager: manager,
                                                                  preview: preview, options: options) else { return }
