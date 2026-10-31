@@ -1,6 +1,74 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "timing.snap.default" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Default"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复默认"
+          }
+        }
+      }
+    },
+    "timing.snap" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Line up with Track 1"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "与第一轨对齐"
+          }
+        }
+      }
+    },
+    "timing.snap.off" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Off"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        }
+      }
+    },
+    "timing.snap.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Track 2 lines that start or end within this much of a Track 1 line switch together with it, so neither track's line lingers after the other's is gone. Raise it if the two files differ more; Off shows Track 2 exactly as its file times it."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "第二轨字幕的开始或结束时间与第一轨相差不超过此值时，与第一轨同时切换，避免一轨已结束另一轨仍残留。两个文件差异较大时可调高；关闭则完全按第二轨文件原有时间显示。"
+          }
+        }
+      }
+    },
     "translate.secondary.help" : {
       "extractionState" : "manual",
       "localizations" : {

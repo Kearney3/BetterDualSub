@@ -116,6 +116,7 @@ func showControlCenterPage(_ page: String) {
 /// Delay and linking of the loaded tracks, on Now Playing.
 struct SubtitleTimingCard: View {
     @EnvironmentObject private var manager: SubtitleManager
+    @AppStorage(SubtitleManager.trackSnapToleranceKey) private var snapTolerance = SubtitleManager.defaultTrackSnapToleranceMs
 
     private var hasSecondTrack: Bool { manager.trackNames.count > 1 }
 
@@ -134,12 +135,35 @@ struct SubtitleTimingCard: View {
             }
             if hasSecondTrack {
                 Toggle("delay.link", isOn: Binding(get: { manager.linkSecondaryDelay }, set: { manager.setLink($0) }))
+                snapRow
             }
             HStack {
                 SettingsHint(key: "timing.help")
                 Spacer()
                 Button("align.open") { showControlCenterPage("align") }
             }
+        }
+    }
+
+    /// How far apart a Track 2 line may start or end from a Track 1 line and still change together with it.
+    private var snapRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Text("timing.snap")
+                Slider(value: Binding(get: { Double(snapTolerance) }, set: { snapTolerance = Int($0) }),
+                       in: Double(SubtitleManager.trackSnapTolerances.lowerBound)...Double(SubtitleManager.trackSnapTolerances.upperBound),
+                       step: 100)
+                    .frame(maxWidth: 220)
+                    .accessibilityValue(Text(verbatim: snapTolerance == 0 ? AppLocalization.string("timing.snap.off") : "\(snapTolerance) ms"))
+                Group {
+                    if snapTolerance == 0 { Text("timing.snap.off") } else { Text(verbatim: "\(snapTolerance) ms") }
+                }
+                .monospacedDigit().foregroundStyle(.secondary).frame(width: 64, alignment: .leading)
+                Spacer()
+                Button("timing.snap.default") { snapTolerance = SubtitleManager.defaultTrackSnapToleranceMs }
+                    .disabled(snapTolerance == SubtitleManager.defaultTrackSnapToleranceMs)
+            }
+            SettingsHint(key: "timing.snap.help")
         }
     }
 

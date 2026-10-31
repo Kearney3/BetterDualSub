@@ -136,6 +136,30 @@ final class SubtitleDownloadTests: XCTestCase {
         ])
     }
 
+    func testSnappingEndsTrackTwoLinesWithTrackOne() throws {
+        let en = try SubtitleDocument(items: [SubtitleItem(startMs: 1000, endMs: 3000, text: "Hello"),
+                                              SubtitleItem(startMs: 3200, endMs: 5000, text: "Bye"),
+                                              SubtitleItem(startMs: 9000, endMs: 10_000, text: "Later")])
+        let zh = try SubtitleDocument(items: [SubtitleItem(startMs: 1080, endMs: 3400, text: "你好"),
+                                              SubtitleItem(startMs: 2800, endMs: 4700, text: "再见"),
+                                              SubtitleItem(startMs: 6000, endMs: 7000, text: "仅中文"),
+                                              SubtitleItem(startMs: 9100, endMs: 9300, text: "短")])
+        let snapped = zh.snapped(to: en, tolerance: 500)
+        XCTAssertEqual(snapped.items, [
+            // A start goes to the nearest start and an end to the nearest end, never to the next line's start.
+            SubtitleItem(startMs: 1000, endMs: 3000, text: "你好"),
+            SubtitleItem(startMs: 3200, endMs: 5000, text: "再见"),
+            SubtitleItem(startMs: 6000, endMs: 7000, text: "仅中文"),
+            SubtitleItem(startMs: 9000, endMs: 9300, text: "短")
+        ])
+        XCTAssertEqual(snapped.text(at: 3100), "")
+        // With Track 1 shown 2 s earlier than Track 2, its lines (1000–3000, 3200–5000) land at -1000–1000 and
+        // 1200–3000 in Track 2's time.
+        XCTAssertEqual(zh.snapped(to: en, shiftMs: -2000, tolerance: 500).items.first,
+                       SubtitleItem(startMs: 1200, endMs: 3000, text: "你好"))
+        XCTAssertEqual(zh.snapped(to: en, tolerance: 0).items, zh.items)
+    }
+
     func testMarkupPreservesBilingualLinesWithoutExternalResources() throws {
         XCTAssertEqual(SubtitleMarkup.runs("<b>你好</b>\n<v Speaker>Hello</v><img src='https://example.com/x'>"), [
             SubtitleTextRun(text: "你好", bold: true),

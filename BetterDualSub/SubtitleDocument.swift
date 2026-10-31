@@ -200,14 +200,15 @@ nonisolated struct SubtitleDocument: Sendable {
         }.joined(separator: "\n\n") + "\n"
     }
 
-    /// Merges two tracks into one bilingual document: primary lines first, then secondary lines.
-    /// Cue boundaries of the secondary track within `tolerance` ms of a primary boundary are snapped to it,
-    /// and adjacent intervals with identical text are coalesced, so small timing differences between
-    /// languages do not produce flickering single-language slivers.
-    static func bilingual(primary: SubtitleDocument, secondary: SubtitleDocument, secondaryOffsetMs: Int = 0, tolerance: Int = 200) throws -> SubtitleDocument {
-        let primaryItems = primary.items.compactMap { cleaned($0) }
-        let anchors = Set(primaryItems.flatMap { [$0.startMs, $0.endMs] }).sorted()
-        func snap(_ value: Int) -> Int {
+    /// This track with each cue start moved onto the nearest cue start of `reference`, and each cue end onto the nearest
+    /// cue end, when it is at most `tolerance` ms away. `reference` is shifted by `shiftMs` into this track's time. Two
+    /// tracks of one video timed a little differently then change lines together, instead of one line lingering after
+    /// the other has gone or showing up before it. A cue that snapping would leave without time keeps its own.
+    func snapped(to reference: SubtitleDocument, shiftMs: Int = 0, tolerance: Int) -> SubtitleDocument {
+        guard tolerance > 0, !reference.items.isEmpty else { return self }
+        let starts = Set(reference.items.map { $0.startMs + shiftMs }).sorted()
+        let ends = Set(reference.items.map { $0.endMs + shiftMs }).sorted()
+        func snap(_ value: Int, to anchors: [Int]) -> Int {
             var low = 0, high = anchors.count
             while low < high {
                 let mid = (low + high) / 2
@@ -217,12 +218,24 @@ nonisolated struct SubtitleDocument: Sendable {
             if let nearest, abs(anchors[nearest] - value) <= tolerance { return anchors[nearest] }
             return value
         }
-        let secondaryItems = secondary.items.compactMap { cleaned($0) }.compactMap { item -> SubtitleItem? in
-            let start = snap(max(0, item.startMs + secondaryOffsetMs)), end = snap(max(0, item.endMs + secondaryOffsetMs))
-            return end > start ? SubtitleItem(startMs: start, endMs: end, text: item.text) : nil
+        let items = items.map { item in
+            let start = max(0, snap(item.startMs, to: starts)), end = snap(item.endMs, to: ends)
+            return end > start ? SubtitleItem(startMs: start, endMs: end, text: item.text) : item
         }
+        return (try? SubtitleDocument(items: items, allowEmpty: true)) ?? self
+    }
+
+    /// Merges two tracks into one bilingual document: primary lines first, then secondary lines.
+    /// Cue starts and ends of the secondary track within `tolerance` ms of a primary one are snapped to it (`snapped`),
+    /// and adjacent intervals with identical text are coalesced, so small timing differences between
+    /// languages do not produce flickering single-language slivers.
+    static func bilingual(primary: SubtitleDocument, secondary: SubtitleDocument, secondaryOffsetMs: Int = 0, tolerance: Int = 200) throws -> SubtitleDocument {
+        let primaryItems = primary.items.compactMap { cleaned($0) }
         let first = try SubtitleDocument(items: primaryItems, allowEmpty: true)
-        let second = try SubtitleDocument(items: secondaryItems, allowEmpty: true)
+        let second = try SubtitleDocument(items: secondary.items.compactMap { cleaned($0) }.compactMap { item -> SubtitleItem? in
+            let start = max(0, item.startMs + secondaryOffsetMs), end = max(0, item.endMs + secondaryOffsetMs)
+            return end > start ? SubtitleItem(startMs: start, endMs: end, text: item.text) : nil
+        }, allowEmpty: true).snapped(to: first, tolerance: tolerance)
         let bounds = Set((first.items + second.items).flatMap { [$0.startMs, $0.endMs] }).sorted()
         var merged: [SubtitleItem] = []
         for (start, end) in zip(bounds, bounds.dropFirst()) {

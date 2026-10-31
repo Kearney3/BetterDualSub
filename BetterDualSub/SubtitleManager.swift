@@ -151,8 +151,19 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     private var toastTask: Task<Void, Never>?
     /// Pending "playback lost" notice; brief gaps (between episodes, a seek) cancel it.
     private var lossTask: Task<Void, Never>?
-    private var primary: SubtitleDocument?
-    private var secondary: SubtitleDocument?
+    private var primary: SubtitleDocument? { didSet { shownSecondaryCache = nil } }
+    private var secondary: SubtitleDocument? { didSet { shownSecondaryCache = nil } }
+    /// Track 2 as shown, for the delay difference and tolerance it was snapped with (`shownSecondary`).
+    private var shownSecondaryCache: (shiftMs: Int, tolerance: Int, document: SubtitleDocument?)?
+    /// Two subtitle files of one video rarely end their lines at exactly the same moment; differences up to this
+    /// setting (0 turns it off) are treated as the same moment, so neither track's line lingers after the other's.
+    static let trackSnapToleranceKey = "trackSnapToleranceMs"
+    static let defaultTrackSnapToleranceMs = 500
+    static let trackSnapTolerances = 0...2000
+    static var trackSnapToleranceMs: Int {
+        let value = UserDefaults.standard.object(forKey: trackSnapToleranceKey) as? Int ?? defaultTrackSnapToleranceMs
+        return min(max(value, trackSnapTolerances.lowerBound), trackSnapTolerances.upperBound)
+    }
     /// The followed player's clock (called the TV clock, as Apple TV is the default player).
     private let playback = PlaybackCoordinator(client: MediaRemotePlaybackClient(), target: SyncTarget.current, mode: SyncMode.current)
     private let timingStore = SubtitleTimingStore(defaults: .standard)
@@ -221,7 +232,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     private func scheduleCueTimer(position: Int) {
         let speed = playbackSpeed
         let next = [primary?.nextChange(after: position - timeOffsetMs).map { $0 + timeOffsetMs },
-                    secondary?.nextChange(after: position - secondaryOffsetMs).map { $0 + secondaryOffsetMs }]
+                    shownSecondary()?.nextChange(after: position - secondaryOffsetMs).map { $0 + secondaryOffsetMs }]
             .compactMap { $0 }.min()
         guard isPlaying, OverlayController.isVisible, speed > 0, let next else {
             cueTimer?.invalidate()
@@ -297,12 +308,23 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         if debugTimeStr != formatted { debugTimeStr = formatted }
         // The video position already runs at the player's speed, so the subtitles follow it 1:1, minus the delay.
         let first = primary?.text(at: position - timeOffsetMs) ?? ""
-        let second = secondary?.text(at: position - secondaryOffsetMs) ?? ""
+        let second = shownSecondary()?.text(at: position - secondaryOffsetMs) ?? ""
         if currentText != first { currentText = first }
         if secondaryText != second { secondaryText = second }
         refreshSyncStatus()
         refreshSubtitleTimer()
         scheduleCueTimer(position: position)
+    }
+
+    /// Track 2 with its cue starts and ends snapped to nearby ones of Track 1, as they line up on screen with the
+    /// current delays. Only what is shown changes: alignment, export and history keep Track 2's own timing.
+    private func shownSecondary() -> SubtitleDocument? {
+        guard let secondary, let primary else { return secondary }
+        let shift = timeOffsetMs - secondaryOffsetMs, tolerance = Self.trackSnapToleranceMs
+        if let cache = shownSecondaryCache, cache.shiftMs == shift, cache.tolerance == tolerance { return cache.document }
+        let shown = secondary.snapped(to: primary, shiftMs: shift, tolerance: tolerance)
+        shownSecondaryCache = (shift, tolerance, shown)
+        return shown
     }
 
     // MARK: Playback controls (manual clock, or the followed player through Now Playing commands)
