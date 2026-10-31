@@ -225,33 +225,21 @@ nonisolated struct SubtitleDocument: Sendable {
         return (try? SubtitleDocument(items: items, allowEmpty: true)) ?? self
     }
 
-    /// Merges two tracks into one bilingual document: primary lines first, then secondary lines.
+    /// Merges two tracks into one bilingual document: primary lines first (or secondary first, with `secondaryOnTop`).
     /// Cue starts and ends of the secondary track within `tolerance` ms of a primary one are snapped to it (`snapped`),
     /// and adjacent intervals with identical text are coalesced, so small timing differences between
     /// languages do not produce flickering single-language slivers.
-    static func bilingual(primary: SubtitleDocument, secondary: SubtitleDocument, secondaryOffsetMs: Int = 0, tolerance: Int = 200) throws -> SubtitleDocument {
-        let primaryItems = primary.items.compactMap { cleaned($0) }
-        let first = try SubtitleDocument(items: primaryItems, allowEmpty: true)
-        let second = try SubtitleDocument(items: secondary.items.compactMap { cleaned($0) }.compactMap { item -> SubtitleItem? in
-            let start = max(0, item.startMs + secondaryOffsetMs), end = max(0, item.endMs + secondaryOffsetMs)
-            return end > start ? SubtitleItem(startMs: start, endMs: end, text: item.text) : nil
-        }, allowEmpty: true).snapped(to: first, tolerance: tolerance)
-        let bounds = Set((first.items + second.items).flatMap { [$0.startMs, $0.endMs] }).sorted()
-        var merged: [SubtitleItem] = []
-        for (start, end) in zip(bounds, bounds.dropFirst()) {
-            let text = [first.text(at: start), second.text(at: start)].filter { !$0.isEmpty }.joined(separator: "\n")
-            guard !text.isEmpty else { continue }
-            if let last = merged.last, last.endMs == start, last.text == text {
-                merged[merged.count - 1] = SubtitleItem(startMs: last.startMs, endMs: end, text: text)
-            } else {
-                merged.append(SubtitleItem(startMs: start, endMs: end, text: text))
-            }
-        }
-        return try SubtitleDocument(items: merged)
+    static func bilingual(primary: SubtitleDocument, secondary: SubtitleDocument, secondaryOffsetMs: Int = 0, tolerance: Int = 200,
+                          secondaryOnTop: Bool = false) throws -> SubtitleDocument {
+        let cues = try bilingualCues(primary: primary, secondary: secondary, secondaryOffsetMs: secondaryOffsetMs, tolerance: tolerance)
+        return try SubtitleDocument(items: cues.map { cue in
+            let lines = secondaryOnTop ? [cue.secondary, cue.primary] : [cue.primary, cue.secondary]
+            return SubtitleItem(startMs: cue.startMs, endMs: cue.endMs, text: lines.filter { !$0.isEmpty }.joined(separator: "\n"))
+        })
     }
 
     /// Strips WebVTT-only markup (keeping b/i/u), decodes common entities and trims each line for plain SRT output.
-    private static func cleaned(_ item: SubtitleItem) -> SubtitleItem? {
+    static func cleaned(_ item: SubtitleItem) -> SubtitleItem? {
         let tags = try! NSRegularExpression(pattern: "<(?!/?(?:b|i|u)\\s*>)[^>]*>", options: .caseInsensitive)
         var text = tags.stringByReplacingMatches(in: item.text, range: NSRange(item.text.startIndex..., in: item.text), withTemplate: "")
         for (entity, value) in [("&lrm;", ""), ("&rlm;", ""), ("&nbsp;", " "), ("&lt;", "<"), ("&gt;", ">"), ("&amp;", "&")] {
@@ -261,7 +249,7 @@ nonisolated struct SubtitleDocument: Sendable {
         return text.isEmpty ? nil : SubtitleItem(startMs: item.startMs, endMs: item.endMs, text: text)
     }
 
-    private static func timestamp(_ value: Int) -> String {
+    static func timestamp(_ value: Int) -> String {
         String(format: "%02d:%02d:%02d,%03d", value / 3_600_000, value / 60_000 % 60, value / 1000 % 60, value % 1000)
     }
 

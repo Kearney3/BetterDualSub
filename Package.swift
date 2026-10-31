@@ -11,7 +11,7 @@ let package = Package(
                           "MovpkgSubtitleImportView.swift", "SubtitleAppearanceView.swift",
                           "ControlCenterView.swift", "ShortcutSettingsView.swift",
                           "Info.plist", "Localizable.xcstrings", "ThirdPartyNotices.txt",
-                          "BilingualExportView.swift", "NowPlayingView.swift", "LoadSubtitlesView.swift", "LocalSubtitleFileView.swift",
+                          "BilingualExportView.swift", "SubtitleFileList.swift", "NowPlayingView.swift", "LoadSubtitlesView.swift", "LocalSubtitleFileView.swift",
                           "ManualControlBar.swift", "SettingsComponents.swift", "SubtitleAlignView.swift",
                           "SyncStatusView.swift", "SubtitleTranslationView.swift", "TranslationSettingsView.swift", "GlossaryEditorView.swift", "LLMPromptEditorView.swift",
                           "UpdateChecker.swift", "ViewingSessionViews.swift", "SubtitleScreenSettings.swift",
@@ -21,7 +21,8 @@ let package = Package(
                            "AppVersion.swift", "ViewingSession.swift", "PlaybackCoordinator.swift",
                            "Localization.swift", "SubtitleTranslator.swift", "SubtitleTranslationSession.swift",
                            "SubtitleSentenceGrouping.swift", "SubtitleTranslationSplitter.swift", "TranslationGlossary.swift",
-                           "LLMTranslationClient.swift", "LLMSubtitleTranslationSession.swift", "KeychainStore.swift"]),
+                           "LLMTranslationClient.swift", "LLMSubtitleTranslationSession.swift", "KeychainStore.swift",
+                           "SubtitleMerge.swift"]),
         .testTarget(name: "BetterDualSubCoreTests", dependencies: ["BetterDualSubCore"], path: "Tests")
     ]
 )
