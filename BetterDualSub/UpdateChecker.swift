@@ -3,12 +3,12 @@ import Combine
 import Sparkle
 
 /// Looks up the latest GitHub release and tells the user when it is newer than the running app. Nothing is downloaded
-/// until the user asks: Homebrew installs are upgraded with `brew`, others in the app through Sparkle.
+/// until the user asks, and then Sparkle installs it in the app. The Homebrew cask is marked `auto_updates`, so `brew`
+/// leaves such upgrades to the app.
 @MainActor
 final class UpdateChecker: ObservableObject {
     static let shared = UpdateChecker()
     static let autoCheckKey = "checkForUpdates"
-    static let brewCommand = "brew upgrade --cask betterdualsub"
     private static let lastCheckKey = "lastUpdateCheck"
     /// The newest release seen, as [version, page URL], so a found update is still offered after a relaunch.
     private static let latestKey = "latestRelease"
@@ -30,8 +30,7 @@ final class UpdateChecker: ObservableObject {
 
     @Published private(set) var state: State = .idle
 
-    /// Sparkle only installs updates the user asks for; its own scheduled checks are off in Info.plist, and it is not
-    /// started for Homebrew installs, which it must not replace behind `brew`'s back.
+    /// Sparkle only installs updates the user asks for; its own scheduled checks are off in Info.plist.
     private let sparkle = SPUStandardUpdaterController(startingUpdater: UpdateChecker.canInstallInApp,
                                                        updaterDelegate: nil, userDriverDelegate: nil)
 
@@ -41,16 +40,9 @@ final class UpdateChecker: ObservableObject {
 
     static var currentVersion: AppVersion? { AppVersion(Bundle.main.appVersion) }
 
-    /// Installed with the Homebrew cask, so `brew` should do the upgrade.
-    static var installedWithHomebrew: Bool {
-        ["/opt/homebrew/Caskroom/betterdualsub", "/usr/local/Caskroom/betterdualsub"]
-            .contains { FileManager.default.fileExists(atPath: $0) }
-    }
-
-    /// Not installed with Homebrew, and built with the release signing key (local builds are not), so the app can
-    /// download and install updates itself.
+    /// Built with the release signing key (local builds are not), so the app can download and install updates itself.
     static var canInstallInApp: Bool {
-        !installedWithHomebrew && !(Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? "").isEmpty
+        !(Bundle.main.object(forInfoDictionaryKey: "SUPublicEDKey") as? String ?? "").isEmpty
     }
 
     /// Shows Sparkle's update window, which downloads, verifies and installs the update, then relaunches.

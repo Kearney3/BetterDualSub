@@ -373,21 +373,7 @@ private struct UpdateStatusView: View {
                     .disabled(updater.state == .checking)
             }
             if let release = updater.available {
-                if UpdateChecker.installedWithHomebrew {
-                    SettingsHint(key: "update.brew.help")
-                    HStack {
-                        Text(verbatim: UpdateChecker.brewCommand)
-                            .font(.system(.callout, design: .monospaced))
-                            .textSelection(.enabled)
-                        Spacer()
-                        Button("update.copy") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(UpdateChecker.brewCommand, forType: .string)
-                        }
-                        Button("update.notes") { NSWorkspace.shared.open(release.page) }
-                    }
-                    .controlSize(.small)
-                } else if UpdateChecker.canInstallInApp {
+                if UpdateChecker.canInstallInApp {
                     HStack {
                         Button("update.install") { updater.installUpdate() }
                             .buttonStyle(.borderedProminent)

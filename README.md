@@ -35,7 +35,7 @@ brew trust --cask kearney3/betterdualsub/betterdualsub
 brew install --cask betterdualsub
 ```
 
-Homebrew only installs casks from third-party taps that you trust; `brew trust` allows this one cask and nothing else from the tap. Upgrade with `brew upgrade --cask betterdualsub`. The app also tells you when a new version is out.
+Homebrew only installs casks from third-party taps that you trust; `brew trust` allows this one cask and nothing else from the tap. The app updates itself (see below), so `brew upgrade` skips it; `brew upgrade --greedy --cask betterdualsub` upgrades it with Homebrew instead.
 
 ### Manual
 
@@ -48,7 +48,7 @@ Homebrew only installs casks from third-party taps that you trust; `brew trust` 
 
 The Homebrew cask does the equivalent for you.
 
-When a new version is out, **Settings** › **General** offers **Install Update…**, which downloads it, checks its signature and relaunches the app. Homebrew installs are upgraded with `brew` instead.
+When a new version is out, **Settings** › **General** offers **Install Update…**, which downloads it, checks its signature and relaunches the app. This works the same for Homebrew installs.
 
 ## Quick start
 

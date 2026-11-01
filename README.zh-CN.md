@@ -35,7 +35,7 @@ brew trust --cask kearney3/betterdualsub/betterdualsub
 brew install --cask betterdualsub
 ```
 
-Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行这一个 cask，不会放行该 tap 中的其他内容。用 `brew upgrade --cask betterdualsub` 升级。有新版本时，应用也会提示。
+Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行这一个 cask，不会放行该 tap 中的其他内容。应用会自行更新（见下文），因此 `brew upgrade` 会跳过它；如需用 Homebrew 升级，运行 `brew upgrade --greedy --cask betterdualsub`。
 
 ### 手动安装
 
@@ -48,7 +48,7 @@ Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行
 
 通过 Homebrew 安装时会自动完成这一步。
 
-有新版本时，**设置** › **通用** 中会出现 **安装更新…**，点击后会下载新版本、校验签名并重新打开应用。通过 Homebrew 安装的仍用 `brew` 升级。
+有新版本时，**设置** › **通用** 中会出现 **安装更新…**，点击后会下载新版本、校验签名并重新打开应用。通过 Homebrew 安装的也一样。
 
 ## 快速开始
 

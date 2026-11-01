@@ -7841,23 +7841,6 @@
         }
       }
     },
-    "update.brew.help" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Installed with Homebrew. Upgrade from Terminal with:"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "通过 Homebrew 安装，可在终端中运行以下命令升级："
-          }
-        }
-      }
-    },
     "update.check" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7888,23 +7871,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在检查…"
-          }
-        }
-      }
-    },
-    "update.copy" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Copy Command"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "复制命令"
           }
         }
       }
