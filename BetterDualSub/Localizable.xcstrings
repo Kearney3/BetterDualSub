@@ -653,13 +653,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "{name} is the source file name without extension, {lang} the target language code, {episode} the episode (S01E02). The extension follows the format."
+            "value" : "{name} is the source file name without extension, {lang} the target language code, {episode} the episode (S01E02). With {lang} in the name, a source language tag at the end (.en) is left out. The extension follows the format."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "{name} 为原文件名（不含扩展名），{lang} 为目标语言代码，{episode} 为集数（S01E02）。扩展名随格式自动添加。"
+            "value" : "{name} 为原文件名（不含扩展名），{lang} 为目标语言代码，{episode} 为集数（S01E02）。名称含 {lang} 时，原文件名末尾的源语言标记（如 .en）会被去掉。扩展名随格式自动添加。"
           }
         }
       }

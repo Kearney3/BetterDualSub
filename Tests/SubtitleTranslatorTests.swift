@@ -231,3 +231,16 @@ final class SubtitleTranslatorTests: XCTestCase {
         XCTFail("Translation event did not complete")
     }
 }
+
+final class SystemTranslationScriptTests: XCTestCase {
+    func testChineseOutputIsTurnedIntoTheScriptAskedFor() throws {
+        func convert(_ text: String, _ target: String) -> String {
+            SystemSubtitleTranslationSession.scriptTransform(to: Locale.Language(identifier: target))
+                .flatMap { text.applyingTransform($0, reverse: false) } ?? text
+        }
+        XCTAssertEqual(convert("你聞到這個味道了嗎？ 看不出来。", "zh-Hans"), "你闻到这个味道了吗？ 看不出来。")
+        XCTAssertEqual(convert("他们已经杀死了Struan Loy。", "zh-Hant"), "他們已經殺死了Struan Loy。")
+        XCTAssertEqual(convert("我们走吧", "zh"), "我们走吧")
+        XCTAssertNil(SystemSubtitleTranslationSession.scriptTransform(to: Locale.Language(identifier: "ja")))
+    }
+}

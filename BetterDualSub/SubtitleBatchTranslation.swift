@@ -135,7 +135,8 @@ final class SubtitleBatchTranslator: ObservableObject {
             for index in indices {
                 guard let self, !Task.isCancelled else { break }
                 let url = self.items[index].url
-                let plans = Self.destinations(for: url, language: language, outputs: outputs, sources: Set(self.items.map(\.url)))
+                let plans = Self.destinations(for: url, language: language, sourceLanguage: source, outputs: outputs,
+                                              sources: Set(self.items.map(\.url)))
                 if plans.allSatisfy({ $0.destination == nil }) {
                     self.items[index].status = .skipped
                     continue
@@ -189,18 +190,21 @@ final class SubtitleBatchTranslator: ObservableObject {
         let merge: BilingualMergeOptions?
     }
 
-    nonisolated static func destinations(for source: URL, language: String, outputs: Outputs, sources: Set<URL>) -> [Planned] {
+    nonisolated static func destinations(for source: URL, language: String, sourceLanguage: Locale.Language? = nil,
+                                         outputs: Outputs, sources: Set<URL>) -> [Planned] {
         let folder = outputs.folder ?? source.deletingLastPathComponent()
         let protected = Set(sources.map(\.standardizedFileURL))
         var planned: [Planned] = []
         if outputs.translation {
-            let name = OutputNaming.fileName(pattern: outputs.translationPattern, source: source, language: language, format: .srt)
+            let name = OutputNaming.fileName(pattern: outputs.translationPattern, source: source, language: language,
+                                             sourceLanguage: sourceLanguage, format: .srt)
             planned.append(Planned(role: .translation, destination: OutputNaming.destination(fileName: name, in: folder,
                                                                                              existing: outputs.existing, protected: protected),
                                    merge: nil))
         }
         if let merge = outputs.bilingual {
-            let name = OutputNaming.fileName(pattern: outputs.bilingualPattern, source: source, language: language, format: merge.format)
+            let name = OutputNaming.fileName(pattern: outputs.bilingualPattern, source: source, language: language,
+                                             sourceLanguage: sourceLanguage, format: merge.format)
             planned.append(Planned(role: .bilingual, destination: OutputNaming.destination(fileName: name, in: folder,
                                                                                            existing: outputs.existing, protected: protected),
                                    merge: merge))

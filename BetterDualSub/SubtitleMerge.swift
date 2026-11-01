@@ -57,7 +57,36 @@ nonisolated extension SubtitleDocument {
                 cues.append(BilingualCue(startMs: start, endMs: end, primary: top, secondary: bottom))
             }
         }
-        return cues
+        return withoutFlashes(cues)
+    }
+
+    /// Stretches too short to read, as a few-millisecond gap between two lines of one track leaves under a line of the
+    /// other, given to the cue they touch, so players do not flicker.
+    private static func withoutFlashes(_ cues: [BilingualCue], shortest: Int = 100) -> [BilingualCue] {
+        var kept: [BilingualCue] = []
+        var pending: BilingualCue?
+        for cue in cues {
+            var cue = cue
+            if let short = pending {
+                pending = nil
+                if short.endMs == cue.startMs {
+                    cue = BilingualCue(startMs: short.startMs, endMs: cue.endMs, primary: cue.primary, secondary: cue.secondary)
+                } else {
+                    kept.append(short)
+                }
+            }
+            if cue.endMs - cue.startMs < shortest {
+                if let last = kept.last, last.endMs == cue.startMs {
+                    kept[kept.count - 1] = BilingualCue(startMs: last.startMs, endMs: cue.endMs, primary: last.primary, secondary: last.secondary)
+                } else {
+                    pending = cue
+                }
+                continue
+            }
+            kept.append(cue)
+        }
+        if let pending { kept.append(pending) }
+        return kept
     }
 
     /// Track 1 cleaned up, and Track 2 cleaned up, moved by its delay and snapped to Track 1.
@@ -149,10 +178,10 @@ nonisolated extension SubtitleDocument {
     }
 
     /// How much later (positive) or earlier this track must be shown to line up with `reference`, when the two are
-    /// one video's subtitles shifted by a constant amount; nil when too few lines match to tell. Every pair of cue
-    /// starts within 10 s votes for its difference, the most voted 100 ms bucket wins, and the median of the
-    /// differences near it is the answer, rounded to 10 ms.
-    func estimatedOffset(to reference: SubtitleDocument, window: Int = 10_000, minimumMatches: Int = 10) -> Int? {
+    /// one video's subtitles shifted by a constant amount, such as a recap or logo at the start of only one of them;
+    /// nil when too few lines match to tell. Every pair of cue starts within 5 minutes votes for its difference, the
+    /// most voted 100 ms bucket wins, and the median of the differences near it is the answer, rounded to 10 ms.
+    func estimatedOffset(to reference: SubtitleDocument, window: Int = 300_000, minimumMatches: Int = 10) -> Int? {
         let starts = reference.items.map(\.startMs).sorted()
         guard !starts.isEmpty else { return nil }
         func firstIndex(atOrAfter value: Int) -> Int {
@@ -183,7 +212,10 @@ nonisolated extension SubtitleDocument {
             guard index < starts.count, abs(starts[index] - item.startMs - center) <= bucket * 3 else { return nil }
             return starts[index] - item.startMs
         }.sorted()
-        guard near.count >= minimumMatches else { return nil }
+        // Dense cues land near some reference cue by chance alone; a real offset lines up clearly more of them.
+        let span = max(1, (starts.last ?? 0) - (starts.first ?? 0))
+        let chance = Double(items.count) * min(1, Double(starts.count * (bucket * 6 + 1)) / Double(span))
+        guard Double(near.count) >= max(Double(minimumMatches), min(chance * 2, (chance + Double(items.count)) / 2)) else { return nil }
         return Int((Double(near[near.count / 2]) / 10).rounded()) * 10
     }
 }
@@ -227,8 +259,8 @@ nonisolated struct EpisodeKey: Hashable, Comparable, Sendable {
                   let value = number(match, episode) else { continue }
             return EpisodeKey(season: season.flatMap { number(match, $0) }, episode: value)
         }
-        // Codec names (x264, H.265) are not episodes either.
-        let fallback = try? NSRegularExpression(pattern: #"(?<![\dxXhH])(?<![hH]\.)(\d{1,3})(?![\dpPkK])"#)
+        // Codec names (x264, H.265) and audio channels (7.1) are not episodes either.
+        let fallback = try? NSRegularExpression(pattern: #"(?<![\dxXhH])(?<![hH]\.)(?<!\d\.)(\d{1,3})(?![\dpPkK])(?!\.\d)"#)
         guard let match = fallback?.matches(in: name, range: range).last, let value = number(match, 1) else { return nil }
         return EpisodeKey(episode: value)
     }
@@ -300,10 +332,14 @@ nonisolated enum OutputNaming {
     static let tokens = ["{name}", "{lang}", "{episode}"]
 
     /// The file name for `source`: `{name}` is its name without extension, `{lang}` the language code, `{episode}`
-    /// its episode ("S01E02"). Characters a file name cannot hold are removed.
-    static func fileName(pattern: String, source: URL, language: String = "", format: SubtitleOutputFormat) -> String {
-        let stem = source.deletingPathExtension().lastPathComponent
+    /// its episode ("S01E02"). With `{lang}` in the pattern, a tag naming `sourceLanguage` at the end of the name is
+    /// left out, so "Show.S01E02.en" becomes "Show.S01E02.zh-Hans" rather than "Show.S01E02.en.zh-Hans". Characters a
+    /// file name cannot hold are removed.
+    static func fileName(pattern: String, source: URL, language: String = "", sourceLanguage: Locale.Language? = nil,
+                         format: SubtitleOutputFormat) -> String {
+        var stem = source.deletingPathExtension().lastPathComponent
         var name = pattern.trimmingCharacters(in: .whitespaces).isEmpty ? "{name}" : pattern
+        if name.contains("{lang}"), let sourceLanguage { stem = removingLanguageTag(stem, sourceLanguage) }
         name = name.replacingOccurrences(of: "{name}", with: stem)
             .replacingOccurrences(of: "{lang}", with: language)
             .replacingOccurrences(of: "{episode}", with: EpisodeKey.parse(source.lastPathComponent)?.label ?? "")
@@ -312,6 +348,19 @@ nonisolated enum OutputNaming {
         while name.contains("..") { name = name.replacingOccurrences(of: "..", with: ".") }
         name = name.trimmingCharacters(in: CharacterSet(charactersIn: ". -_").union(.whitespaces))
         return (name.isEmpty ? stem : name) + "." + format.fileExtension
+    }
+
+    /// Tags that name a language in file names but are not language codes.
+    private static let languageAliases = ["chs": "zh", "cht": "zh", "chi": "zh", "cmn": "zh", "sc": "zh", "tc": "zh",
+                                          "english": "en", "chinese": "zh", "japanese": "ja", "korean": "ko"]
+
+    /// `stem` without its last part when that part names `language` ("en", "eng", "zh-Hans", "chs").
+    static func removingLanguageTag(_ stem: String, _ language: Locale.Language) -> String {
+        guard let code = language.languageCode?.identifier,
+              let cut = stem.lastIndex(where: { $0 == "." || $0 == " " }), cut > stem.startIndex else { return stem }
+        let tag = stem[stem.index(after: cut)...].lowercased()
+        let named = languageAliases[tag] ?? Locale.Language(identifier: tag).languageCode.flatMap { $0.isISOLanguage ? $0.identifier : nil }
+        return named == code ? String(stem[..<cut]) : stem
     }
 
     /// Where to write `fileName` in `folder`, or nil to skip it. An existing file is kept, replaced or given a free

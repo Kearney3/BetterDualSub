@@ -64,9 +64,22 @@ extension SubtitleTranslationSession {
 @MainActor
 final class SystemSubtitleTranslationSession: SubtitleTranslationSession {
     private let session: TranslationSession
+    private let script: StringTransform?
 
     init(source: Locale.Language, target: Locale.Language) {
         session = TranslationSession(installedSource: source, target: target)
+        script = Self.scriptTransform(to: target)
+    }
+
+    /// The system model now and then answers a Simplified Chinese request with Traditional characters, or the other
+    /// way round; this turns them into the script asked for.
+    nonisolated static func scriptTransform(to target: Locale.Language) -> StringTransform? {
+        guard target.languageCode == .chinese else { return nil }
+        return switch Locale.Language(identifier: target.maximalIdentifier).script {
+        case .hanSimplified: StringTransform("Hant-Hans")
+        case .hanTraditional: StringTransform("Hans-Hant")
+        default: nil
+        }
     }
 
     func translate(_ inputs: [SubtitleTranslationInput], context: SubtitleTranslationContext,
@@ -75,7 +88,8 @@ final class SystemSubtitleTranslationSession: SubtitleTranslationSession {
         let requests = inputs.map { TranslationSession.Request(sourceText: $0.text, clientIdentifier: String($0.index)) }
         for try await response in session.translate(batch: requests) {
             try Task.checkCancellation()
-            try receive(SubtitleTranslationOutput(identifier: response.clientIdentifier, text: response.targetText))
+            let text = script.flatMap { response.targetText.applyingTransform($0, reverse: false) } ?? response.targetText
+            try receive(SubtitleTranslationOutput(identifier: response.clientIdentifier, text: text))
         }
         try Task.checkCancellation()
     }

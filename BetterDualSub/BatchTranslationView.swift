@@ -183,9 +183,11 @@ struct BatchTranslationView: View {
     private func exampleNames(for source: URL) -> String {
         let language = settings.targetLanguage.map(SubtitleTranslator.fileCode) ?? ""
         var names: [String] = []
-        if writeTranslation { names.append(OutputNaming.fileName(pattern: pattern, source: source, language: language, format: .srt)) }
+        if writeTranslation { names.append(OutputNaming.fileName(pattern: pattern, source: source, language: language,
+                                                                  sourceLanguage: settings.sourceLanguage, format: .srt)) }
         if writeBilingual {
-            names.append(OutputNaming.fileName(pattern: bilingualPattern, source: source, language: language, format: bilingualFormat))
+            names.append(OutputNaming.fileName(pattern: bilingualPattern, source: source, language: language,
+                                               sourceLanguage: settings.sourceLanguage, format: bilingualFormat))
         }
         return names.joined(separator: ", ")
     }

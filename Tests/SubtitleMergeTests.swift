@@ -24,6 +24,36 @@ final class SubtitleMergeTests: XCTestCase {
         XCTAssertNil(try document([(0, 1000, "a")]).estimatedOffset(to: reference))
     }
 
+    func testOffsetPastARecapIsFoundAndChanceIsNot() throws {
+        var start = 1000
+        let starts = (0..<200).map { index -> Int in
+            defer { start += 1500 + (index * 739) % 2100 }
+            return start
+        }
+        let reference = try document(starts.map { ($0, $0 + 1200, "Line") })
+        // A 55 s recap only Track 2 has, with lines of its own.
+        let recap = stride(from: 500, to: 54_000, by: 2700).map { ($0, $0 + 1000, "前情提要") }
+        let later = try document(recap + starts.map { ($0 + 55_170, $0 + 56_170, "行") })
+        XCTAssertEqual(later.estimatedOffset(to: reference), -55_170)
+        // Unrelated timing: no shift lines up more than a few lines by chance.
+        var seed: UInt64 = 7
+        let unrelated = try document((0..<200).map { _ -> (Int, Int, String) in
+            seed = seed &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            let value = Int(seed >> 33) % 420_000
+            return (value, value + 900, "x")
+        }.sorted { $0.0 < $1.0 })
+        XCTAssertNil(unrelated.estimatedOffset(to: reference))
+    }
+
+    func testAGapOfAFewMillisecondsLeavesNoFlash() throws {
+        // Two English lines 2 ms apart under one Chinese line.
+        let en = try document([(1000, 2998, "Can you count?"), (3000, 4000, "One, two, ten.")])
+        let zh = try document([(1000, 4000, "你会数数吗 一 二 十")])
+        let cues = try SubtitleDocument.bilingualCues(primary: en, secondary: zh, tolerance: 500)
+        XCTAssertEqual(cues.map { [$0.startMs, $0.endMs] }, [[1000, 3000], [3000, 4000]])
+        XCTAssertEqual(cues.map(\.primary), ["Can you count?", "One, two, ten."])
+    }
+
     func testCombinedSRTKeepsOrderOption() throws {
         let en = try document([(1000, 3000, "Hello")]), zh = try document([(1100, 3200, "你好")])
         var options = BilingualMergeOptions()
@@ -65,6 +95,7 @@ final class SubtitleMergeTests: XCTestCase {
         XCTAssertEqual(EpisodeKey.parse("剧名 第3集.zh.srt"), EpisodeKey(episode: 3))
         XCTAssertEqual(EpisodeKey.parse("Show - EP07 [720p].ass"), EpisodeKey(episode: 7))
         XCTAssertEqual(EpisodeKey.parse("Show.04.H.265.srt"), EpisodeKey(episode: 4))
+        XCTAssertNil(EpisodeKey.parse("Movie.2001.2160p.X265.TrueHD.7.1.Atmos.srt"))
         XCTAssertNil(EpisodeKey.parse("Movie.srt"))
 
         let url = { (name: String) in URL(fileURLWithPath: "/tmp/\(name)") }
@@ -82,6 +113,17 @@ final class SubtitleMergeTests: XCTestCase {
                        "Show.S01E03.en.zh-Hans.srt")
         XCTAssertEqual(OutputNaming.fileName(pattern: "Show {episode}/{lang}", source: source, format: .ass), "Show S01E03.ass")
         XCTAssertEqual(OutputNaming.fileName(pattern: "", source: source, format: .srt), "Show.S01E03.en.srt")
+        // With the new language in the name, the source's own tag goes; other endings stay.
+        let english = Locale.Language(identifier: "en")
+        XCTAssertEqual(OutputNaming.fileName(pattern: "{name}.{lang}", source: source, language: "zh-Hans", sourceLanguage: english, format: .srt),
+                       "Show.S01E03.zh-Hans.srt")
+        XCTAssertEqual(OutputNaming.fileName(pattern: "{name}.bilingual", source: source, sourceLanguage: english, format: .ass),
+                       "Show.S01E03.en.bilingual.ass")
+        XCTAssertEqual(OutputNaming.removingLanguageTag("Show.S01E03.eng", english), "Show.S01E03")
+        XCTAssertEqual(OutputNaming.removingLanguageTag("Stephen King It", english), "Stephen King It")
+        XCTAssertEqual(OutputNaming.removingLanguageTag("Show.S01E03.chs", Locale.Language(identifier: "zh-Hans")), "Show.S01E03")
+        XCTAssertEqual(OutputNaming.removingLanguageTag("Show.S01E03.zh-Hans", Locale.Language(identifier: "zh")), "Show.S01E03")
+        XCTAssertEqual(OutputNaming.removingLanguageTag("en", english), "en")
 
         let folder = URL(fileURLWithPath: "/tmp/out")
         let existing: Set<String> = ["/tmp/out/a.srt", "/tmp/out/a 2.srt"]
