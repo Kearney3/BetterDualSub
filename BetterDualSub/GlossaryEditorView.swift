@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 struct GlossaryEditorView: View {
     @State private var glossary: TranslationGlossary
     @State private var selection = Set<GlossaryEntry.ID>()
+    /// Shows only names (people, places, organizations) or only terms; nil shows everything.
+    @State private var filter: Filter = .all
     @Environment(\.dismiss) private var dismiss
     let onSave: (TranslationGlossary) -> Void
 
@@ -14,12 +16,31 @@ struct GlossaryEditorView: View {
         self.onSave = onSave
     }
 
+    private enum Filter: String, CaseIterable {
+        case all, names, terms
+
+        func includes(_ kind: GlossaryEntry.Kind) -> Bool {
+            switch self {
+            case .all: true
+            case .names: kind != .term
+            case .terms: kind == .term
+            }
+        }
+    }
+
+    private var shown: [GlossaryEntry] { glossary.entries.filter { filter.includes($0.kind) } }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("glossary.title").font(.title3.bold())
             TextField("glossary.name", text: $glossary.name)
             SettingsHint(key: "glossary.help")
-            Table(glossary.entries, selection: $selection) {
+            Picker("glossary.filter", selection: $filter) {
+                ForEach(Filter.allCases, id: \.self) { Text(LocalizedStringKey("glossary.filter.\($0.rawValue)")).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            Table(shown, selection: $selection) {
                 TableColumn("glossary.source") { entry in TextField("glossary.source", text: binding(entry.id, \.source)).labelsHidden() }
                 TableColumn("glossary.target") { entry in TextField("glossary.target", text: binding(entry.id, \.target)).labelsHidden() }
                 TableColumn("glossary.kind") { entry in
@@ -41,7 +62,7 @@ struct GlossaryEditorView: View {
             .frame(minHeight: 280)
             HStack {
                 Button {
-                    let entry = GlossaryEntry(source: "", target: "")
+                    let entry = GlossaryEntry(source: "", target: "", kind: filter == .names ? .person : .term)
                     glossary.entries.append(entry)
                     selection = [entry.id]
                 } label: { Image(systemName: "plus") }
@@ -55,7 +76,12 @@ struct GlossaryEditorView: View {
                 Text(AppLocalization.format("glossary.count", glossary.entries.count)).font(.callout).foregroundStyle(.secondary)
                 Spacer()
                 Button("glossary.import", action: importTSV)
-                Button("glossary.export", action: exportTSV).disabled(glossary.entries.isEmpty)
+                Menu("glossary.export") {
+                    Button("glossary.export.tsv") { export(json: false) }
+                    Button("glossary.export.json") { export(json: true) }
+                }
+                .fixedSize()
+                .disabled(glossary.entries.isEmpty)
                 Button("common.cancel", role: .cancel) { dismiss() }.keyboardShortcut(.cancelAction)
                 Button("glossary.save") {
                     glossary.name = glossary.name.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -86,31 +112,34 @@ struct GlossaryEditorView: View {
     /// Imported entries replace those with the same source and add the rest.
     private func importTSV() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.tabSeparatedText, .plainText, .commaSeparatedText]
+        panel.allowedContentTypes = [.tabSeparatedText, .plainText, .commaSeparatedText, .json]
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
-            let imported = TranslationGlossary.entries(fromTSV: try String(contentsOf: url, encoding: .utf8))
-            for entry in imported {
-                if let index = glossary.entries.firstIndex(where: { $0.source.caseInsensitiveCompare(entry.source) == .orderedSame }) {
-                    glossary.entries[index].target = entry.target
-                    glossary.entries[index].kind = entry.kind
-                    glossary.entries[index].automatic = false
-                } else {
-                    glossary.entries.append(entry)
-                }
-            }
+            let data = try Data(contentsOf: url)
+            let imported = TranslationGlossary.entries(fromJSON: data)
+                ?? TranslationGlossary.entries(fromTSV: String(decoding: data, as: UTF8.self))
+            glossary.importEntries(imported)
         } catch {
             NSAlert(error: error).runModal()
         }
     }
 
-    private func exportTSV() {
+    /// Exports what the filter shows, so names and terms can be kept as separate libraries.
+    private func export(json: Bool) {
         let panel = NSSavePanel()
-        panel.allowedContentTypes = [.tabSeparatedText]
-        panel.nameFieldStringValue = (glossary.name.isEmpty ? "glossary" : glossary.name) + ".tsv"
+        panel.allowedContentTypes = [json ? .json : .tabSeparatedText]
+        let base = glossary.name.isEmpty ? "glossary" : glossary.name
+        panel.nameFieldStringValue = base + (filter == .all ? "" : "." + filter.rawValue) + (json ? ".json" : ".tsv")
         guard panel.runModal() == .OK, let url = panel.url else { return }
+        var part = glossary
+        part.entries = shown
         do {
-            try glossary.tsv.write(to: url, atomically: true, encoding: .utf8)
+            if json {
+                guard let data = part.json else { return }
+                try data.write(to: url, options: .atomic)
+            } else {
+                try part.tsv.write(to: url, atomically: true, encoding: .utf8)
+            }
         } catch {
             NSAlert(error: error).runModal()
         }

@@ -127,7 +127,10 @@ struct SubtitleTranslationCard: View {
         guard let plan, let source = settings.sourceLanguage, let target = settings.targetLanguage else { return }
         Task {
             let options = await settings.options(preview: false)
-            await translator.extractTerms(plan: plan, source: source, target: target, manager: manager, options: options)
+            guard let configuration = await translator.extractTerms(plan: plan, source: source, target: target, manager: manager,
+                                                                    options: options) else { return }
+            downloadRequestID = translator.pendingID
+            if download == configuration { download?.invalidate() } else { download = configuration }
         }
     }
 

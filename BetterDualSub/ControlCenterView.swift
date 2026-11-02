@@ -166,6 +166,7 @@ struct ControlCenterView: View {
                 } actions: {
                     Button("nav.load") { navigate(to: "load") }.buttonStyle(.borderedProminent)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 SettingsPage { RecentWatchingCard() }
             }

@@ -177,11 +177,11 @@ final class SubtitleTranslator: ObservableObject {
         await begin(plan: plan, source: source, target: target, manager: manager, preview: preview, options: options, extractOnly: false)
     }
 
-    /// Gathers the show's names and terms into `options.glossary` with the language model, without translating.
+    /// Gathers the show's names and terms into `options.glossary`, without translating: terms by the language model,
+    /// or names only by the on-device tagger and translator.
     func extractTerms(plan: SubtitleTranslationPlan, source: Locale.Language, target: Locale.Language,
-                      manager: any SubtitleTranslationTarget, options: SubtitleTranslationOptions) async {
-        guard case .llm = options.engine else { return }
-        _ = await begin(plan: plan, source: source, target: target, manager: manager, preview: false, options: options, extractOnly: true)
+                      manager: any SubtitleTranslationTarget, options: SubtitleTranslationOptions) async -> TranslationSession.Configuration? {
+        await begin(plan: plan, source: source, target: target, manager: manager, preview: false, options: options, extractOnly: true)
     }
 
     private func begin(plan: SubtitleTranslationPlan, source: Locale.Language, target: Locale.Language,
@@ -301,7 +301,7 @@ final class SubtitleTranslator: ObservableObject {
             }
             do {
                 var glossary = request.options.glossary ?? TranslationGlossary(name: "", targetLanguage: request.target.maximalIdentifier)
-                if session.understandsContext, request.options.extractTerms || request.extractOnly {
+                if request.extractOnly || (session.understandsContext && request.options.extractTerms) {
                     let chunks = stride(from: 0, to: units.count, by: Self.termChunkSize).map {
                         units[$0..<min(units.count, $0 + Self.termChunkSize)].map(\.text)
                     }

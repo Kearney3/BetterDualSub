@@ -28,6 +28,7 @@ struct SubtitleAlignView: View {
                 } actions: {
                     Button("nav.load") { showControlCenterPage("load") }.buttonStyle(.borderedProminent)
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 SettingsPage(descriptionKey: "align.description") {
                     SettingsCard {

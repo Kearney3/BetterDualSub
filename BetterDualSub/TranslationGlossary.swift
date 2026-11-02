@@ -116,6 +116,32 @@ nonisolated struct TranslationGlossary: Codable, Equatable, Sendable {
         }
     }
 
+    /// Entries from a JSON file: a whole exported glossary, or a bare list of entries.
+    static func entries(fromJSON data: Data) -> [GlossaryEntry]? {
+        let decoder = JSONDecoder()
+        return (try? decoder.decode(TranslationGlossary.self, from: data))?.entries ?? (try? decoder.decode([GlossaryEntry].self, from: data))
+    }
+
+    var json: Data? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        return try? encoder.encode(self)
+    }
+
+    /// Adds `imported` entries, replacing those with the same source; the user's own wording wins over a found one.
+    mutating func importEntries(_ imported: [GlossaryEntry]) {
+        for entry in imported {
+            if let index = entries.firstIndex(where: { $0.source.caseInsensitiveCompare(entry.source) == .orderedSame }) {
+                entries[index].target = entry.target
+                entries[index].kind = entry.kind
+                if !entry.note.isEmpty { entries[index].note = entry.note }
+                entries[index].automatic = false
+            } else {
+                entries.append(GlossaryEntry(source: entry.source, target: entry.target, kind: entry.kind, note: entry.note))
+            }
+        }
+    }
+
     var tsv: String {
         let clean = { (text: String) in text.replacingOccurrences(of: "\t", with: " ").replacingOccurrences(of: "\n", with: " ") }
         return (["# source\ttarget\tkind\tnote"] + entries.map {

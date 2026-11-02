@@ -209,15 +209,14 @@ struct ContentView: View {
         // Keep the window visible (and draggable) while there is nothing to show yet.
         guard subManager.secondaryText.isEmpty else { return "" }
         if subManager.trackNames.isEmpty { return AppLocalization.string("overlay.placeholder.idle") }
-        return subManager.isPlaying ? "" : AppLocalization.string("overlay.placeholder.waiting")
+        // Once subtitles are loaded, a pause shows nothing rather than a placeholder.
+        return ""
     }
 
     private var secondaryDisplayText: String {
         if !subManager.secondaryText.isEmpty { return subManager.secondaryText }
         guard subManager.currentText.isEmpty else { return "" }
-        // Keep the empty overlay as one draggable preview. Both styles remain visible on the Appearance page.
-        if subManager.trackNames.isEmpty { return "" }
-        if subManager.trackNames.count > 1 && !subManager.isPlaying { return AppLocalization.string("overlay.placeholder.secondary") }
+        // Both styles remain visible on the Appearance page.
         return ""
     }
     

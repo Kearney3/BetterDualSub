@@ -199,15 +199,16 @@ struct TranslationOptionsSection: View {
     /// The show's glossary for the target language: its name, size, and the ways to fill it.
     private var glossaryRow: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 10) {
-                Picker("translate.glossary", selection: $model.glossaryName) {
-                    ForEach(Array(Set(model.glossaryNames + [model.glossaryName])).sorted { $0.localizedStandardCompare($1) == .orderedAscending },
-                            id: \.self) {
-                        Text(verbatim: $0).tag($0)
-                    }
+            // A show's name can be long, so the picker takes the full width and truncates, with its controls below.
+            Picker("translate.glossary", selection: $model.glossaryName) {
+                ForEach(Array(Set(model.glossaryNames + [model.glossaryName])).sorted { $0.localizedStandardCompare($1) == .orderedAscending },
+                        id: \.self) {
+                    Text(verbatim: $0).tag($0)
                 }
-                .fixedSize()
-                .disabled(disabled)
+            }
+            .disabled(disabled)
+            .help(Text("translate.glossary.help"))
+            HStack(spacing: 10) {
                 Text(AppLocalization.format("glossary.count", model.glossary?.entries.count ?? 0)).font(.callout).foregroundStyle(.secondary)
                 Spacer()
                 Button("translate.glossary.edit") { editingGlossary = true }.disabled(disabled || model.glossaryName.isEmpty)
@@ -218,7 +219,7 @@ struct TranslationOptionsSection: View {
                     }
                     .disabled(disabled || model.glossaryName.isEmpty)
                 }
-                if usesLLM, let extract {
+                if let extract {
                     Button("translate.glossary.extract", action: extract).disabled(!canExtract)
                 }
             }

@@ -1,5 +1,6 @@
 import Foundation
 import Translation
+import NaturalLanguage
 
 @MainActor
 protocol SubtitleTranslationTarget: AnyObject, Sendable {
@@ -65,8 +66,10 @@ extension SubtitleTranslationSession {
 final class SystemSubtitleTranslationSession: SubtitleTranslationSession {
     private let session: TranslationSession
     private let script: StringTransform?
+    private let source: Locale.Language
 
     init(source: Locale.Language, target: Locale.Language) {
+        self.source = source
         session = TranslationSession(installedSource: source, target: target)
         script = Self.scriptTransform(to: target)
     }
@@ -94,7 +97,50 @@ final class SystemSubtitleTranslationSession: SubtitleTranslationSession {
         try Task.checkCancellation()
     }
 
+    /// Finds names with the on-device tagger and translates each with the system translator; the user corrects them.
+    func extractTerms(_ lines: [String], known: [GlossaryEntry]) async throws -> [GlossaryEntry] {
+        let knownSources = Set(known.map { $0.source.lowercased() })
+        let names = GlossaryNameFinder.names(in: lines, language: source).filter { !knownSources.contains($0.text.lowercased()) }
+        guard !names.isEmpty else { return [] }
+        try Task.checkCancellation()
+        let requests = names.enumerated().map { TranslationSession.Request(sourceText: $1.text, clientIdentifier: String($0)) }
+        var entries: [GlossaryEntry] = []
+        for try await response in session.translate(batch: requests) {
+            try Task.checkCancellation()
+            guard let index = response.clientIdentifier.flatMap(Int.init), names.indices.contains(index) else { continue }
+            let text = script.flatMap { response.targetText.applyingTransform($0, reverse: false) } ?? response.targetText
+            entries.append(GlossaryEntry(source: names[index].text, target: text, kind: names[index].kind))
+        }
+        return entries
+    }
+
     func cancel() { session.cancel() }
+}
+
+/// Finds person, place and organization names in subtitle lines without a language model.
+nonisolated enum GlossaryNameFinder {
+    static func names(in lines: [String], language: Locale.Language) -> [(text: String, kind: GlossaryEntry.Kind)] {
+        var counts: [String: (kind: GlossaryEntry.Kind, count: Int)] = [:]
+        let tagger = NLTagger(tagSchemes: [.nameType])
+        for line in lines {
+            tagger.string = line
+            if let code = language.languageCode?.identifier { tagger.setLanguage(NLLanguage(code), range: line.startIndex..<line.endIndex) }
+            tagger.enumerateTags(in: line.startIndex..<line.endIndex, unit: .word, scheme: .nameType,
+                                 options: [.omitWhitespace, .omitPunctuation, .joinNames]) { tag, range in
+                let kind: GlossaryEntry.Kind
+                switch tag {
+                case .personalName: kind = .person
+                case .placeName: kind = .place
+                case .organizationName: kind = .organization
+                default: return true
+                }
+                let text = String(line[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if text.count > 1 { counts[text, default: (kind, 0)].count += 1 }
+                return true
+            }
+        }
+        return counts.sorted { ($0.value.count, $1.key) > ($1.value.count, $0.key) }.map { ($0.key, $0.value.kind) }
+    }
 }
 
 /// Immutable request context for SwiftUI's framework-owned language download session.
