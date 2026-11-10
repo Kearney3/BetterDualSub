@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 nonisolated enum SyncMode: String, CaseIterable, Sendable { case auto, manual }
 nonisolated enum SyncSource: Sendable { case tv, manual }
@@ -86,6 +87,9 @@ final class PlaybackCoordinator {
             guard let self, self.generation == token, !self.suspended else { return }
             self.handshakeTask?.cancel()
             self.retryTask?.cancel()
+            if self.connection != .connected {
+                AppLog.playback.info("Listener connected after \(self.failures) failed attempts")
+            }
             self.failures = 0
             self.connection = .connected
             self.queryID = UUID()
@@ -122,6 +126,7 @@ final class PlaybackCoordinator {
         manualPlaying = false
         connection = .disconnected
         event = "suspended"
+        AppLog.playback.info("Listener suspended")
         onChange?()
     }
 
@@ -137,6 +142,7 @@ final class PlaybackCoordinator {
         event = reason
         let delay = Self.retryDelay(failures: failures)
         failures += 1
+        AppLog.playback.error("Listener failed: \(reason, privacy: .public); attempt \(self.failures), retrying in \(delay) s")
         let token = generation
         retryTask = Task { [weak self, sleep] in
             do { try await sleep(.seconds(delay)) } catch { return }
@@ -152,9 +158,12 @@ final class PlaybackCoordinator {
         lastReportUptime = uptime()
         reportedApp = report?.elapsedMicros == nil ? nil : report?.app
         if tracker.receive(report, target: target, uptime: uptime(), epoch: epoch()) {
+            if event != "report" { AppLog.playback.info("Following the player's clock") }
             event = "report"
         } else {
-            event = report == nil ? "noMedia" : (tracker.ignoredApp == nil ? "missingPosition" : "otherPlayer")
+            let ignored = report == nil ? "noMedia" : (tracker.ignoredApp == nil ? "missingPosition" : "otherPlayer")
+            if event != ignored { AppLog.playback.info("Not following: \(ignored, privacy: .public)") }
+            event = ignored
             invalidateClock()
         }
         onChange?()
@@ -195,6 +204,7 @@ final class PlaybackCoordinator {
             manualPlaying = false
         }
         self.mode = mode
+        AppLog.playback.info("Sync mode: \(mode.rawValue, privacy: .public)")
         onChange?()
     }
 

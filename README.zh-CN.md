@@ -231,7 +231,7 @@ xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub -configuration
 
 ### 测试
 
-字幕解析、时间计算、翻译规划、播放跟踪和下载逻辑都在 `BetterDualSubCore` Swift 包中，无需启动 TV.app 即可测试：
+字幕解析、时间计算、翻译规划、播放跟踪和下载逻辑都在 `BetterDualSub/Core/` 中；该目录既编进 App，也是 `BetterDualSubCore` Swift 包，并使用与 App 相同的并发设置，新文件放进去两边都会自动包含。测试无需启动 TV.app：
 
 ```sh
 swift test
@@ -250,10 +250,10 @@ BETTERDUALSUB_LIVE_MOVIE_URL='https://tv.apple.com/hk/movie/spider-man-into-the-
 
 | 路径 | 内容 |
 | --- | --- |
-| `BetterDualSub/SubtitleDocument.swift` | 字幕模型、SRT/WebVTT/ASS 解析、时间计算 |
-| `BetterDualSub/PlaybackTracking.swift` | “正在播放”跟踪、同步状态、校准保存 |
-| `BetterDualSub/MovieSubtitleDownloader.swift`、`MovpkgSubtitleExtractor.swift`、`VideoSubtitleExtractor.swift` | Apple TV 下载、`.movpkg` 提取，以及 Matroska / MP4 内嵌字幕提取 |
-| `BetterDualSub/SubtitleManager.swift`、`PlaybackCoordinator.swift` | 字幕会话、播放协调与监听器恢复 |
+| `BetterDualSub/Core/SubtitleDocument.swift` | 字幕模型、SRT/WebVTT/ASS 解析、时间计算 |
+| `BetterDualSub/Core/PlaybackTracking.swift` | “正在播放”跟踪、同步状态、校准保存 |
+| `BetterDualSub/Core/MovieSubtitleDownloader.swift`、`MovpkgSubtitleExtractor.swift`、`VideoSubtitleExtractor.swift` | Apple TV 下载、`.movpkg` 提取，以及 Matroska / MP4 内嵌字幕提取 |
+| `BetterDualSub/SubtitleManager.swift`、`Core/PlaybackCoordinator.swift` | 字幕会话、播放协调与监听器恢复 |
 | `BetterDualSub/ContentView.swift` | 字幕渲染与浮层交互 |
 | `BetterDualSub/*View.swift` | 控制窗口各页面 |
 | `Tests/` | 核心包的单元测试 |

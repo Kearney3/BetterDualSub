@@ -231,7 +231,7 @@ xcodebuild -project BetterDualSub.xcodeproj -scheme BetterDualSub -configuration
 
 ### Tests
 
-Parsing, timing, translation planning, playback tracking and downloading logic live in the `BetterDualSubCore` Swift package and run without the TV app:
+Parsing, timing, translation planning, playback tracking and downloading logic live in `BetterDualSub/Core/`, which is both part of the app and the `BetterDualSubCore` Swift package, built with the app's concurrency settings. A file added to that folder is picked up by both. The tests run without the TV app:
 
 ```sh
 swift test
@@ -250,10 +250,10 @@ If more than one Xcode is installed, prefix the commands with `DEVELOPER_DIR=/Ap
 
 | Path | Contents |
 | --- | --- |
-| `BetterDualSub/SubtitleDocument.swift` | Subtitle model, SRT/WebVTT/ASS parsing, timing math |
-| `BetterDualSub/PlaybackTracking.swift` | Now Playing tracking, sync status, saved timing |
-| `BetterDualSub/MovieSubtitleDownloader.swift`, `MovpkgSubtitleExtractor.swift`, `VideoSubtitleExtractor.swift` | Apple TV download, `.movpkg` extraction, and Matroska / MP4 embedded subtitle extraction |
-| `BetterDualSub/SubtitleManager.swift`, `PlaybackCoordinator.swift` | Subtitle sessions, playback coordination and listener recovery |
+| `BetterDualSub/Core/SubtitleDocument.swift` | Subtitle model, SRT/WebVTT/ASS parsing, timing math |
+| `BetterDualSub/Core/PlaybackTracking.swift` | Now Playing tracking, sync status, saved timing |
+| `BetterDualSub/Core/MovieSubtitleDownloader.swift`, `MovpkgSubtitleExtractor.swift`, `VideoSubtitleExtractor.swift` | Apple TV download, `.movpkg` extraction, and Matroska / MP4 embedded subtitle extraction |
+| `BetterDualSub/SubtitleManager.swift`, `Core/PlaybackCoordinator.swift` | Subtitle sessions, playback coordination and listener recovery |
 | `BetterDualSub/ContentView.swift` | Subtitle rendering and overlay interaction |
 | `BetterDualSub/*View.swift` | Control window pages |
 | `Tests/` | Unit tests for the core package |

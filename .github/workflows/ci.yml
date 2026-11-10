@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -15,7 +18,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
 
@@ -34,11 +37,27 @@ jobs:
       matrix:
         configuration: [Debug, Release]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Unit tests
         if: matrix.configuration == 'Debug'
-        run: swift test
+        run: swift test --enable-code-coverage
+
+      # Line coverage of BetterDualSub/Core, the least covered files first, on the run's summary page.
+      - name: Coverage summary
+        if: matrix.configuration == 'Debug'
+        run: |
+          REPORT="$(swift test --show-codecov-path)"
+          {
+            echo "### Core line coverage"
+            jq -r '[.data[0].files[] | select(.filename | contains("/BetterDualSub/Core/")) | .summary.lines]
+              | "**\((map(.covered) | add) * 100 / (map(.count) | add) | floor)%** of \(map(.count) | add) lines"' "$REPORT"
+            echo
+            echo "| File | Lines |"
+            echo "| --- | --- |"
+            jq -r '.data[0].files | map(select(.filename | contains("/BetterDualSub/Core/"))) | sort_by(.summary.lines.percent)[]
+              | "| \(.filename | split("/") | last) | \(.summary.lines.percent | floor)% |"' "$REPORT"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Build app (${{ matrix.configuration }})
         env:

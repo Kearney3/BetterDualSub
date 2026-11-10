@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 // Apple TV endpoint discovery follows iSubRip (Michael Yochpaz, MIT).
 // See ThirdPartyNotices.txt for the upstream license and pinned source reference.
@@ -214,6 +215,7 @@ actor MovieSubtitleDownloader {
         }
         try Self.validateResource(finalURL)
         guard (200..<300).contains(response.statusCode) else {
+            AppLog.download.error("Request failed: HTTP \(response.statusCode)")
             throw HTTPFailure(status: response.statusCode)
         }
         guard data.count <= 5_000_000, let content = String(data: data, encoding: .utf8) else {
@@ -347,9 +349,11 @@ actor MovieSubtitleDownloader {
                         if next < segments.count { enqueue(next); next += 1 }
                     }
                 }
+                AppLog.download.info("Downloaded a track: \(segments.count) segments, \(bytes) bytes")
                 return try SubtitlePlaylist.merge(texts, segments: segments)
             } catch {
                 if Task.isCancelled { throw CancellationError() }
+                AppLog.download.error("A mirror failed: \(String(describing: type(of: error)), privacy: .public)")
                 lastError = error
             }
         }

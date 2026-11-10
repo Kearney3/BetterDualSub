@@ -12,7 +12,7 @@ jobs:
     name: Build & Publish
     runs-on: macos-26
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Unit tests
         run: swift test
@@ -59,6 +59,12 @@ jobs:
           hdiutil create -volname "BetterDualSub" -srcfolder dmg-root -ov -format UDZO \
             "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg"
 
+      # Debug symbols for this exact build, to symbolicate crash reports users send in.
+      - name: Archive debug symbols
+        run: |
+          ditto -c -k --keepParent "build/Build/Products/Release/BetterDualSub.app.dSYM" \
+            "BetterDualSub-${GITHUB_REF_NAME}-arm64.dSYM.zip"
+
       # The app reads the feed from releases/latest/download/appcast.xml, so it is uploaded with the DMG in one step.
       - name: Create signed appcast
         env:
@@ -98,6 +104,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" "BetterDualSub-${GITHUB_REF_NAME}-arm64.dmg" appcast.xml \
+            "BetterDualSub-${GITHUB_REF_NAME}-arm64.dSYM.zip" \
             --title "BetterDualSub ${GITHUB_REF_NAME}" --notes-file notes.md --verify-tag
 
       - name: Update Homebrew cask

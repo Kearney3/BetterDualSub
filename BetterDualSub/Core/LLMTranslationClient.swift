@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Services with an OpenAI-compatible chat API. Local ones (Ollama, LM Studio) keep subtitle text on this Mac.
 nonisolated enum LLMPreset: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -206,16 +207,24 @@ nonisolated struct LLMTranslationClient: Sendable {
 
     private func send(_ request: URLRequest, retries: Bool = true) async throws -> Data {
         var attempt = 0
+        let endpoint = request.url?.lastPathComponent ?? ""
         while true {
             try Task.checkCancellation()
+            let started = ContinuousClock.now
             do {
                 let (data, response) = try await session.data(for: request)
                 guard let http = response as? HTTPURLResponse else { throw LLMError.invalidResponse }
-                if (200..<300).contains(http.statusCode) { return data }
+                let seconds = (ContinuousClock.now - started) / .seconds(1)
+                if (200..<300).contains(http.statusCode) {
+                    AppLog.translation.debug("\(endpoint, privacy: .public): \(data.count) bytes in \(seconds, format: .fixed(precision: 1)) s")
+                    return data
+                }
+                AppLog.translation.error("\(endpoint, privacy: .public): HTTP \(http.statusCode) after \(seconds, format: .fixed(precision: 1)) s, attempt \(attempt + 1)")
                 let error = LLMError.http(status: http.statusCode, message: Self.message(in: data))
                 guard retries, http.statusCode == 429 || http.statusCode >= 500, attempt < retryDelays.count else { throw error }
             } catch let error as URLError where retries && [.timedOut, .networkConnectionLost].contains(error.code) && attempt < retryDelays.count {
                 // A busy local model can take longer than the timeout; try again rather than lose the whole track.
+                AppLog.translation.error("\(endpoint, privacy: .public): network error \(error.code.rawValue), attempt \(attempt + 1)")
             }
             try await Task.sleep(for: retryDelays[attempt])
             attempt += 1
