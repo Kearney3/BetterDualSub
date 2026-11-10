@@ -103,6 +103,7 @@ Choose which player to follow under **General** › **Sync source**. A connected
 - **Delay**: positive values show subtitles later. Set them on **Now Playing**, on the overlay's control bar or with shortcuts. Track 2 follows Track 1 unless you unlink them.
 - **Align by Line**: while a line is being spoken, select it in the list and click **Align to current time**; the delay is calculated for you. The line that should be showing at the current delay is marked, and **Current line** scrolls back to it. It also works from the overlay: click the target button on its control bar.
 - **Playback speed**: subtitle time runs 1:1 with video time. At 2× the video and the subtitles both move two seconds per second; the overlay shows the player's speed.
+- **Correct drift**: when a file made for another frame rate drifts further off the longer the movie plays, align a line near the start first, then select a line at least 30 seconds later and click **Correct drift with this line** (on **Align by Line** or on the overlay's control bar) while it is being spoken. The file is stretched to fit, for example ×1.0427 for 23.976 fps played at 25 fps; lines that imply a ratio outside ×0.9–×1.1 are rejected. Only this action changes the ratio, a plain delay keeps it, and **Reset to 1:1** removes it. The correction is saved with the delays.
 - Delays are saved by subtitle content and source edition, then restored with a notice. Legacy per-title timing is migrated once so a different edition cannot repeatedly inherit it.
 
 ### Translating a second language
@@ -198,7 +199,7 @@ Check the sync status on **Now Playing** or in the menu bar. If it names another
 <details>
 <summary>The subtitles get further off as the movie goes on</summary>
 
-The file was made for another frame rate or a different cut of the movie. BetterDualSub keeps subtitle time 1:1 with video time, so download a subtitle file that matches your version.
+The file was made for another frame rate. Use **Align by Line** on one line near the start and **Correct drift with this line** on another at least 30 seconds later (see [Timing](#timing)). If the file was made for a different cut of the movie, no single ratio fits; download a subtitle file that matches your version.
 </details>
 
 <details>

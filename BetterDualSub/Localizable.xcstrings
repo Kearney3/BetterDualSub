@@ -33,6 +33,142 @@
         }
       }
     },
+    "align.drift.apply" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Correct drift with this line"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "用这一句校正漂移"
+          }
+        }
+      }
+    },
+    "align.drift.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "If subtitles get further off as the movie plays, first align a line near the start, then select a line at least 30 seconds later and use Correct drift while it is being spoken. The file is then stretched to fit, for example ×1.0427 for a 23.976 fps file played at 25 fps. The player's own playback speed is separate and is followed as before."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如果字幕越往后越对不上，先对齐开头附近的一句，再选一句至少相隔 30 秒的台词，在它正在播放时点“用这一句校正漂移”。字幕会被拉伸以匹配，例如 23.976 帧的文件按 25 帧播放是 ×1.0427。播放器自己的倍速是另一回事，仍然照常跟随。"
+          }
+        }
+      }
+    },
+    "align.drift.status" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drift correction: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "漂移校正：%@"
+          }
+        }
+      }
+    },
+    "align.drift.reset" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reset to 1:1"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "恢复 1:1"
+          }
+        }
+      }
+    },
+    "align.drift.needFirst" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Align a line near the start first."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请先对齐开头附近的一句。"
+          }
+        }
+      }
+    },
+    "align.drift.tooClose" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pick a line at least 30 seconds away from the first one."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请选一句与第一句至少相隔 30 秒的台词。"
+          }
+        }
+      }
+    },
+    "align.drift.implausible" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Those lines imply ×%@, which no frame-rate difference produces. Check that you picked the right lines."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这两句推出的比例是 ×%@，不像是帧率差异造成的，请确认选对了台词。"
+          }
+        }
+      }
+    },
+    "align.drift.result" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Drift corrected: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已校正漂移：%@"
+          }
+        }
+      }
+    },
     "align.description" : {
       "extractionState" : "manual",
       "localizations" : {

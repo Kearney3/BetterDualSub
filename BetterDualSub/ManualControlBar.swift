@@ -268,6 +268,17 @@ private struct OverlayAlignPanel: View {
                 }
                 .disabled(selected == nil)
                 .barTip("align.hint", $tip)
+                if manager.driftAnchors[track] != nil {
+                    Button {
+                        guard let selected else { return }
+                        result = SubtitleAlignView.driftMessage(manager.correctDrift(track: track, to: selected))
+                    } label: {
+                        Text("align.drift.apply").padding(.horizontal, 10).padding(.vertical, 3)
+                            .background(Capsule().fill(Color.white.opacity(selected == nil ? 0.15 : 0.35)))
+                    }
+                    .disabled(selected == nil)
+                    .barTip("align.drift.hint", $tip)
+                }
                 if !result.isEmpty { Text(verbatim: result).foregroundStyle(.secondary).lineLimit(1) }
                 Spacer(minLength: 0)
                 Text(AppLocalization.format("playback.speed", ManualControlBar.speedLabel(manager.playbackSpeed)))
@@ -278,8 +289,7 @@ private struct OverlayAlignPanel: View {
 
     /// Brings the line that should be on screen now (at the track's current delay) into view.
     private func scrollToNow(_ proxy: ScrollViewProxy) {
-        let offset = track == "secondary" ? manager.secondaryOffsetMs : manager.timeOffsetMs
-        guard let target = SubtitleCueSearch.nearest(in: cues, atFileMs: manager.positionMs - offset) else { return }
+        guard let target = SubtitleCueSearch.nearest(in: cues, atFileMs: manager.fileTimeMs(track: track, atVideo: manager.positionMs)) else { return }
         DispatchQueue.main.async { proxy.scrollTo(target, anchor: .center) }
     }
 }

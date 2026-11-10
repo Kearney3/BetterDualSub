@@ -108,6 +108,12 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
             updateSub()
         }
     }
+    /// Drift correction of each track (`SubtitleDrift`): 1 runs the file 1:1 with the video. Changed only by
+    /// `correctDrift` and `resetDrift`, never by a delay, and linked like the delays.
+    @Published private(set) var primaryScale = 1.0
+    @Published private(set) var secondaryScale = 1.0
+    /// The last line aligned on each track, as the first point for `correctDrift`.
+    @Published private(set) var driftAnchors: [String: SubtitleDrift.Point] = [:]
     /// The timing saved for this title was restored when it was loaded.
     @Published private(set) var restoredTiming = false
     /// While on, Track B always has the same delay as Track A (changing either changes both). Persisted by `setLink`.
@@ -137,7 +143,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     @Published private(set) var trackSwitchError: String?
     private var trackSwitchTask: Task<Void, Never>?
     private var currentSession: ViewingSession?
-    private var previousSecondary: (document: SubtitleDocument?, name: String?, trackID: String?, offset: Int, linked: Bool)?
+    private var previousSecondary: (document: SubtitleDocument?, name: String?, trackID: String?, offset: Int, scale: Double, linked: Bool)?
     private let sessionStore = ViewingSessionStore(url: URL.applicationSupportDirectory
         .appendingPathComponent("BetterDualSub/RecentWatching.json"))
     private var sessionSaveTask: Task<Void, Never>?
@@ -155,6 +161,19 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     private var secondary: SubtitleDocument? { didSet { shownSecondaryCache = nil } }
     /// Track 2 as shown, for the delay difference and tolerance it was snapped with (`shownSecondary`).
     private var shownSecondaryCache: (shiftMs: Int, tolerance: Int, document: SubtitleDocument?)?
+
+    /// Position in a track's own file time: the video position less the delay, over the drift correction.
+    func fileTimeMs(track: String, atVideo videoMs: Int? = nil) -> Int {
+        let secondaryTrack = track == "secondary"
+        return SubtitleDrift.fileTime(atVideo: videoMs ?? playback.positionMs, offsetMs: secondaryTrack ? secondaryOffsetMs : timeOffsetMs,
+                                      scale: secondaryTrack ? secondaryScale : primaryScale)
+    }
+
+    private func videoTimeMs(track: String, ofFile fileMs: Int) -> Int {
+        let secondaryTrack = track == "secondary"
+        return SubtitleDrift.videoTime(ofFile: fileMs, offsetMs: secondaryTrack ? secondaryOffsetMs : timeOffsetMs,
+                                       scale: secondaryTrack ? secondaryScale : primaryScale)
+    }
     /// Two subtitle files of one video rarely end their lines at exactly the same moment; differences up to this
     /// setting (0 turns it off) are treated as the same moment, so neither track's line lingers after the other's.
     static let trackSnapToleranceKey = "trackSnapToleranceMs"
@@ -231,9 +250,11 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     /// Schedules an update for the moment either track's text next changes, at the current playback speed.
     private func scheduleCueTimer(position: Int) {
         let speed = playbackSpeed
-        let next = [primary?.nextChange(after: position - timeOffsetMs).map { $0 + timeOffsetMs },
-                    shownSecondary()?.nextChange(after: position - secondaryOffsetMs).map { $0 + secondaryOffsetMs }]
-            .compactMap { $0 }.min()
+        // A scaled boundary can round to the current position; the timer then fires at once and moves past it.
+        let next = [primary?.nextChange(after: fileTimeMs(track: "primary", atVideo: position)).map { videoTimeMs(track: "primary", ofFile: $0) },
+                    shownSecondary()?.nextChange(after: fileTimeMs(track: "secondary", atVideo: position))
+                        .map { videoTimeMs(track: "secondary", ofFile: $0) }]
+            .compactMap { $0 }.map { max($0, position + 1) }.min()
         guard isPlaying, OverlayController.isVisible, speed > 0, let next else {
             cueTimer?.invalidate()
             cueTimer = nil
@@ -306,9 +327,10 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         if abs(positionMs - position) >= 200 || !playing && positionMs != position || (position == 0) != (positionMs == 0) { positionMs = position }
         let formatted = String(format: "%02d:%02d:%02d", position / 3_600_000, position / 60_000 % 60, position / 1000 % 60)
         if debugTimeStr != formatted { debugTimeStr = formatted }
-        // The video position already runs at the player's speed, so the subtitles follow it 1:1, minus the delay.
-        let first = primary?.text(at: position - timeOffsetMs) ?? ""
-        let second = shownSecondary()?.text(at: position - secondaryOffsetMs) ?? ""
+        // The video position already runs at the player's speed, so the subtitles follow it 1:1, minus the delay
+        // (and over the drift correction, for a file made for another frame rate).
+        let first = primary?.text(at: fileTimeMs(track: "primary", atVideo: position)) ?? ""
+        let second = shownSecondary()?.text(at: fileTimeMs(track: "secondary", atVideo: position)) ?? ""
         if currentText != first { currentText = first }
         if secondaryText != second { secondaryText = second }
         refreshSyncStatus()
@@ -319,8 +341,9 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     /// Track 2 with its cue starts and ends snapped to nearby ones of Track 1, as they line up on screen with the
     /// current delays. Only what is shown changes: alignment, export and history keep Track 2's own timing.
     private func shownSecondary() -> SubtitleDocument? {
-        guard let secondary, let primary else { return secondary }
-        let shift = timeOffsetMs - secondaryOffsetMs, tolerance = Self.trackSnapToleranceMs
+        // Tracks with different drift corrections are not a constant shift apart, so there is nothing to snap to.
+        guard let secondary, let primary, primaryScale == secondaryScale else { return secondary }
+        let shift = Int((Double(timeOffsetMs - secondaryOffsetMs) / primaryScale).rounded()), tolerance = Self.trackSnapToleranceMs
         if let cache = shownSecondaryCache, cache.shiftMs == shift, cache.tolerance == tolerance { return cache.document }
         let shown = secondary.snapped(to: primary, shiftMs: shift, tolerance: tolerance)
         shownSecondaryCache = (shift, tolerance, shown)
@@ -338,11 +361,47 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     }
 
     /// Times `track` so that `cue` is the line on screen right now (cue at 8:00 while playing at 10:00 -> +2:00).
-    /// Returns the new delay. Subtitle time runs 1:1 with video time, so only the delay changes.
+    /// Returns the new delay. Only the delay changes; a drift correction, if any, is kept. The line is remembered as
+    /// the first point for `correctDrift`.
     @discardableResult
     func align(track: String, to cue: SubtitleItem) -> Int {
-        setDelay(track: track, ms: currentPositionMs() - cue.startMs)
+        let point = SubtitleDrift.Point(fileMs: cue.startMs, videoMs: currentPositionMs())
+        setDelay(track: track, ms: SubtitleDrift.offset(for: point, scale: track == "secondary" ? secondaryScale : primaryScale))
+        driftAnchors[track] = point
         return track == "secondary" ? secondaryOffsetMs : timeOffsetMs
+    }
+
+    /// Fits `track` to the line aligned before and to `cue` being the line on screen right now, which corrects a file
+    /// made for another frame rate. Asked for explicitly; nothing else changes the scale. With linked tracks both
+    /// get it. Without an earlier `align`, or when the lines do not give a usable fit, nothing changes.
+    func correctDrift(track: String, to cue: SubtitleItem) -> SubtitleDrift.Fit? {
+        guard let anchor = driftAnchors[track] else { return nil }
+        let fit = SubtitleDrift.fit(anchor, SubtitleDrift.Point(fileMs: cue.startMs, videoMs: currentPositionMs()))
+        guard case .fitted(let scale, let offsetMs) = fit else { return fit }
+        setScale(track: track, scale)
+        if track == "secondary" { secondaryOffsetMs = offsetMs } else { timeOffsetMs = offsetMs }
+        saveOffsets()
+        updateSub()
+        showToast(timingSummary)
+        return fit
+    }
+
+    /// Back to 1:1 with the video, keeping the line that is on screen now where it is.
+    func resetDrift(track: String) {
+        let position = currentPositionMs()
+        let point = SubtitleDrift.Point(fileMs: fileTimeMs(track: track, atVideo: position), videoMs: position)
+        setScale(track: track, 1)
+        driftAnchors[track] = nil
+        if track == "secondary" { secondaryOffsetMs = point.videoMs - point.fileMs } else { timeOffsetMs = point.videoMs - point.fileMs }
+        saveOffsets()
+        updateSub()
+        showToast(timingSummary)
+    }
+
+    private func setScale(track: String, _ scale: Double) {
+        if track == "secondary" || linkSecondaryDelay { secondaryScale = scale }
+        if track != "secondary" || linkSecondaryDelay { primaryScale = scale }
+        shownSecondaryCache = nil
     }
 
     private var documentDurationMs: Int {
@@ -416,9 +475,12 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         let saved = restoring?.timing ?? timingStore.load(sessionID: session.id, legacyTitle: title)
         timeOffsetMs = saved.primaryOffsetMs
         secondaryOffsetMs = linkSecondaryDelay ? saved.primaryOffsetMs : saved.secondaryOffsetMs
+        primaryScale = saved.primaryScale
+        secondaryScale = linkSecondaryDelay ? saved.primaryScale : saved.secondaryScale
+        driftAnchors = [:]
         timingTitle = timingKey
         currentSession = session
-        restoredTiming = timeOffsetMs != 0 || secondaryOffsetMs != 0
+        restoredTiming = timeOffsetMs != 0 || secondaryOffsetMs != 0 || primaryScale != 1 || secondaryScale != 1
         // Loading subtitles means the user wants to see them, even if the window was hidden earlier.
         if !OverlayController.isVisible { OverlayController.setVisible(true) }
         updateSub()
@@ -435,10 +497,16 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
 
     /// Delay of each track, such as "+1200 ms" or, for different tracks, both joined by " / ".
     var timingSummary: String {
-        let first = String(format: "%+d ms", timeOffsetMs)
-        guard secondary != nil, secondaryOffsetMs != timeOffsetMs else { return first }
-        return first + " / " + String(format: "%+d ms", secondaryOffsetMs)
+        func summary(_ offset: Int, _ scale: Double) -> String {
+            String(format: "%+d ms", offset) + (scale == 1 ? "" : " " + Self.scaleLabel(scale))
+        }
+        let first = summary(timeOffsetMs, primaryScale)
+        guard secondary != nil, secondaryOffsetMs != timeOffsetMs || secondaryScale != primaryScale else { return first }
+        return first + " / " + summary(secondaryOffsetMs, secondaryScale)
     }
+
+    /// A drift correction as shown to the user, such as "×1.0427".
+    static func scaleLabel(_ scale: Double) -> String { String(format: "×%.4f", scale) }
 
     /// The loaded Track 1, as the source for a translated Track 2.
     var primaryDocument: SubtitleDocument? { primary }
@@ -448,13 +516,15 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     func setSecondary(_ document: SubtitleDocument, name: String) {
         guard !trackNames.isEmpty else { return }
         previousSecondary = (secondary, trackNames.count > 1 ? trackNames[1] : nil, packageTracks?.secondaryID,
-                             secondaryOffsetMs, linkSecondaryDelay)
+                             secondaryOffsetMs, secondaryScale, linkSecondaryDelay)
         canUndoSecondary = true
         packageTracks?.secondaryID = nil
         secondary = document
         currentSession?.secondarySRT = document.srt
         trackNames = [trackNames[0], name]
         durationMs = max(durationMs, documentDurationMs)
+        secondaryScale = primaryScale
+        driftAnchors["secondary"] = nil
         secondaryOffsetMs = timeOffsetMs
         updateSub()
         queueSessionSave()
@@ -471,7 +541,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     }
 
     /// Track 1's position in its own time, where a translation of it should start.
-    var translationPositionMs: Int { currentPositionMs() - timeOffsetMs }
+    var translationPositionMs: Int { fileTimeMs(track: "primary") }
 
     func undoSecondary() {
         guard let previousSecondary else { return }
@@ -480,6 +550,8 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         trackNames = [trackNames[0]] + (previousSecondary.name.map { [$0] } ?? [])
         packageTracks?.secondaryID = previousSecondary.trackID
         linkSecondaryDelay = previousSecondary.linked
+        secondaryScale = previousSecondary.scale
+        driftAnchors["secondary"] = nil
         secondaryOffsetMs = previousSecondary.offset
         self.previousSecondary = nil
         canUndoSecondary = false
@@ -546,7 +618,8 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         currentSession?.primarySRT = first.srt
         currentSession?.secondarySRT = secondary?.srt
         // A new Track 2 starts on Track 1's delay; existing delays stay exactly as they were.
-        if !hadSecondary && secondary != nil { secondaryOffsetMs = timeOffsetMs }
+        if !hadSecondary && secondary != nil { secondaryScale = primaryScale; secondaryOffsetMs = timeOffsetMs }
+        driftAnchors = [:]
         currentText = ""
         secondaryText = ""
         updateSub()
@@ -599,7 +672,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         guard var session = currentSession else { return nil }
         SubtitleScreenPreferences.saveCurrentLayout()
         session.names = trackNames
-        session.timing = SavedTiming(primaryOffsetMs: timeOffsetMs, secondaryOffsetMs: secondaryOffsetMs)
+        session.timing = currentTiming
         session.linked = linkSecondaryDelay
         session.display = ViewingDisplaySettings.capture(.standard)
         return session
@@ -634,9 +707,10 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         if syncStatus == .manual { return "health.manual" }
         if !syncStatus.isFollowing { return "health.noClock" }
         if !currentText.isEmpty || !secondaryText.isEmpty { return "health.cue" }
-        let start = min((primary.items.first?.startMs ?? 0) + timeOffsetMs,
-                        secondary.map { ($0.items.first?.startMs ?? 0) + secondaryOffsetMs } ?? Int.max)
-        let end = max(primary.duration + timeOffsetMs, secondary.map { $0.duration + secondaryOffsetMs } ?? Int.min)
+        let start = min(videoTimeMs(track: "primary", ofFile: primary.items.first?.startMs ?? 0),
+                        secondary.map { videoTimeMs(track: "secondary", ofFile: $0.items.first?.startMs ?? 0) } ?? Int.max)
+        let end = max(videoTimeMs(track: "primary", ofFile: primary.duration),
+                      secondary.map { videoTimeMs(track: "secondary", ofFile: $0.duration) } ?? Int.min)
         let time = currentPositionMs()
         if time < start || time >= end { return "health.outside" }
         return "health.gap"
@@ -659,7 +733,8 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
             "listenerAlive": playback.connection == .connected, "mode": SyncMode.current.rawValue, "target": SyncTarget.current,
             "following": syncStatus.isFollowing, "playing": isPlaying, "positionMs": currentPositionMs(),
             "rate": playbackSpeed, "primaryCueCount": primary?.items.count ?? 0, "secondaryCueCount": secondary?.items.count ?? 0,
-            "primaryOffsetMs": timeOffsetMs, "secondaryOffsetMs": secondaryOffsetMs, "health": subtitleHealthKey,
+            "primaryOffsetMs": timeOffsetMs, "secondaryOffsetMs": secondaryOffsetMs, "primaryScale": primaryScale,
+            "secondaryScale": secondaryScale, "health": subtitleHealthKey,
             "events": diagnosticEvents]
         if let lastReportUptime = playback.lastReportUptime {
             snapshot["lastReportAgeSeconds"] = max(0, ProcessInfo.processInfo.systemUptime - lastReportUptime)
@@ -670,8 +745,12 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
 
     private func saveOffsets() {
         guard let title = timingTitle else { return }
-        timingStore.save(SavedTiming(primaryOffsetMs: timeOffsetMs, secondaryOffsetMs: secondaryOffsetMs), title: title)
+        timingStore.save(currentTiming, title: title)
         queueSessionSave()
+    }
+
+    private var currentTiming: SavedTiming {
+        SavedTiming(primaryOffsetMs: timeOffsetMs, secondaryOffsetMs: secondaryOffsetMs, primaryScale: primaryScale, secondaryScale: secondaryScale)
     }
 
     func adjustDelay(track: String, delta: Int) {
@@ -701,7 +780,7 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     func setLink(_ on: Bool) {
         UserDefaults.standard.set(on, forKey: "linkSecondaryDelay")
         linkSecondaryDelay = on
-        if on { secondaryOffsetMs = timeOffsetMs }
+        if on { secondaryScale = primaryScale; shownSecondaryCache = nil; secondaryOffsetMs = timeOffsetMs }
     }
 
     /// For loaders that supply a file-level delay and an extra delay for Track B (B = A + extra).

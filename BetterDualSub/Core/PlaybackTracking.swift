@@ -134,8 +134,22 @@ nonisolated struct PlaybackTracker: Sendable {
 nonisolated struct SavedTiming: Codable, Equatable, Sendable {
     var primaryOffsetMs = 0
     var secondaryOffsetMs = 0
+    /// Drift correction of each track (`SubtitleDrift`); 1 is the usual 1:1 with the video.
+    var primaryScale = 1.0
+    var secondaryScale = 1.0
 
     var isDefault: Bool { self == SavedTiming() }
+}
+
+extension SavedTiming {
+    /// Sessions archived before drift correction have no scales.
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(primaryOffsetMs: try container.decodeIfPresent(Int.self, forKey: .primaryOffsetMs) ?? 0,
+                  secondaryOffsetMs: try container.decodeIfPresent(Int.self, forKey: .secondaryOffsetMs) ?? 0,
+                  primaryScale: SubtitleDrift.valid(try container.decodeIfPresent(Double.self, forKey: .primaryScale) ?? 1),
+                  secondaryScale: SubtitleDrift.valid(try container.decodeIfPresent(Double.self, forKey: .secondaryScale) ?? 1))
+    }
 }
 
 /// Saves timing per title in user defaults: delays under "offsets.<title>" as [A, B, 0] (older versions wrote
@@ -146,7 +160,7 @@ nonisolated struct SubtitleTimingStore {
 
     func load(sessionID: String, legacyTitle: String) -> SavedTiming {
         let key = "session." + sessionID
-        if defaults.object(forKey: "offsets." + key) != nil { return load(title: key) }
+        if defaults.object(forKey: "offsets." + key) != nil || defaults.object(forKey: "drift." + key) != nil { return load(title: key) }
         guard !legacyTitle.isEmpty, defaults.object(forKey: "offsets." + legacyTitle) != nil else { return SavedTiming() }
         let timing = load(title: legacyTitle)
         save(timing, title: key)
@@ -160,10 +174,19 @@ nonisolated struct SubtitleTimingStore {
             timing.primaryOffsetMs = first
             timing.secondaryOffsetMs = offsets.count > 2 ? offsets[1] : first + (offsets.count > 1 ? offsets[1] : 0)
         }
+        if let scales = defaults.array(forKey: "drift." + title) as? [Double], scales.count == 2 {
+            timing.primaryScale = SubtitleDrift.valid(scales[0])
+            timing.secondaryScale = SubtitleDrift.valid(scales[1])
+        }
         return timing
     }
 
     func save(_ timing: SavedTiming, title: String) {
+        if timing.primaryScale == 1 && timing.secondaryScale == 1 {
+            defaults.removeObject(forKey: "drift." + title)
+        } else {
+            defaults.set([timing.primaryScale, timing.secondaryScale], forKey: "drift." + title)
+        }
         if timing.primaryOffsetMs == 0 && timing.secondaryOffsetMs == 0 {
             defaults.removeObject(forKey: "offsets." + title)
         } else {

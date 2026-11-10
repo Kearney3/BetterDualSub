@@ -8,13 +8,13 @@ struct SubtitleAlignView: View {
     @State private var search = ""
     @State private var selected: SubtitleItem?
     @State private var result = ""
+    @State private var driftResult = ""
     /// Cues matching the search; recomputed only when the search, track or subtitles change, not on every clock tick.
     @State private var cues: [SubtitleItem] = []
 
     /// The cue that should be on screen now at the track's current delay.
     private var currentCue: SubtitleItem? {
-        let offset = track == "secondary" ? manager.secondaryOffsetMs : manager.timeOffsetMs
-        return SubtitleCueSearch.current(in: manager.cues(track: track), atFileMs: manager.positionMs - offset)
+        SubtitleCueSearch.current(in: manager.cues(track: track), atFileMs: manager.fileTimeMs(track: track, atVideo: manager.positionMs))
     }
 
     var body: some View {
@@ -66,6 +66,7 @@ struct SubtitleAlignView: View {
                                 Button("align.apply") {
                                     guard let selected else { return }
                                     result = Self.message(forDelay: manager.align(track: track, to: selected))
+                                    driftResult = ""
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .disabled(selected == nil)
@@ -78,14 +79,46 @@ struct SubtitleAlignView: View {
                             }
                         }
                         SettingsHint(key: "align.hint")
+                        driftSection
                     }
                 }
             }
         }
         .onAppear(perform: refreshCues)
         .onChange(of: search) { _, _ in refreshCues() }
-        .onChange(of: track) { _, _ in selected = nil; result = ""; refreshCues() }
-        .onChange(of: manager.loadID) { _, _ in selected = nil; result = ""; refreshCues() }
+        .onChange(of: track) { _, _ in selected = nil; result = ""; driftResult = ""; refreshCues() }
+        .onChange(of: manager.loadID) { _, _ in selected = nil; result = ""; driftResult = ""; refreshCues() }
+    }
+
+    /// The second step for a file made for another frame rate: a later line fits the speed as well as the delay.
+    private var driftSection: some View {
+        let scale = track == "secondary" ? manager.secondaryScale : manager.primaryScale
+        return VStack(alignment: .leading, spacing: 8) {
+            Divider()
+            HStack {
+                Button("align.drift.apply") {
+                    guard let selected else { return }
+                    driftResult = Self.driftMessage(manager.correctDrift(track: track, to: selected))
+                }
+                .disabled(selected == nil)
+                if !driftResult.isEmpty { Text(verbatim: driftResult).foregroundStyle(.secondary) }
+                Spacer()
+                if scale != 1 {
+                    Text(AppLocalization.format("align.drift.status", SubtitleManager.scaleLabel(scale))).monospacedDigit().foregroundStyle(.secondary)
+                    Button("align.drift.reset") { manager.resetDrift(track: track); driftResult = "" }
+                }
+            }
+            SettingsHint(key: "align.drift.hint")
+        }
+    }
+
+    static func driftMessage(_ fit: SubtitleDrift.Fit?) -> String {
+        switch fit {
+        case nil: AppLocalization.string("align.drift.needFirst")
+        case .tooClose: AppLocalization.string("align.drift.tooClose")
+        case .implausible(let scale): AppLocalization.format("align.drift.implausible", String(format: "%.4f", scale))
+        case .fitted(let scale, _): AppLocalization.format("align.drift.result", SubtitleManager.scaleLabel(scale))
+        }
     }
 
     private func row(_ cue: SubtitleItem, isCurrent: Bool) -> some View {
@@ -113,8 +146,7 @@ struct SubtitleAlignView: View {
     }
 
     private func scrollToCurrent(_ proxy: ScrollViewProxy, animated: Bool) {
-        let offset = track == "secondary" ? manager.secondaryOffsetMs : manager.timeOffsetMs
-        guard let target = SubtitleCueSearch.nearest(in: cues, atFileMs: manager.positionMs - offset) else { return }
+        guard let target = SubtitleCueSearch.nearest(in: cues, atFileMs: manager.fileTimeMs(track: track, atVideo: manager.positionMs)) else { return }
         DispatchQueue.main.async {
             if animated { withAnimation { proxy.scrollTo(target, anchor: .center) } } else { proxy.scrollTo(target, anchor: .center) }
         }
