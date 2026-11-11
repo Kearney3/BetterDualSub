@@ -343,9 +343,10 @@ final class SpeechTranscriptionTests: XCTestCase {
         XCTAssertEqual(try audioSpecificConfig(in: cookie), Data([0x12, 0x10]))
     }
 
-    func testTheLanguageListHasInstalledLanguagesFirst() async {
+    func testTheLanguageListHasInstalledLanguagesFirst() async throws {
         let languages = await SpeechTranscription.languages()
-        XCTAssertFalse(languages.isEmpty)
+        // A virtual machine such as a CI runner has no speech recognition, so no languages to order.
+        guard !languages.isEmpty else { throw XCTSkip("Speech recognition offers no languages on this Mac") }
         if let firstMissing = languages.firstIndex(where: { !$0.installed }) {
             XCTAssertTrue(languages[firstMissing...].allSatisfy { !$0.installed }, "installed languages come first")
         }
