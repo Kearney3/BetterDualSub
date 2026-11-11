@@ -159,56 +159,44 @@ struct ShortcutSettingsView: View {
     @State private var delayStepText = ""
     @State private var largeStepText = ""
 
+    /// The shortcuts in the groups the page shows them in.
+    private static let groups: [(titleKey: LocalizedStringKey, actions: [SubtitleShortcutAction])] = [
+        ("shortcuts.track.primary", [.primaryEarlier, .primaryLater, .primaryReset]),
+        ("shortcuts.track.secondary", [.secondaryEarlier, .secondaryLater, .secondaryReset]),
+        ("shortcuts.section.other", [.manualPlayPause, .manualBack, .manualForward, .toggleLock])
+    ]
+
     var body: some View {
         SettingsPage(descriptionKey: "shortcuts.description") {
-                SettingsCard {
-                    SettingsRow(symbol: "keyboard", tint: .blue, titleKey: "shortcuts.enabled", subtitleKey: "shortcuts.enabled.help") {
-                        Toggle("shortcuts.enabled", isOn: $shortcutsEnabled).labelsHidden().toggleStyle(.switch)
-                    }
+            SettingsCard {
+                SettingsRow(symbol: "keyboard", tint: .blue, titleKey: "shortcuts.enabled", subtitleKey: "shortcuts.enabled.help") {
+                    Toggle("shortcuts.enabled", isOn: $shortcutsEnabled).labelsHidden().toggleStyle(.switch)
                 }
-                VStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Text("shortcuts.step.title")
-                            Spacer()
-                            TextField("250", text: $delayStepText)
-                                .frame(width: 100)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit(saveDelayStep)
-                            Text("common.unit.ms").foregroundStyle(.secondary)
-                        }
-                        HStack {
-                            Text("shortcuts.largeStep.title")
-                            Spacer()
-                            TextField("1000", text: $largeStepText)
-                                .frame(width: 100)
-                                .textFieldStyle(.roundedBorder)
-                                .onSubmit(saveLargeStep)
-                            Text("common.unit.ms").foregroundStyle(.secondary)
-                        }
-                        Text("shortcuts.step.help")
-                            .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
-                        Button("shortcuts.resetBoth", action: resetBothTracks)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 16)
-                    Divider()
-                    ForEach(SubtitleShortcutAction.allCases) { action in
+            }
+            SettingsCard(titleKey: "shortcuts.section.steps") {
+                SettingsField("shortcuts.step.title") { stepField("250", text: $delayStepText, commit: saveDelayStep) }
+                SettingsField("shortcuts.largeStep.title") { stepField("1000", text: $largeStepText, commit: saveLargeStep) }
+                SettingsHint(key: "shortcuts.step.help")
+            }
+            ForEach(Self.groups, id: \.actions) { group in
+                SettingsCard(titleKey: group.titleKey) {
+                    ForEach(group.actions) { action in
                         shortcutRow(action)
-                            .disabled(!shortcutsEnabled)
-                            .opacity(shortcutsEnabled ? 1 : 0.5)
-                        if action != SubtitleShortcutAction.allCases.last { Divider() }
+                        if action != group.actions.last { Divider() }
                     }
                 }
-                .padding(.horizontal, 18)
-                .settingsCardBackground()
-                HStack {
-                    Button("shortcuts.restoreDefaults", action: reset)
-                    if !message.isEmpty {
-                        Text(message).font(.callout).foregroundStyle(.secondary)
-                    }
+                .disabled(!shortcutsEnabled)
+                .opacity(shortcutsEnabled ? 1 : 0.55)
+            }
+            HStack(spacing: 10) {
+                Button("shortcuts.restoreDefaults", action: reset)
+                Button("shortcuts.resetBoth", action: resetBothTracks)
+                if !message.isEmpty {
+                    Text(message).font(.callout).foregroundStyle(.secondary)
                 }
-                SettingsHint(key: "shortcuts.help")
+                Spacer(minLength: 0)
+            }
+            SettingsHint(key: "shortcuts.help")
         }
         .onChange(of: shortcutsEnabled) { _, _ in
             recordingAction = nil
@@ -227,33 +215,45 @@ struct ShortcutSettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .appLanguageChanged)) { _ in message = "" }
     }
 
+    private func stepField(_ placeholder: String, text: Binding<String>, commit: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
+            TextField(text: text, prompt: Text(verbatim: placeholder)) { EmptyView() }
+                .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).monospacedDigit()
+                .frame(width: 90)
+                .onSubmit(commit)
+            Text("common.unit.ms").foregroundStyle(.secondary)
+        }
+    }
+
     private func shortcutRow(_ action: SubtitleShortcutAction) -> some View {
-        HStack(spacing: 16) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(LocalizedStringKey(action.titleKey)).font(.body.weight(.medium))
-                Text(LocalizedStringKey(action.track.isSecondary ? "shortcuts.track.secondary" : "shortcuts.track.primary"))
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Spacer()
-            if !disabledActions.contains(action.id), recordingAction != action.id {
+        let recording = recordingAction == action.id, off = disabledActions.contains(action.id)
+        return HStack(spacing: 10) {
+            Text(LocalizedStringKey(action.titleKey))
+            Spacer(minLength: 12)
+            if !off, !recording {
                 Button {
                     SubtitleShortcutPreferences.disable(action.id)
                     disabledActions.insert(action.id)
                     message = ""
                 } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.tertiary)
                 }
                 .buttonStyle(.plain)
                 .help(AppLocalization.string("shortcuts.disableOne"))
+                .accessibilityLabel(Text(verbatim: AppLocalization.string("shortcuts.disableOne")))
             }
-            Button(buttonTitle(for: action)) {
+            Button {
                 message = ""
                 recordingAction = action.id
+            } label: {
+                Text(verbatim: buttonTitle(for: action))
+                    .font(recording || off ? .body : .system(.body, design: .rounded).weight(.medium))
+                    .foregroundStyle(recording ? AnyShapeStyle(.tint) : off ? AnyShapeStyle(.secondary) : AnyShapeStyle(.primary))
+                    .frame(minWidth: 96)
             }
             .buttonStyle(.bordered)
-            .frame(minWidth: 150)
             .overlay {
-                if recordingAction == action.id {
+                if recording {
                     HotKeyCaptureView(isRecording: true, onCapture: { keyCode, modifiers in
                         capture(keyCode: keyCode, modifiers: modifiers, for: action)
                     }, onCancel: { recordingAction = nil })
@@ -261,7 +261,6 @@ struct ShortcutSettingsView: View {
                 }
             }
         }
-        .padding(.vertical, 15)
     }
 
     private func buttonTitle(for action: SubtitleShortcutAction) -> String {

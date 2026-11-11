@@ -53,13 +53,13 @@ struct SyncStatusDetail: View {
                     }
                 }
                 if let help = status.help {
-                    Text(verbatim: help).font(.caption).foregroundStyle(.secondary)
+                    Text(verbatim: help).font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 action(for: status).controlSize(.small).padding(.top, 2)
                 if !manager.trackNames.isEmpty {
                     let health = manager.subtitleHealthKey
-                    Text(LocalizedStringKey(health)).font(.caption).foregroundStyle(.secondary)
+                    Text(LocalizedStringKey(health)).font(.subheadline).foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                     // Fixes are offered only when the subtitles may not match what is playing.
                     if health == "health.gap" || health == "health.outside" {

@@ -106,15 +106,13 @@ struct BilingualExportView: View {
         SettingsCard {
             Text("bilingual.primary.title").font(.headline)
             SubtitleFileRow(url: $primaryURL, symbol: "text.bubble")
-            HStack {
-                Spacer()
+            SettingsCardHeader(titleKey: "bilingual.secondary.title") {
                 Button {
                     swap(&primaryURL, &secondaryURL)
                 } label: { Label("localFile.swap", systemImage: "arrow.up.arrow.down") }
                 .controlSize(.small).disabled(primaryURL == nil && secondaryURL == nil)
-                Spacer()
             }
-            Text("bilingual.secondary.title").font(.headline)
+            .padding(.top, 4)
             SubtitleFileRow(url: $secondaryURL, symbol: "text.bubble.fill")
         }
         .disabled(busy)

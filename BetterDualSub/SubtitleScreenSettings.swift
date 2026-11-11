@@ -62,19 +62,25 @@ struct SubtitleScreenSettings: View {
     @State private var screens = NSScreen.screens
 
     var body: some View {
-        SettingsCard(titleKey: "screen.title") {
-            Picker("screen.choose", selection: $displayID) {
-                Text("screen.auto").tag("")
-                ForEach(screens, id: \.self) { screen in
-                    Text(verbatim: screen.localizedName).tag(SubtitleScreenPreferences.id(screen))
+        // A row of the General page's app card.
+        VStack(alignment: .leading, spacing: 6) {
+            SettingsRow(symbol: "display", tint: .purple, titleKey: "screen.choose", subtitleKey: "screen.help") {
+                Picker("screen.choose", selection: $displayID) {
+                    Text("screen.auto").tag("")
+                    ForEach(screens, id: \.self) { screen in
+                        Text(verbatim: screen.localizedName).tag(SubtitleScreenPreferences.id(screen))
+                    }
+                    if !displayID.isEmpty, !screens.contains(where: { SubtitleScreenPreferences.id($0) == displayID }) {
+                        Text("screen.disconnected").tag(displayID)
+                    }
                 }
-                if !displayID.isEmpty, !screens.contains(where: { SubtitleScreenPreferences.id($0) == displayID }) {
-                    Text("screen.disconnected").tag(displayID)
-                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .fixedSize()
             }
-            SettingsHint(key: "screen.help")
             if let screen = SubtitleScreenPreferences.selectedScreen {
-                Text(AppLocalization.format("screen.current", screen.localizedName)).font(.caption).foregroundStyle(.secondary)
+                Text(AppLocalization.format("screen.current", screen.localizedName))
+                    .font(.subheadline).foregroundStyle(.secondary).padding(.leading, 44)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification)) { _ in

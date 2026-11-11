@@ -3527,6 +3527,57 @@
         }
       }
     },
+    "general.section.app" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "App"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "应用"
+          }
+        }
+      }
+    },
+    "general.section.maintenance" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Updates and Data"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新与数据"
+          }
+        }
+      }
+    },
+    "general.section.playback" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback Sync"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放同步"
+          }
+        }
+      }
+    },
     "glossary.add" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -6803,22 +6854,6 @@
         }
       }
     },
-    "movpkg.shortcutHint" : {
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Customize subtitle timing shortcuts in the Keyboard Shortcuts page."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "可在侧边栏的“快捷键”页面自定义字幕延迟快捷键。"
-          }
-        }
-      }
-    },
     "movpkg.status.exported" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -7053,6 +7088,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "正在保存字幕…"
+          }
+        }
+      }
+    },
+    "shortcuts.section.other" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Playback and Window"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "播放与窗口"
+          }
+        }
+      }
+    },
+    "shortcuts.section.steps" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adjustment Steps"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "调整步长"
           }
         }
       }

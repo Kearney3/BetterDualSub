@@ -63,23 +63,23 @@ struct BatchTranslationView: View {
         SettingsCard(titleKey: "batch.output.title") {
             Toggle("batch.output.translation", isOn: $writeTranslation)
             if writeTranslation {
-                HStack(spacing: 10) {
-                    Text("output.name")
-                    TextField("{name}.{lang}", text: $pattern).textFieldStyle(.roundedBorder)
+                SettingsField("output.name") {
+                    TextField(text: $pattern, prompt: Text(verbatim: "{name}.{lang}")) { EmptyView() }
+                        .textFieldStyle(.roundedBorder).frame(minWidth: 160, maxWidth: 320)
                 }
                 .padding(.leading, 20)
             }
             Toggle("batch.output.bilingual", isOn: $writeBilingual)
             if writeBilingual {
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 10) {
-                        Text("output.name")
-                        TextField("{name}.bilingual", text: $bilingualPattern).textFieldStyle(.roundedBorder)
+                    SettingsField("output.name") {
                         Picker("merge.format", selection: $bilingualFormat) {
                             Text(verbatim: "SRT").tag(SubtitleOutputFormat.srt)
                             Text(verbatim: "ASS").tag(SubtitleOutputFormat.ass)
                         }
-                        .pickerStyle(.segmented).labelsHidden().fixedSize()
+                        .pickerStyle(.segmented).labelsHidden().frame(width: 100)
+                        TextField(text: $bilingualPattern, prompt: Text(verbatim: "{name}.bilingual")) { EmptyView() }
+                            .textFieldStyle(.roundedBorder).frame(minWidth: 160, maxWidth: 320)
                     }
                     Toggle("batch.output.translationOnTop", isOn: $secondaryOnTop)
                 }

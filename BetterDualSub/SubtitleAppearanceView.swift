@@ -95,7 +95,6 @@ struct SubtitleAppearanceView: View {
                 .frame(maxWidth: .infinity)
             Divider()
             SettingsPage(descriptionKey: "appearance.description") {
-                SubtitlePreviewOptionsCard()
                 SubtitleWindowCard()
                 SubtitleTrackStyleEditor(secondary: false)
                 SubtitleTrackStyleEditor(secondary: true)
@@ -120,6 +119,8 @@ private struct SubtitleWindowCard: View {
     @AppStorage(SubtitleAppearanceDefaults.backgroundColorKey) private var backgroundColor = SubtitleAppearanceDefaults.backgroundColor
     @AppStorage(SubtitleAppearanceDefaults.backgroundOpacityKey) private var backgroundOpacity = SubtitleAppearanceDefaults.backgroundOpacity
     @AppStorage(SubtitleAppearanceDefaults.backgroundRadiusKey) private var backgroundRadius = SubtitleAppearanceDefaults.backgroundRadius
+    /// Whether the overlay shows the sample while no subtitles are loaded.
+    @AppStorage("showSubtitlePreview") private var showSubtitlePreview = true
 
     var body: some View {
         SettingsCard(titleKey: "appearance.window.title") {
@@ -131,6 +132,11 @@ private struct SubtitleWindowCard: View {
                 Toggle("appearance.window.lock", isOn: $locked).labelsHidden().toggleStyle(.switch)
             }
             Divider()
+            SettingsRow(symbol: "text.bubble", tint: .green, titleKey: "appearance.preview.showWhenEmpty",
+                        subtitleKey: "appearance.preview.hint") {
+                Toggle("appearance.preview.showWhenEmpty", isOn: $showSubtitlePreview).labelsHidden().toggleStyle(.switch)
+            }
+            Divider()
             SettingsRow(symbol: "rectangle.dashed", tint: .purple, titleKey: "menu.background.title") {
                 Picker("menu.background.title", selection: $backgroundStyle) {
                     Text("menu.background.transparent").tag(BackgroundStyleOption.transparent.rawValue)
@@ -140,48 +146,30 @@ private struct SubtitleWindowCard: View {
                 .labelsHidden().pickerStyle(.segmented).fixedSize()
             }
             if backgroundStyle == BackgroundStyleOption.custom.rawValue {
-                Divider()
-                ColorPicker("appearance.background.color", selection: Binding(
-                    get: { Color(hex: backgroundColor) }, set: { backgroundColor = $0.hexString }), supportsOpacity: false)
-                HStack {
-                    Text("appearance.background.opacity")
-                    Slider(value: $backgroundOpacity, in: 0...1, step: 0.05)
-                    Text(backgroundOpacity.formatted(.percent.precision(.fractionLength(0))))
-                        .monospacedDigit().frame(width: 54, alignment: .trailing)
+                VStack(spacing: 12) {
+                    SettingsField("appearance.background.color") {
+                        ColorPicker("appearance.background.color", selection: Binding(
+                            get: { Color(hex: backgroundColor) }, set: { backgroundColor = $0.hexString }), supportsOpacity: false)
+                            .labelsHidden()
+                    }
+                    SettingsSlider(titleKey: "appearance.background.opacity", value: $backgroundOpacity, range: 0...1, step: 0.05,
+                                   valueText: backgroundOpacity.formatted(.percent.precision(.fractionLength(0))))
+                    SettingsSlider(titleKey: "appearance.background.radius", value: $backgroundRadius, range: 0...24,
+                                   valueText: "\(Int(backgroundRadius)) pt")
                 }
-                HStack {
-                    Text("appearance.background.radius")
-                    Slider(value: $backgroundRadius, in: 0...24, step: 1)
-                    Text("\(Int(backgroundRadius)) pt").monospacedDigit().frame(width: 54, alignment: .trailing)
-                }
+                .padding(.leading, 44)
             }
             Divider()
             HStack {
-                Button("appearance.background.reset") { SubtitleAppearanceDefaults.apply(SubtitleAppearanceDefaults.backgroundValues) }
                 Spacer()
+                Button("appearance.background.reset") { SubtitleAppearanceDefaults.apply(SubtitleAppearanceDefaults.backgroundValues) }
                 Button("appearance.window.reset") { OverlayController.resetPosition() }
             }
+            .controlSize(.small)
         }
         .onChange(of: showWindow) { _, _ in NotificationCenter.default.post(name: .subtitleDisplayChanged, object: nil) }
         .onChange(of: locked) { _, _ in NotificationCenter.default.post(name: .subtitleDisplayChanged, object: nil) }
         .onChange(of: backgroundStyle) { _, _ in NotificationCenter.default.post(name: .subtitleDisplayChanged, object: nil) }
-    }
-}
-
-/// Whether the overlay shows the sample while no subtitles are loaded.
-private struct SubtitlePreviewOptionsCard: View {
-    @AppStorage("showSubtitlePreview") private var showSubtitlePreview = true
-
-    var body: some View {
-        SettingsCard {
-            Toggle("appearance.preview.showWhenEmpty", isOn: $showSubtitlePreview)
-            HStack(alignment: .center) {
-                Text("appearance.preview.hint")
-                    .font(.caption).foregroundStyle(.secondary)
-                Spacer(minLength: 8)
-                Button("menu.openFile") { showControlCenterPage("localFile") }
-            }
-        }
     }
 }
 
@@ -288,47 +276,51 @@ private struct SubtitleTrackStyleEditor: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(LocalizedStringKey(secondary ? "appearance.track.secondary" : "appearance.track.primary"))
-                    .font(.headline)
-                Spacer()
+        VStack(alignment: .leading, spacing: 12) {
+            SettingsCardHeader(titleKey: secondary ? "appearance.track.secondary" : "appearance.track.primary") {
                 Button("appearance.track.reset") {
                     SubtitleAppearanceDefaults.apply(SubtitleAppearanceDefaults.trackValues(secondary: secondary))
                 }
+                .controlSize(.small)
             }
-            Picker("appearance.fontFamily", selection: $family) {
-                ForEach(fontFamilies, id: \.self) { fontFamily in
-                    Text(fontFamily)
-                        .font(.custom(fontFamily, size: 14))
-                        .tag(fontFamily)
+            SettingsField("appearance.fontFamily") {
+                Picker("appearance.fontFamily", selection: $family) {
+                    ForEach(fontFamilies, id: \.self) { fontFamily in
+                        Text(fontFamily)
+                            .font(.custom(fontFamily, size: 14))
+                            .tag(fontFamily)
+                    }
                 }
+                .pickerStyle(.menu).labelsHidden().frame(width: 240)
             }
-            .pickerStyle(.menu)
-            Picker("appearance.weight.title", selection: $weight) {
-                ForEach(FontWeightOption.allCases) { option in Text(LocalizedStringKey(option.titleKey)).tag(option.rawValue) }
+            SettingsField("appearance.weight.title") {
+                Picker("appearance.weight.title", selection: $weight) {
+                    ForEach(FontWeightOption.allCases) { option in Text(LocalizedStringKey(option.titleKey)).tag(option.rawValue) }
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
             }
-            HStack {
-                Text("appearance.size")
-                Slider(value: $size, in: SubtitleAppearanceLimits.fontSize, step: 1)
-                Text("\(size.formatted(.number.precision(.fractionLength(0...1)))) pt")
-                    .monospacedDigit().frame(width: 54, alignment: .trailing)
+            SettingsSlider(titleKey: "appearance.size", value: $size, range: SubtitleAppearanceLimits.fontSize,
+                           valueText: "\(size.formatted(.number.precision(.fractionLength(0...1)))) pt")
+            SettingsField("appearance.lineMode") {
+                Picker("appearance.lineMode", selection: $lineMode) {
+                    Text("appearance.lineMode.original").tag(SubtitleLineMode.original.rawValue)
+                    Text("appearance.lineMode.single").tag(SubtitleLineMode.single.rawValue)
+                    Text("appearance.lineMode.double").tag(SubtitleLineMode.double.rawValue)
+                }
+                .pickerStyle(.segmented).labelsHidden().fixedSize()
             }
-            Picker("appearance.lineMode", selection: $lineMode) {
-                Text("appearance.lineMode.original").tag(SubtitleLineMode.original.rawValue)
-                Text("appearance.lineMode.single").tag(SubtitleLineMode.single.rawValue)
-                Text("appearance.lineMode.double").tag(SubtitleLineMode.double.rawValue)
+            Divider()
+            SettingsField("appearance.textColor") {
+                ColorPicker("appearance.textColor", selection: colorBinding($textHex), supportsOpacity: false).labelsHidden()
             }
-            .pickerStyle(.segmented)
-            ColorPicker("appearance.textColor", selection: colorBinding($textHex), supportsOpacity: false)
-            ColorPicker("appearance.outlineColor", selection: colorBinding($outlineHex), supportsOpacity: false)
-            HStack {
-                Text("appearance.outlineWidth")
-                Slider(value: $outlinePixels, in: SubtitleAppearanceLimits.outlinePixels, step: 0.5)
-                Text("\(outlinePixels.formatted(.number.precision(.fractionLength(0...1)))) px")
-                    .monospacedDigit().frame(width: 60, alignment: .trailing)
+            SettingsField("appearance.outlineColor") {
+                ColorPicker("appearance.outlineColor", selection: colorBinding($outlineHex), supportsOpacity: false).labelsHidden()
             }
-            Toggle("appearance.shadow", isOn: $shadow)
+            SettingsSlider(titleKey: "appearance.outlineWidth", value: $outlinePixels, range: SubtitleAppearanceLimits.outlinePixels, step: 0.5,
+                           valueText: "\(outlinePixels.formatted(.number.precision(.fractionLength(0...1)))) px")
+            SettingsField("appearance.shadow") {
+                Toggle("appearance.shadow", isOn: $shadow).labelsHidden().toggleStyle(.switch).controlSize(.small)
+            }
         }
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)

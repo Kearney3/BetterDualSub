@@ -47,33 +47,43 @@ struct MovieSubtitleDownloadView: View {
                 }
                 if !versions.isEmpty {
                     Divider()
-                    HStack {
+                    SettingsField("download.version") {
                         Picker("download.version", selection: $selectedVersion) {
                             ForEach(versions) { movie in Text(movie.label).tag(movie.id) }
                         }
-                        Button("download.loadTracks", action: loadTracks).disabled(busy)
-                    }.disabled(busy)
+                        .labelsHidden().frame(maxWidth: 320)
+                        Button("download.loadTracks", action: loadTracks)
+                    }
+                    .disabled(busy)
                 }
             }
             if !tracks.isEmpty {
                 SettingsCard(titleKey: "download.step.tracks") {
-                    Picker("download.primary", selection: Binding(get: { primaryID }, set: { id in
-                        primaryID = id
-                        if let track = tracks.first(where: { $0.id == id }) { preferredPrimary = track.language }
-                    })) {
-                        ForEach(tracks) { Text($0.label).tag($0.id) }
-                    }.disabled(busy)
-                    Picker("download.secondary", selection: Binding(get: { secondaryID }, set: { id in
-                        secondaryID = id
-                        translateSecondary = id == Self.translateTag
-                        // Translating keeps the language Track 2 is otherwise taken in.
-                        if !translateSecondary { preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? "" }
-                    })) {
-                        Text("download.noSecondary").tag("")
-                        Text("movpkg.secondary.translate").tag(Self.translateTag)
-                        Divider()
-                        ForEach(tracks) { Text($0.label).tag($0.id) }
-                    }.disabled(busy)
+                    SettingsField("download.primary") {
+                        Picker("download.primary", selection: Binding(get: { primaryID }, set: { id in
+                            primaryID = id
+                            if let track = tracks.first(where: { $0.id == id }) { preferredPrimary = track.language }
+                        })) {
+                            ForEach(tracks) { Text($0.label).tag($0.id) }
+                        }
+                        .labelsHidden().frame(maxWidth: 320)
+                    }
+                    .disabled(busy)
+                    SettingsField("download.secondary") {
+                        Picker("download.secondary", selection: Binding(get: { secondaryID }, set: { id in
+                            secondaryID = id
+                            translateSecondary = id == Self.translateTag
+                            // Translating keeps the language Track 2 is otherwise taken in.
+                            if !translateSecondary { preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? "" }
+                        })) {
+                            Text("download.noSecondary").tag("")
+                            Text("movpkg.secondary.translate").tag(Self.translateTag)
+                            Divider()
+                            ForEach(tracks) { Text($0.label).tag($0.id) }
+                        }
+                        .labelsHidden().frame(maxWidth: 320)
+                    }
+                    .disabled(busy)
                     if secondaryID == Self.translateTag { SettingsHint(key: "translate.secondary.help") }
                     SettingsHint(key: "download.tracks.help")
                     HStack {
@@ -85,13 +95,7 @@ struct MovieSubtitleDownloadView: View {
                 }
             }
             if busy {
-                HStack {
-                    ProgressView().controlSize(.small)
-                    Text(status)
-                    Spacer()
-                    Button("common.cancel", action: cancel)
-                        .keyboardShortcut(.cancelAction)
-                }
+                BusyStatusRow(text: status, cancel: cancel)
             } else if !status.isEmpty { StatusLine(text: status) }
             if !failure.isEmpty {
                 StatusLine(text: failure, isError: true)

@@ -50,33 +50,39 @@ struct MovpkgSubtitleImportView: View {
     var body: some View {
         SettingsPage(descriptionKey: "movpkg.description") {
             SettingsCard(titleKey: "movpkg.chooseTitle") {
-                HStack {
-                    Button("movpkg.choose", action: choosePackage).disabled(busy)
-                    if let packageURL { Text(packageURL.lastPathComponent).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary) }
-                }
-                if tracks.isEmpty { SettingsHint(key: "movpkg.shortcutHint") }
+                SubtitleFileSlot(url: packageURL, symbol: "film", emptyKey: "movpkg.panelMessage", chooseKey: "movpkg.choose",
+                                 choose: choosePackage)
+                    .disabled(busy)
             }
             if canTranscribe { transcribeCard }
             if !tracks.isEmpty {
                 SettingsCard {
                     Text(AppLocalization.format("movpkg.tracksAvailable", tracks.count)).font(.headline)
-                    Picker("download.primary", selection: Binding(get: { primaryID }, set: { id in
-                        primaryID = id
-                        if let track = tracks.first(where: { $0.id == id }) { preferredPrimary = track.language }
-                    })) {
-                        ForEach(tracks) { Text($0.label).tag($0.id) }
-                    }.disabled(busy)
-                    Picker("download.secondary", selection: Binding(get: { secondaryID }, set: { id in
-                        secondaryID = id
-                        translateSecondary = id == Self.translateTag
-                        // Translating keeps the language Track 2 is otherwise taken in.
-                        if !translateSecondary { preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? "" }
-                    })) {
-                        Text("download.noSecondary").tag("")
-                        Text("movpkg.secondary.translate").tag(Self.translateTag)
-                        Divider()
-                        ForEach(tracks) { Text($0.label).tag($0.id) }
-                    }.disabled(busy)
+                    SettingsField("download.primary") {
+                        Picker("download.primary", selection: Binding(get: { primaryID }, set: { id in
+                            primaryID = id
+                            if let track = tracks.first(where: { $0.id == id }) { preferredPrimary = track.language }
+                        })) {
+                            ForEach(tracks) { Text($0.label).tag($0.id) }
+                        }
+                        .labelsHidden().frame(maxWidth: 320)
+                    }
+                    .disabled(busy)
+                    SettingsField("download.secondary") {
+                        Picker("download.secondary", selection: Binding(get: { secondaryID }, set: { id in
+                            secondaryID = id
+                            translateSecondary = id == Self.translateTag
+                            // Translating keeps the language Track 2 is otherwise taken in.
+                            if !translateSecondary { preferredSecondary = tracks.first(where: { $0.id == id })?.language ?? "" }
+                        })) {
+                            Text("download.noSecondary").tag("")
+                            Text("movpkg.secondary.translate").tag(Self.translateTag)
+                            Divider()
+                            ForEach(tracks) { Text($0.label).tag($0.id) }
+                        }
+                        .labelsHidden().frame(maxWidth: 320)
+                    }
+                    .disabled(busy)
                     if secondaryID == Self.translateTag { SettingsHint(key: "movpkg.secondary.translateHelp") }
                     if tracks.contains(where: \.needsOCR) { SettingsHint(key: "movpkg.ocr.help") }
                     Divider()
@@ -87,25 +93,21 @@ struct MovpkgSubtitleImportView: View {
                         }.pickerStyle(.segmented).disabled(busy)
                         SettingsHint(key: usePackageTimeline ? "movpkg.timeline.packageHelp" : "movpkg.timeline.episodeHelp")
                     }
-                    Button("movpkg.extract", action: extract)
-                        .buttonStyle(.borderedProminent)
-                        .disabled(busy || primaryID.isEmpty || primaryID == secondaryID)
-                    Divider()
-                    HStack {
+                    HStack(spacing: 10) {
+                        Button("movpkg.extract", action: extract)
+                            .buttonStyle(.borderedProminent)
                         Button("movpkg.exportTracks", action: exportTracks)
-                            .disabled(busy || primaryID.isEmpty || primaryID == secondaryID)
                     }
+                    .disabled(busy || primaryID.isEmpty || primaryID == secondaryID)
                     SettingsHint(key: "movpkg.exportHelp")
                 }
             }
             if busy {
-                HStack {
-                    ProgressView().controlSize(.small)
-                    Text(status)
-                    Spacer()
-                    Button("common.cancel", action: cancel)
-                }
-            } else if !status.isEmpty { StatusLine(text: status) }
+                BusyStatusRow(text: status, cancel: cancel)
+            } else if !status.isEmpty, status != AppLocalization.string("movpkg.panelMessage") {
+                // The opening prompt is already the empty slot's text.
+                StatusLine(text: status)
+            }
             if !error.isEmpty { StatusLine(text: error, isError: true) }
             if let outputFolder, !busy {
                 Button("movpkg.openFolder") { NSWorkspace.shared.open(outputFolder) }
@@ -312,10 +314,13 @@ extension MovpkgSubtitleImportView {
 extension MovpkgSubtitleImportView {
     fileprivate var transcribeCard: some View {
         SettingsCard(titleKey: "transcribe.title") {
-            Picker("transcribe.language", selection: $transcribeLanguageID) {
-                ForEach(transcribeLanguages) { language in
-                    Text(language.installed ? language.name : AppLocalization.format("transcribe.language.download", language.name)).tag(language.id)
+            SettingsField("transcribe.language") {
+                Picker("transcribe.language", selection: $transcribeLanguageID) {
+                    ForEach(transcribeLanguages) { language in
+                        Text(language.installed ? language.name : AppLocalization.format("transcribe.language.download", language.name)).tag(language.id)
+                    }
                 }
+                .labelsHidden().fixedSize()
             }
             .disabled(busy || transcribeLanguages.isEmpty)
             HStack {

@@ -25,10 +25,10 @@ struct LocalSubtitleFileView: View {
     var body: some View {
         SettingsPage(descriptionKey: "localFile.description") {
             SettingsCard(titleKey: "localFile.primary.title") {
-                fileRow(url: primaryURL, symbol: "text.bubble", choose: { primaryURL = pick() }, clear: { primaryURL = nil })
-                if primaryURL == nil { SettingsHint(key: "localFile.drop") }
+                SubtitleFileSlot(url: primaryURL, symbol: "text.bubble", emptyKey: "localFile.drop",
+                                 choose: { primaryURL = pick() ?? primaryURL }, clear: { primaryURL = nil })
             }
-            .overlay { if targeted { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor, lineWidth: 2) } }
+            .dropHighlight(targeted)
             .dropDestination(for: URL.self) { urls, _ in
                 // Two files dropped together are the two tracks, in the order given.
                 let files = urls.filter(Self.isSubtitle)
@@ -53,13 +53,15 @@ struct LocalSubtitleFileView: View {
             }
 
             SettingsCard(titleKey: "localFile.secondary.title") {
-                fileRow(url: secondaryURL, symbol: "text.bubble.fill", choose: { secondaryURL = pick() }, clear: { secondaryURL = nil })
+                SubtitleFileSlot(url: secondaryURL, symbol: "text.bubble.fill",
+                                 choose: { secondaryURL = pick() ?? secondaryURL }, clear: { secondaryURL = nil })
                 if secondaryURL == nil {
+                    Divider()
                     Toggle("movpkg.secondary.translate", isOn: $translateSecondary)
                 }
                 SettingsHint(key: secondaryURL == nil && translateSecondary ? "translate.secondary.help" : "localFile.secondary.help")
             }
-            .overlay { if secondaryTargeted { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor, lineWidth: 2) } }
+            .dropHighlight(secondaryTargeted)
             .dropDestination(for: URL.self) { urls, _ in
                 guard let url = urls.first(where: Self.isSubtitle) else { return false }
                 secondaryURL = url
@@ -67,21 +69,19 @@ struct LocalSubtitleFileView: View {
             } isTargeted: { secondaryTargeted = $0 }
 
             SettingsCard(titleKey: "localFile.delay.title") {
-                HStack(spacing: 10) {
-                    Text("download.delay.primary")
-                    TextField("0", value: $primaryDelay, format: .number).frame(width: 80)
-                    Text("download.delay.secondary")
-                    TextField("0", value: $secondaryDelay, format: .number).frame(width: 80)
-                }.textFieldStyle(.roundedBorder)
+                SettingsField("download.delay.primary") { MillisecondsField(value: $primaryDelay) }
+                SettingsField("download.delay.secondary") { MillisecondsField(value: $secondaryDelay) }
                 SettingsHint(key: "localFile.delay.help")
-                HStack {
-                    Button("localFile.load", action: load)
-                        .buttonStyle(.borderedProminent)
-                        .disabled(primaryURL == nil || busy)
-                    if busy {
-                        ProgressView().controlSize(.small)
-                        Button("common.cancel", action: cancel)
-                    }
+            }
+
+            HStack(spacing: 10) {
+                Button("localFile.load", action: load)
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .disabled(primaryURL == nil || busy)
+                if busy {
+                    ProgressView().controlSize(.small)
+                    Button("common.cancel", action: cancel)
                 }
             }
 
@@ -107,20 +107,6 @@ struct LocalSubtitleFileView: View {
         primaryURL = urls.first
         secondaryURL = urls.count > 1 ? urls[1] : nil
         inputURLs = []
-    }
-
-    private func fileRow(url: URL?, symbol: String, choose: @escaping () -> Void, clear: @escaping () -> Void) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol).foregroundStyle(.secondary)
-            if let url {
-                Text(url.lastPathComponent).lineLimit(1).truncationMode(.middle)
-                Spacer()
-                Button("localFile.clear", action: clear).controlSize(.small)
-            } else {
-                Spacer()
-            }
-            Button("localFile.choose", action: choose)
-        }
     }
 
     private nonisolated static func isSubtitle(_ url: URL) -> Bool {

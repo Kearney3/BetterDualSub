@@ -58,26 +58,32 @@ struct TranslationSettingsView: View {
                 SettingsHint(key: "llm.local.help")
             }
             SettingsCard(titleKey: "llm.translation.title") {
-                Stepper(value: $configuration.batchSize, in: LLMConfiguration.batchSizes, step: 5) {
-                    Text(AppLocalization.format("llm.batchSize", configuration.batchSize))
+                SettingsField(title: Text(AppLocalization.format("llm.batchSize", configuration.batchSize))) {
+                    Stepper(value: $configuration.batchSize, in: LLMConfiguration.batchSizes, step: 5) {
+                        Text(AppLocalization.format("llm.batchSize", configuration.batchSize))
+                    }
+                    .labelsHidden()
                 }
-                Stepper(value: $configuration.contextLines, in: LLMConfiguration.contextSizes) {
-                    Text(AppLocalization.format("llm.contextLines", configuration.contextLines))
+                SettingsField(title: Text(AppLocalization.format("llm.contextLines", configuration.contextLines))) {
+                    Stepper(value: $configuration.contextLines, in: LLMConfiguration.contextSizes) {
+                        Text(AppLocalization.format("llm.contextLines", configuration.contextLines))
+                    }
+                    .labelsHidden()
                 }
-                Picker("llm.parallel", selection: $configuration.parallelRequests) {
-                    Text(AppLocalization.format("llm.parallel.auto", configuration.automaticParallelRequests)).tag(Int?.none)
-                    ForEach(Array(LLMConfiguration.parallelLimits), id: \.self) { Text(verbatim: String($0)).tag(Int?.some($0)) }
-                }
-                .fixedSize()
-                SettingsHint(key: "llm.parallel.help")
-                HStack {
-                    Text("llm.temperature")
-                    Slider(value: $configuration.temperature, in: 0...1, step: 0.1)
-                    Text(verbatim: String(format: "%.1f", configuration.temperature)).monospacedDigit().frame(width: 28)
-                }
+                SettingsSlider(titleKey: "llm.temperature", value: $configuration.temperature, range: 0...1, step: 0.1,
+                               valueText: String(format: "%.1f", configuration.temperature))
                 SettingsHint(key: "llm.batch.help")
                 Divider()
-                Text("llm.extra")
+                SettingsField("llm.parallel") {
+                    Picker("llm.parallel", selection: $configuration.parallelRequests) {
+                        Text(AppLocalization.format("llm.parallel.auto", configuration.automaticParallelRequests)).tag(Int?.none)
+                        ForEach(Array(LLMConfiguration.parallelLimits), id: \.self) { Text(verbatim: String($0)).tag(Int?.some($0)) }
+                    }
+                    .labelsHidden().fixedSize()
+                }
+                SettingsHint(key: "llm.parallel.help")
+                Divider()
+                Text("llm.extra").font(.body.weight(.medium))
                 TextField(text: $configuration.extraParameters, prompt: Text(verbatim: #"{"reasoning_effort": "low"}"#), axis: .vertical) { EmptyView() }
                     .textFieldStyle(.roundedBorder)
                     .font(.system(.body, design: .monospaced))
@@ -86,7 +92,7 @@ struct TranslationSettingsView: View {
                 if configuration.hasInvalidExtraParameters { StatusLine(text: AppLocalization.string("llm.extra.invalid"), isError: true) }
                 SettingsHint(key: "llm.extra.help")
                 Divider()
-                Text("llm.instructions")
+                Text("llm.instructions").font(.body.weight(.medium))
                 TextEditor(text: $configuration.instructions)
                     .font(.body)
                     .frame(height: 96)

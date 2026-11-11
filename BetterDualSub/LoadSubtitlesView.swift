@@ -30,35 +30,49 @@ struct LoadSubtitlesView: View {
     @State private var inputURLs: [URL] = []
     @State private var input = ""
     @State private var inputError = false
+    @State private var targeted = false
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    TextField("load.detect.placeholder", text: $input).textFieldStyle(.roundedBorder).onSubmit(openInput)
-                    Button("load.detect.open", action: openInput).disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                }
-                Text(inputError ? "load.detect.unsupported" : "load.detect.help")
-                    .font(.caption).foregroundStyle(inputError ? Color.orange : Color.secondary)
-                if inputError {
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: "tray.and.arrow.down")
+                    .font(.system(size: 24))
+                    .foregroundStyle(targeted ? AnyShapeStyle(.tint) : AnyShapeStyle(.secondary))
+                    .frame(width: 32, height: 28)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Button("load.source.file") { source = .file }
-                        Button("load.source.episode") { source = .episode }
-                    }.controlSize(.small)
+                        TextField("load.detect.placeholder", text: $input).textFieldStyle(.roundedBorder).onSubmit(openInput)
+                        Button("load.detect.open", action: openInput).disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                    Text(inputError ? "load.detect.unsupported" : "load.detect.help")
+                        .font(.subheadline).foregroundStyle(inputError ? Color.orange : Color.secondary)
+                        // No vertical `fixedSize` here: outside a scroll view, the height this text has at no width
+                        // would become the window's minimum height.
+                        .lineLimit(3)
+                    if inputError {
+                        HStack {
+                            Button("load.source.file") { source = .file }
+                            Button("load.source.episode") { source = .episode }
+                        }.controlSize(.small)
+                    }
                 }
             }
+            .padding(16)
+            .dropZoneBackground(targeted: targeted, cornerRadius: 16)
+            .dropDestination(for: URL.self) { urls, _ in route(urls); return !inputError } isTargeted: { targeted = $0 }
             .padding(.horizontal, 28).padding(.top, 20)
             .frame(maxWidth: 760).frame(maxWidth: .infinity)
-            .dropDestination(for: URL.self) { urls, _ in route(urls); return !inputError }
             Picker("nav.load", selection: $source) {
                 ForEach(LoadSource.allCases) { source in
                     Label(LocalizedStringKey(source.titleKey), systemImage: source.symbol).tag(source)
                 }
             }
             .pickerStyle(.segmented)
+            .controlSize(.large)
             .labelsHidden()
             .padding(.horizontal, 28)
-            .padding(.top, 20)
+            .padding(.top, 16)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
 

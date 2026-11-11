@@ -223,8 +223,8 @@ private struct GeneralSettingsView: View {
     @State private var cacheError = false
 
     var body: some View {
-        SettingsPage(descriptionKey: "general.language.description") {
-            SettingsCard {
+        SettingsPage {
+            SettingsCard(titleKey: "general.section.playback") {
                 SettingsRow(symbol: "play.rectangle.on.rectangle", tint: .green, titleKey: "sync.source.title", subtitleKey: "sync.source.help") {
                     Picker("sync.source.title", selection: $syncTarget) {
                         syncAppLabel(AppLocalization.string("sync.source.tv"), bundleID: SyncTarget.tvBundleID)
@@ -242,9 +242,6 @@ private struct GeneralSettingsView: View {
                     .fixedSize()
                 }
                 Divider()
-                SyncStatusDetail(showsDiagnostics: true)
-            }
-            SettingsCard {
                 SettingsRow(symbol: "timer", tint: .orange, titleKey: "sync.mode.title", subtitleKey: "sync.mode.help") {
                     Picker("sync.mode.title", selection: $syncMode) {
                         Text("sync.mode.auto").tag(SyncMode.auto.rawValue)
@@ -254,35 +251,34 @@ private struct GeneralSettingsView: View {
                     .pickerStyle(.menu)
                     .fixedSize()
                 }
+                Divider()
+                SyncStatusDetail(showsDiagnostics: true)
             }
-            SettingsCard {
-                SettingsRow(symbol: "globe", tint: .blue, titleKey: "general.language.picker") {
+            SettingsCard(titleKey: "general.section.app") {
+                SettingsRow(symbol: "globe", tint: .blue, titleKey: "general.language.picker", subtitleKey: "general.language.description") {
                     Picker("general.language.picker", selection: $language) {
-                        Text("简体中文").tag("zh-Hans")
-                        Text("English").tag("en")
+                        Text(verbatim: "简体中文").tag("zh-Hans")
+                        Text(verbatim: "English").tag("en")
                     }
                     .labelsHidden()
                     .pickerStyle(.menu)
                     .fixedSize()
                 }
-            }
-            SettingsCard {
+                Divider()
                 SettingsRow(symbol: "menubar.rectangle", tint: .teal, titleKey: "general.menuBar.showIcon",
                             subtitleKey: "general.menuBar.help") {
                     Toggle("general.menuBar.showIcon", isOn: $showStatusBarItem)
                         .labelsHidden().toggleStyle(.switch)
                 }
+                Divider()
+                SubtitleScreenSettings()
             }
-            SubtitleScreenSettings()
-            SettingsCard {
-                SettingsRow(symbol: "sparkles", tint: .pink, titleKey: "onboarding.restart", subtitleKey: "onboarding.restart.help") {
-                    Button("onboarding.restart.action") {
-                        ViewingGuide.restart()
-                        showControlCenterPage("nowPlaying")
-                    }
+            SettingsCard(titleKey: "general.section.maintenance") {
+                SettingsRow(symbol: "arrow.down.app", tint: .blue, titleKey: "update.auto", subtitleKey: "update.help") {
+                    Toggle("update.auto", isOn: $checkForUpdates).labelsHidden().toggleStyle(.switch)
                 }
-            }
-            SettingsCard {
+                UpdateStatusView().padding(.leading, 44)
+                Divider()
                 SettingsRow(symbol: "folder", tint: .indigo, titleKey: "general.cache.title",
                             subtitleKey: "general.cache.help") {
                     HStack {
@@ -294,14 +290,14 @@ private struct GeneralSettingsView: View {
                         Button("general.cache.clear") { showingCacheConfirmation = true }
                     }
                 }
-                if !cacheMessage.isEmpty { StatusLine(text: cacheMessage, isError: cacheError) }
-            }
-            SettingsCard {
-                SettingsRow(symbol: "arrow.down.app", tint: .blue, titleKey: "update.auto", subtitleKey: "update.help") {
-                    Toggle("update.auto", isOn: $checkForUpdates).labelsHidden().toggleStyle(.switch)
-                }
+                if !cacheMessage.isEmpty { StatusLine(text: cacheMessage, isError: cacheError).padding(.leading, 44) }
                 Divider()
-                UpdateStatusView()
+                SettingsRow(symbol: "sparkles", tint: .pink, titleKey: "onboarding.restart", subtitleKey: "onboarding.restart.help") {
+                    Button("onboarding.restart.action") {
+                        ViewingGuide.restart()
+                        showControlCenterPage("nowPlaying")
+                    }
+                }
             }
         }
         .confirmationDialog("general.cache.confirm", isPresented: $showingCacheConfirmation) {

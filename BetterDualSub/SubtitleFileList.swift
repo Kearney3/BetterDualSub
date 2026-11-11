@@ -36,6 +36,37 @@ enum SubtitleFilePanel {
     }
 }
 
+/// A chosen file (its name above its folder) or an invitation to choose one, with the buttons that do so.
+struct SubtitleFileSlot: View {
+    let url: URL?
+    var symbol = "doc.text"
+    var emptyKey: LocalizedStringKey = "files.dropOne"
+    var chooseKey: LocalizedStringKey = "localFile.choose"
+    let choose: () -> Void
+    var clear: (() -> Void)?
+
+    var body: some View {
+        HStack(spacing: 12) {
+            IconTile(symbol: url == nil ? "plus" : symbol, tint: url == nil ? .secondary : .accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                if let url {
+                    Text(verbatim: url.lastPathComponent).lineLimit(1).truncationMode(.middle)
+                    Text(verbatim: (url.deletingLastPathComponent().path as NSString).abbreviatingWithTildeInPath)
+                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(1).truncationMode(.head)
+                } else {
+                    Text(emptyKey).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .help(url?.path ?? "")
+            Spacer(minLength: 12)
+            if url != nil, let clear {
+                Button("localFile.clear", action: clear).controlSize(.small)
+            }
+            Button(chooseKey, action: choose)
+        }
+    }
+}
+
 /// One subtitle file, chosen with a panel or dropped on the row.
 struct SubtitleFileRow: View {
     @Binding var url: URL?
@@ -43,25 +74,14 @@ struct SubtitleFileRow: View {
     @State private var targeted = false
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: symbol).foregroundStyle(.secondary)
-            if let url {
-                Text(url.lastPathComponent).lineLimit(1).truncationMode(.middle)
-                Spacer()
-                Button("localFile.clear") { self.url = nil }.controlSize(.small)
-            } else {
-                Text("files.dropOne").foregroundStyle(.tertiary)
-                Spacer()
-            }
-            Button("localFile.choose") { url = SubtitleFilePanel.pickFile() ?? url }
-        }
-        .padding(6)
-        .overlay { if targeted { RoundedRectangle(cornerRadius: 8).strokeBorder(Color.accentColor, lineWidth: 2) } }
-        .dropDestination(for: URL.self) { urls, _ in
-            guard let file = urls.first(where: SubtitleFileScanner.isSubtitle) else { return false }
-            url = file
-            return true
-        } isTargeted: { targeted = $0 }
+        SubtitleFileSlot(url: url, symbol: symbol, choose: { url = SubtitleFilePanel.pickFile() ?? url }, clear: { url = nil })
+            .padding(10)
+            .dropZoneBackground(targeted: targeted)
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let file = urls.first(where: SubtitleFileScanner.isSubtitle) else { return false }
+                url = file
+                return true
+            } isTargeted: { targeted = $0 }
     }
 }
 
@@ -75,9 +95,7 @@ struct SubtitleFileDropList: View {
     var body: some View {
         SettingsCard(titleKey: titleKey) {
             if files.isEmpty {
-                Text("files.drop").font(.callout).foregroundStyle(.secondary)
-                    .frame(maxWidth: .infinity, minHeight: 60)
-                    .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                DropZoneLabel(symbol: "tray.and.arrow.down", textKey: "files.drop", targeted: targeted)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 2) {
@@ -96,6 +114,8 @@ struct SubtitleFileDropList: View {
                     }
                 }
                 .frame(maxHeight: 200)
+                .padding(6)
+                .background(.quaternary.opacity(0.35), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
             }
             HStack(spacing: 10) {
                 Button("files.add") { add(SubtitleFilePanel.pickFilesAndFolders()) }
@@ -107,7 +127,7 @@ struct SubtitleFileDropList: View {
             }
             .disabled(disabled)
         }
-        .overlay { if targeted { RoundedRectangle(cornerRadius: 16).strokeBorder(Color.accentColor, lineWidth: 2) } }
+        .dropHighlight(targeted && !files.isEmpty)
         .dropDestination(for: URL.self) { urls, _ in
             guard !disabled else { return false }
             add(urls)
@@ -133,12 +153,13 @@ struct OutputOptionsSection: View {
     var showsPattern = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 10) {
                 Text("output.folder")
-                Text(verbatim: folderPath.isEmpty ? AppLocalization.string("output.folder.source") : folderPath)
+                Spacer(minLength: 12)
+                Text(verbatim: folderPath.isEmpty ? AppLocalization.string("output.folder.source")
+                     : (folderPath as NSString).abbreviatingWithTildeInPath)
                     .lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
-                Spacer()
                 if !folderPath.isEmpty { Button("output.folder.reset") { folderPath = "" }.controlSize(.small) }
                 Button("output.folder.choose") {
                     if let url = SubtitleFilePanel.pickFolder(startingAt: folderPath.isEmpty ? nil : URL(fileURLWithPath: folderPath)) {
@@ -147,19 +168,21 @@ struct OutputOptionsSection: View {
                 }
             }
             if showsPattern {
-                HStack(spacing: 10) {
-                    Text("output.name")
-                    TextField("{name}", text: $pattern).textFieldStyle(.roundedBorder)
+                SettingsField("output.name") {
+                    TextField(text: $pattern, prompt: Text(verbatim: "{name}")) { EmptyView() }
+                        .textFieldStyle(.roundedBorder).frame(minWidth: 160, maxWidth: 320)
                 }
                 SettingsHint(key: "output.name.help")
                 if let example { StatusLine(text: AppLocalization.format("output.name.example", example)) }
             }
-            Picker("output.existing", selection: $existing) {
-                Text("output.existing.skip").tag(OutputNaming.ExistingFile.skip)
-                Text("output.existing.rename").tag(OutputNaming.ExistingFile.rename)
-                Text("output.existing.overwrite").tag(OutputNaming.ExistingFile.overwrite)
+            SettingsField("output.existing") {
+                Picker("output.existing", selection: $existing) {
+                    Text("output.existing.skip").tag(OutputNaming.ExistingFile.skip)
+                    Text("output.existing.rename").tag(OutputNaming.ExistingFile.rename)
+                    Text("output.existing.overwrite").tag(OutputNaming.ExistingFile.overwrite)
+                }
+                .labelsHidden().fixedSize()
             }
-            .fixedSize()
         }
     }
 }
@@ -173,42 +196,32 @@ struct MergeOptionsSection: View {
     var detecting = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             if showsDelay {
-                HStack(spacing: 10) {
-                    Text("download.delay.secondary")
-                    TextField("0", value: $options.secondaryOffsetMs, format: .number)
-                        .textFieldStyle(.roundedBorder).multilineTextAlignment(.trailing).monospacedDigit().frame(width: 90)
-                    Text(verbatim: "ms").foregroundStyle(.secondary)
-                    if let detect {
-                        Button("merge.detect", action: detect).disabled(detecting)
-                        if detecting { ProgressView().controlSize(.small) }
-                    }
+                SettingsField("download.delay.secondary") {
+                    if detecting { ProgressView().controlSize(.small) }
+                    if let detect { Button("merge.detect", action: detect).disabled(detecting) }
+                    MillisecondsField(value: $options.secondaryOffsetMs)
                 }
             }
-            HStack(spacing: 10) {
-                Text("timing.snap")
-                Slider(value: Binding(get: { Double(options.tolerance) }, set: { options.tolerance = Int($0) }),
-                       in: Double(SubtitleManager.trackSnapTolerances.lowerBound)...Double(SubtitleManager.trackSnapTolerances.upperBound),
-                       step: 100)
-                    .frame(maxWidth: 220)
-                Group {
-                    if options.tolerance == 0 { Text("timing.snap.off") } else { Text(verbatim: "\(options.tolerance) ms") }
-                }
-                .monospacedDigit().foregroundStyle(.secondary).frame(width: 64, alignment: .leading)
-            }
+            SnapToleranceSlider(tolerance: $options.tolerance)
             SettingsHint(key: "merge.snap.help")
-            HStack(spacing: 16) {
+            Divider()
+            SettingsField("merge.layout") {
                 Picker("merge.layout", selection: $options.layout) {
                     Text("merge.layout.combined").tag(BilingualMergeOptions.Layout.combined)
                     Text("merge.layout.separate").tag(BilingualMergeOptions.Layout.separate)
                 }
-                .fixedSize()
+                .labelsHidden().fixedSize()
+            }
+            SettingsField("merge.format") {
                 Picker("merge.format", selection: $options.format) {
                     Text(verbatim: "SRT").tag(SubtitleOutputFormat.srt)
                     Text(verbatim: "ASS").tag(SubtitleOutputFormat.ass)
                 }
-                .pickerStyle(.segmented).fixedSize()
+                // Two short segments draw wider than the size the control reports, so `fixedSize` lets it spill past
+                // the card's edge; this is the width it draws at.
+                .pickerStyle(.segmented).labelsHidden().frame(width: 100)
             }
             if options.layout == .combined {
                 Toggle("merge.secondaryOnTop", isOn: $options.secondaryOnTop)
