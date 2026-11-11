@@ -219,7 +219,7 @@ struct ContentView: View {
         // Both styles remain visible on the Appearance page.
         return ""
     }
-    
+
     var body: some View {
         ZStack(alignment: .bottom) {
             Color.clear
@@ -394,7 +394,7 @@ struct ContentView: View {
                            textColor: secondaryTextColor, outlineColor: secondaryOutlineColor, outlinePixels: secondaryOutlinePixels,
                            shadow: secondaryShadow)
     }
-    
+
     // MARK: - Overlay placement
     /// Uses the chosen screen (or the current main screen) and remembers each display's free placement.
     private func placeOverlay() {
@@ -420,19 +420,19 @@ struct ContentView: View {
 struct VisualEffectBlur: NSViewRepresentable {
     var material: NSVisualEffectView.Material = .hudWindow // Use a semantic material instead of .dark
     var blendingMode: NSVisualEffectView.BlendingMode = .withinWindow
-    
+
     func makeNSView(context: Context) -> NSVisualEffectView {
         let visualEffectView = NSVisualEffectView()
         visualEffectView.material = material
         visualEffectView.blendingMode = blendingMode
         visualEffectView.state = .active
-        
+
         // Force the effect to render in the dark tone (Vibrant Dark)
         visualEffectView.appearance = NSAppearance(named: .vibrantDark)
-        
+
         return visualEffectView
     }
-    
+
     func updateNSView(_ nsView: NSVisualEffectView, context: Context) {
         nsView.material = material
         nsView.blendingMode = blendingMode

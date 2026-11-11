@@ -326,7 +326,8 @@ final class SubtitleDownloadTests: XCTestCase {
                         "hlsUrl": "https://play.itunes.apple.com/WebObjects/MZPlay.woa/hls/playlist.m3u8?dsid=999"]]]]]]])
             case "/WebObjects/MZPlay.woa/hls/playlist.m3u8":
                 XCTAssertFalse(url.query?.contains("dsid") == true)
-                return text("#EXTM3U\n#EXT-X-MEDIA:TYPE=SUBTITLES,LANGUAGE=\"en\",NAME=\"English\",URI=\"https://vod-ap-amt.tv.apple.com/bad.m3u8\"\n#EXT-X-MEDIA:TYPE=SUBTITLES,LANGUAGE=\"en\",NAME=\"English\",URI=\"https://vod-ak-amt.tv.apple.com/en/list.m3u8\"")
+                let media = "#EXT-X-MEDIA:TYPE=SUBTITLES,LANGUAGE=\"en\",NAME=\"English\",URI="
+                return text("#EXTM3U\n\(media)\"https://vod-ap-amt.tv.apple.com/bad.m3u8\"\n\(media)\"https://vod-ak-amt.tv.apple.com/en/list.m3u8\"")
             case "/bad.m3u8": return (Data(), 503)
             case "/en/list.m3u8": return text("#EXTM3U\n#EXTINF:10,\n0.vtt\n#EXTINF:10,\n1.vtt\n#EXT-X-ENDLIST")
             case "/en/0.vtt": return text("WEBVTT\nX-TIMESTAMP-MAP=LOCAL:00:00:00.000,MPEGTS:900000\n\n00:01.000 --> 00:02.000\nHello")

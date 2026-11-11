@@ -39,6 +39,10 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      - name: Lint
+        if: matrix.configuration == 'Debug'
+        run: ./script/lint.sh
+
       - name: Unit tests
         if: matrix.configuration == 'Debug'
         run: swift test --enable-code-coverage

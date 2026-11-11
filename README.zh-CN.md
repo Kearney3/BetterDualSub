@@ -271,6 +271,12 @@ BETTERDUALSUB_LIVE_MOVIE_URL='https://tv.apple.com/hk/movie/spider-man-into-the-
 git config core.hooksPath .githooks
 ```
 
+CI 还会对 Swift 源码做一项机械检查（不含制表符、行尾空白，且每行不超过 220 个字符）。推送前可先运行：
+
+```sh
+./script/lint.sh
+```
+
 ### 发布
 
 推送 `v*` 标签，如 `v1.1.0`。发布流程会运行测试、构建 arm64 DMG、发布附带已签名 Sparkle `appcast.xml` 的 GitHub Release，并更新 Homebrew cask 中的版本和校验值。

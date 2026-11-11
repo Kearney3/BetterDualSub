@@ -271,6 +271,12 @@ Commits follow [Conventional Commits](docs/commit-convention.md). Enable the mes
 git config core.hooksPath .githooks
 ```
 
+CI also runs a mechanical check on the Swift sources (no tabs, trailing whitespace or lines over 220 characters). Run it before pushing:
+
+```sh
+./script/lint.sh
+```
+
 ### Releasing
 
 Push a `v*` tag, such as `v1.1.0`. The release workflow runs the tests, builds an arm64 DMG, publishes the GitHub release with a signed Sparkle `appcast.xml`, and updates the version and checksum in the Homebrew cask.
