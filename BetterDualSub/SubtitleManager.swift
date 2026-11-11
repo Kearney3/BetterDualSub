@@ -54,6 +54,8 @@ final class SubtitleManager: SubtitleTranslationTarget {
     private(set) var packageTracks: PackageTrackChoice?
     private(set) var switchingTracks = false
     private(set) var trackSwitchError: String?
+    /// What a track switch is doing while it takes long, such as reading the text of a picture track.
+    private(set) var trackSwitchStatus: String?
     @ObservationIgnored private var trackSwitchTask: Task<Void, Never>?
     @ObservationIgnored private var currentSession: ViewingSession?
     @ObservationIgnored private var previousSecondary: (document: SubtitleDocument?, name: String?, trackID: String?, timing: DualTrackTiming.SecondarySnapshot)?
@@ -431,9 +433,16 @@ final class SubtitleManager: SubtitleTranslationTarget {
         let packageTimeline = choice.packageTimeline, initialLoad = loadID, current = loaded
         switchingTracks = true
         trackSwitchError = nil
+        trackSwitchStatus = nil
         trackSwitchTask = Task {
+            defer { if loadID == initialLoad { trackSwitchStatus = nil } }
             do {
-                let extracted = try await LocalSubtitleExtractor.documents(for: missing, packageTimeline: packageTimeline)
+                let extracted = try await LocalSubtitleExtractor.documents(for: missing, packageTimeline: packageTimeline) { track, done, total in
+                    Task { @MainActor [weak self] in
+                        guard let self, self.loadID == initialLoad else { return }
+                        self.trackSwitchStatus = AppLocalization.format("movpkg.status.ocr", track.name, done, total)
+                    }
+                }
                 guard !Task.isCancelled, loadID == initialLoad else { return }
                 let documents = current.merging(extracted) { $1 }
                 guard let first = documents[primaryID] else { return }

@@ -6938,6 +6938,40 @@
         }
       }
     },
+    "movpkg.status.ocr" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading the pictures of “%@”: %d of %d"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在识别“%@”的图片文字：%d / %d"
+          }
+        }
+      }
+    },
+    "movpkg.ocr.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tracks marked OCR are pictures (Blu-ray PGS). Their text is read from the pictures on this Mac, which takes a few minutes for a film and can contain mistakes, so check names and look for lines that were read wrongly. Only the tracks you choose are read."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "标有 OCR 的轨道是图片字幕（蓝光 PGS）。其中的文字会在本机从图片中识别，一部电影需要几分钟，并可能有识别错误，请留意人名和读错的行。只会识别你选中的轨道。"
+          }
+        }
+      }
+    },
     "movpkg.status.read" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -9621,6 +9655,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "强制（仅部分对白）"
+          }
+        }
+      }
+    },
+    "track.ocr" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCR"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OCR 识别"
           }
         }
       }

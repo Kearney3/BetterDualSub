@@ -72,6 +72,7 @@ struct MovpkgSubtitleImportView: View {
                         ForEach(tracks) { Text($0.label).tag($0.id) }
                     }.disabled(busy)
                     if secondaryID == Self.translateTag { SettingsHint(key: "movpkg.secondary.translateHelp") }
+                    if tracks.contains(where: \.needsOCR) { SettingsHint(key: "movpkg.ocr.help") }
                     Divider()
                     if !isVideo {
                         Picker("movpkg.timeline.section", selection: $usePackageTimeline) {
@@ -241,7 +242,11 @@ extension MovpkgSubtitleImportView {
                                   packageTimeline: Bool) async throws -> ([SubtitleDocument], [String: SubtitleDocument]) {
         if isVideo {
             status = AppLocalization.string("movpkg.status.readingVideo")
-            let all = try await VideoSubtitleExtractor.documents(for: tracks)
+            // Picture tracks are read by text recognition, which takes minutes: only the ones chosen are.
+            let chosen = Set(selected.map(\.id))
+            let all = try await VideoSubtitleExtractor.documents(for: tracks.filter { !$0.needsOCR || chosen.contains($0.id) }) { track, done, total in
+                Task { @MainActor in status = AppLocalization.format("movpkg.status.ocr", track.name, done, total) }
+            }
             let documents = try selected.map { track in
                 guard let document = all[track.id] else { throw SubtitleError.message("error.subtitle.empty") }
                 return document

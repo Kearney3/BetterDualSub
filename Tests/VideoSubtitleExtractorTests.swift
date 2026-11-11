@@ -1,5 +1,6 @@
 import XCTest
 import AVFoundation
+import os
 @testable import BetterDualSubCore
 
 final class VideoSubtitleExtractorTests: XCTestCase {
@@ -75,12 +76,18 @@ final class VideoSubtitleExtractorTests: XCTestCase {
     func testMatroskaListsTextTracksAndReadsThemInOnePass() async throws {
         let url = try temporaryFile("mkv", matroska())
         let tracks = try await VideoSubtitleExtractor.inspect(url)
-        XCTAssertEqual(tracks.map(\.id), ["mkv:3", "mkv:2"])
-        XCTAssertEqual(tracks[1].language, "zh")
-        XCTAssertTrue(tracks[1].forced)
-        XCTAssertEqual(tracks[0].name, "Signs & Songs")
+        // The PGS picture track is listed, marked as one that needs text recognition.
+        XCTAssertEqual(tracks.map(\.id), ["mkv:4", "mkv:3", "mkv:2"])
+        XCTAssertEqual(tracks[2].language, "zh")
+        XCTAssertTrue(tracks[2].forced)
+        XCTAssertEqual(tracks[1].name, "Signs & Songs")
+        XCTAssertEqual(tracks.map(\.needsOCR), [true, false, false])
+        XCTAssertTrue(tracks[0].label.contains("track.ocr"))
+        XCTAssertFalse(tracks[1].label.contains("track.ocr"))
 
-        let documents = try await VideoSubtitleExtractor.documents(for: tracks)
+        // Leaving the picture track out reads the text ones without any recognition.
+        let documents = try await VideoSubtitleExtractor.documents(for: tracks.filter { !$0.needsOCR })
+        XCTAssertNil(documents["mkv:4"])
         XCTAssertEqual(documents["mkv:2"]?.items, [
             SubtitleItem(startMs: 1500, endMs: 3000, text: "你好\n<i>Hello</i>"),
             SubtitleItem(startMs: 10_000, endMs: 12_000, text: "Open ended"),
@@ -96,6 +103,53 @@ final class VideoSubtitleExtractorTests: XCTestCase {
         let documents = try await VideoSubtitleExtractor.documents(for: tracks)
         XCTAssertEqual(documents["mkv:2"]?.items.first?.text, "你好\n<i>Hello</i>")
         XCTAssertNotNil(documents["mkv:3"])
+        XCTAssertNil(documents["mkv:4"], "garbage in a picture track gives no cues rather than an error")
+    }
+
+    /// A Matroska file whose PGS track (2) holds two pictures of text and whose third track is plain text.
+    private func matroskaWithPictures() throws -> [UInt8] {
+        let header = element(0x1A45_DFA3, [string(0x4282, "matroska")])
+        let info = element(0x1549_A966, [uint(0x2A_D7B1, 1_000_000)])
+        let tracks = element(0x1654_AE6B, [
+            trackEntry(1, type: 1, codec: "V_MPEG4/ISO/AVC"),
+            trackEntry(2, type: 0x11, codec: "S_HDMV/PGS", extra: [string(0x22_B59C, "eng"), string(0x536E, "English PGS")]),
+            trackEntry(3, type: 0x11, codec: "S_TEXT/UTF8", extra: [string(0x22_B59C, "eng")])
+        ])
+        func set(_ text: String) -> [UInt8] {
+            let picture = PGSFixture.text(text)
+            return [UInt8](PGSFixture.show(indices: picture.indices, width: picture.width, height: picture.height))
+        }
+        let cluster = element(0x1F43_B675, [
+            uint(0xE7, 0),
+            block(track: 1, at: 0, [UInt8](repeating: 7, count: 50_000), simple: true),
+            block(track: 2, at: 1000, set("First subtitle"), simple: true),
+            block(track: 3, at: 1000, Array("Text".utf8), simple: true),
+            block(track: 2, at: 3000, [UInt8](PGSFixture.clear()), simple: true),
+            block(track: 2, at: 5000, set("Second subtitle"), simple: true),
+            block(track: 2, at: 6500, [UInt8](PGSFixture.clear()), simple: true)
+        ])
+        return header + [0x18, 0x53, 0x80, 0x67, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF] + info + tracks + cluster
+    }
+
+    func testPictureSubtitlesInMatroskaAreReadByTextRecognition() async throws {
+        let url = try temporaryFile("mkv", matroskaWithPictures())
+        let tracks = try await VideoSubtitleExtractor.inspect(url)
+        let picture = try XCTUnwrap(tracks.first { $0.needsOCR })
+        XCTAssertEqual(picture.language, "en")
+        let reported = OSAllocatedUnfairLock(initialState: [(String, Int, Int)]())
+        let documents = try await VideoSubtitleExtractor.documents(for: [picture]) { track, done, total in
+            reported.withLock { $0.append((track.id, done, total)) }
+        }
+        let items = try XCTUnwrap(documents[picture.id]).items
+        XCTAssertEqual(items.map { $0.text.lowercased() }, ["first subtitle", "second subtitle"])
+        XCTAssertEqual(items.map(\.startMs), [1000, 5000])
+        XCTAssertEqual(items.map(\.endMs), [3000, 6500])
+        XCTAssertEqual(reported.withLock { $0.last.map { [$0.1, $0.2] } }, [2, 2])
+        XCTAssertEqual(reported.withLock { Set($0.map(\.0)) }, [picture.id])
+        // The text track in the same file reads as before, in the same pass.
+        let both = try await VideoSubtitleExtractor.documents(for: tracks)
+        XCTAssertEqual(both.keys.sorted(), ["mkv:2", "mkv:3"])
+        XCTAssertEqual(both["mkv:3"]?.items.map(\.text), ["Text"])
     }
 
     func testMatroskaWithOnlyImageSubtitlesOrNoMatroskaHeaderIsRejected() async throws {

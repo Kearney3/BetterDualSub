@@ -15,8 +15,15 @@ nonisolated struct LocalSubtitleTrack: Identifiable, Sendable {
         case video(VideoSubtitleStream)
     }
 
+    /// A picture track, whose text is recognized from the pictures when it is extracted: much slower than a text track.
+    var needsOCR: Bool {
+        if case .video(let stream) = source { return stream.format == .pgs }
+        return false
+    }
+
     var label: String {
         "\(name) [\(language)]"
+            + (needsOCR ? " · " + subtitleLocalizedString("track.ocr") : "")
             + (forced ? " · " + subtitleLocalizedString("track.forced") : "")
             + (sdh ? " · " + subtitleLocalizedString("track.sdhCc") : "")
     }
@@ -54,8 +61,10 @@ nonisolated struct PackageTrackChoice: Sendable {
 
 /// Extracts tracks from a .movpkg or a video file, whichever they came from.
 nonisolated enum LocalSubtitleExtractor {
-    @concurrent static func documents(for tracks: [LocalSubtitleTrack], packageTimeline: Bool) async throws -> [String: SubtitleDocument] {
-        var documents = try await VideoSubtitleExtractor.documents(for: tracks)
+    @concurrent static func documents(for tracks: [LocalSubtitleTrack], packageTimeline: Bool,
+                                      progress: @escaping @Sendable (LocalSubtitleTrack, Int, Int) -> Void = { _, _, _ in })
+        async throws -> [String: SubtitleDocument] {
+        var documents = try await VideoSubtitleExtractor.documents(for: tracks, progress: progress)
         for track in tracks where documents[track.id] == nil {
             try Task.checkCancellation()
             // A video track left out of the result had no cues.

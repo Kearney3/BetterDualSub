@@ -93,6 +93,9 @@ struct NowPlayingView: View {
                 }
             }
             .disabled(manager.switchingTracks)
+            if manager.switchingTracks, let status = manager.trackSwitchStatus {
+                HStack(spacing: 8) { ProgressView().controlSize(.small); Text(verbatim: status).foregroundStyle(.secondary) }
+            }
             if let error = manager.trackSwitchError {
                 StatusLine(text: error, isError: true)
             } else {

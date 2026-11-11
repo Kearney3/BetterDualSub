@@ -5,7 +5,8 @@ import CoreMedia
 /// A text subtitle track muxed into a video file.
 nonisolated struct VideoSubtitleStream: Sendable {
     enum Container: Sendable { case matroska, mpeg4 }
-    enum Format: Sendable { case plain, subStation, webVTTSamples }
+    /// `pgs` is a picture track (Blu-ray graphics): its text is recognized from the pictures.
+    enum Format: Sendable { case plain, subStation, webVTTSamples, pgs }
 
     let file: URL
     let container: Container
@@ -21,9 +22,9 @@ nonisolated struct MatroskaContentEncoding: Sendable {
     let kind: Kind
 }
 
-/// Reads text subtitle tracks embedded in Matroska (.mkv, .webm) and MPEG-4 (.mp4, .m4v, .mov) files. Matroska is
-/// parsed here, reading only element headers and subtitle blocks; MPEG-4 goes through AVFoundation. Image-based
-/// subtitles (PGS, VobSub, DVB) have no text and are left out.
+/// Reads subtitle tracks embedded in Matroska (.mkv, .webm) and MPEG-4 (.mp4, .m4v, .mov) files. Matroska is parsed
+/// here, reading only element headers and subtitle blocks; MPEG-4 goes through AVFoundation. PGS picture tracks in
+/// Matroska are read by text recognition; other picture formats (VobSub, DVB) are left out.
 nonisolated enum VideoSubtitleExtractor {
     static let matroskaExtensions = ["mkv", "mks", "webm"]
     static let mpeg4Extensions = ["mp4", "m4v", "mov"]
@@ -43,20 +44,35 @@ nonisolated enum VideoSubtitleExtractor {
     }
 
     /// Extracts `tracks`, which all come from one file; tracks without any cue are left out. A Matroska file is read
-    /// once for all of them.
-    @concurrent static func documents(for tracks: [LocalSubtitleTrack]) async throws -> [String: SubtitleDocument] {
-        let streams = tracks.compactMap { track -> (String, VideoSubtitleStream)? in
+    /// once for all of them. Picture tracks are read by text recognition, which takes minutes for a film; `progress`
+    /// reports the track and how many of its distinct pictures are done.
+    @concurrent static func documents(for tracks: [LocalSubtitleTrack],
+                                      progress: @escaping @Sendable (LocalSubtitleTrack, Int, Int) -> Void = { _, _, _ in })
+        async throws -> [String: SubtitleDocument] {
+        let streams = tracks.compactMap { track -> (LocalSubtitleTrack, VideoSubtitleStream)? in
             guard case .video(let stream) = track.source else { return nil }
-            return (track.id, stream)
+            return (track, stream)
         }
         guard let first = streams.first?.1 else { return [:] }
         var cues: [String: [SubtitleItem]] = [:]
         switch first.container {
         case .matroska:
-            let byNumber = try MatroskaFile(url: first.file).cues(for: streams.map(\.1))
-            for (id, stream) in streams { cues[id] = byNumber[stream.trackNumber] ?? [] }
+            let file = try MatroskaFile(url: first.file)
+            let blocks = try file.blocks(for: streams.map(\.1))
+            for (track, stream) in streams {
+                let own = blocks[stream.trackNumber] ?? []
+                if stream.format == .pgs {
+                    var decoder = PGSDecoder()
+                    for block in own.sorted(by: { $0.start < $1.start }) { decoder.feed(timeMs: block.start, payload: block.payload) }
+                    cues[track.id] = try await SubtitleOCR.cues(from: decoder.result(), language: track.language) { done, total in
+                        progress(track, done, total)
+                    }
+                } else {
+                    cues[track.id] = closeOpenCues(own.map { ($0.start, $0.end, text($0.payload, format: stream.format)) })
+                }
+            }
         case .mpeg4:
-            for (id, stream) in streams { cues[id] = try await MPEG4Subtitles.cues(for: stream) }
+            for (track, stream) in streams { cues[track.id] = try await MPEG4Subtitles.cues(for: stream) }
         }
         return try cues.compactMapValues { cues in
             let document = try SubtitleDocument(items: cues, allowEmpty: true)
@@ -93,6 +109,8 @@ nonisolated enum VideoSubtitleExtractor {
             // ReadOrder, Layer, Style, Name, MarginL, MarginR, MarginV, Effect, Text: the text may contain commas.
             let fields = raw.split(separator: ",", maxSplits: 8, omittingEmptySubsequences: false)
             return SubtitleDocument.subStationText(fields.count == 9 ? String(fields[8]) : raw)
+        case .pgs:
+            return ""
         case .plain, .webVTTSamples:
             return raw.replacingOccurrences(of: "\r\n", with: "\n").replacingOccurrences(of: "\r", with: "\n")
                 .replacingOccurrences(of: "\u{feff}", with: "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -138,6 +156,7 @@ private nonisolated struct MatroskaTrack {
         switch codec {
         case "S_TEXT/UTF8", "S_TEXT/ASCII", "S_TEXT/WEBVTT": .plain
         case "S_TEXT/ASS", "S_TEXT/SSA", "S_ASS", "S_SSA": .subStation
+        case "S_HDMV/PGS": .pgs
         default: nil
         }
     }
@@ -211,11 +230,12 @@ private nonisolated final class MatroskaFile {
         return readable
     }
 
-    /// Cues of each of `streams`, by track number, from one pass over the Clusters. A file cut short (still
-    /// downloading, say) gives the cues up to where it ends.
-    func cues(for streams: [VideoSubtitleStream]) throws -> [Int: [SubtitleItem]] {
+    /// The blocks of each of `streams`, by track number, from one pass over the Clusters: when each starts, how long it
+    /// lasts if the file says, and its data with the track's content encodings undone. A file cut short (still
+    /// downloading, say) gives the blocks up to where it ends.
+    func blocks(for streams: [VideoSubtitleStream]) throws -> [Int: [(start: Int, end: Int?, payload: Data)]] {
         let wanted = Dictionary(streams.map { ($0.trackNumber, $0) }, uniquingKeysWith: { first, _ in first })
-        var cues: [Int: [(start: Int, end: Int?, text: String)]] = [:]
+        var blocks: [Int: [(start: Int, end: Int?, payload: Data)]] = [:]
         if let firstCluster {
             reader.seek(to: firstCluster)
             do {
@@ -223,7 +243,7 @@ private nonisolated final class MatroskaFile {
                     try Task.checkCancellation()
                     guard let element = try reader.element() else { break }
                     if element.id == ID.cluster {
-                        try readCluster(element, wanted: wanted, into: &cues)
+                        try readCluster(element, wanted: wanted, into: &blocks)
                     } else {
                         guard let end = element.end else { break }
                         reader.seek(to: end)
@@ -231,7 +251,16 @@ private nonisolated final class MatroskaFile {
                 }
             } catch is EBMLReader.Failure {}
         }
-        return cues.mapValues { VideoSubtitleExtractor.closeOpenCues($0) }
+        return blocks
+    }
+
+    /// Cues of each of `streams` that are text, by track number.
+    func cues(for streams: [VideoSubtitleStream]) throws -> [Int: [SubtitleItem]] {
+        let formats = Dictionary(streams.map { ($0.trackNumber, $0.format) }, uniquingKeysWith: { first, _ in first })
+        return try blocks(for: streams).mapValues { $0 }.reduce(into: [:]) { result, entry in
+            let format = formats[entry.key] ?? .plain
+            result[entry.key] = VideoSubtitleExtractor.closeOpenCues(entry.value.map { ($0.start, $0.end, VideoSubtitleExtractor.text($0.payload, format: format)) })
+        }
     }
 
     private func readHeaders() throws {
@@ -352,7 +381,7 @@ private nonisolated final class MatroskaFile {
     }
 
     private func readCluster(_ cluster: EBMLReader.Element, wanted: [Int: VideoSubtitleStream],
-                             into cues: inout [Int: [(start: Int, end: Int?, text: String)]]) throws {
+                             into cues: inout [Int: [(start: Int, end: Int?, payload: Data)]]) throws {
         let end = cluster.end.map { min($0, segmentEnd) } ?? segmentEnd
         var clusterTime: Int64 = 0
         while reader.position < end {
@@ -392,7 +421,8 @@ private nonisolated final class MatroskaFile {
         let flags = try reader.byte()
         // Subtitle frames are not laced in practice; a laced block would need splitting first.
         let length = end - reader.position
-        guard flags & 0x06 == 0, (0...1_000_000).contains(length) else { return nil }
+        // A text frame is small; a picture subtitle's display set can be a few hundred kilobytes.
+        guard flags & 0x06 == 0, (0...(stream.format == .pgs ? 16_000_000 : 1_000_000)).contains(length) else { return nil }
         var payload = Data(try reader.bytes(Int(length)))
         for encoding in stream.encodings {
             switch encoding.kind {
@@ -408,11 +438,11 @@ private nonisolated final class MatroskaFile {
     }
 
     private func append(_ block: (track: Int, relative: Int64, payload: Data), duration: Int64?, clusterTime: Int64,
-                        wanted: [Int: VideoSubtitleStream], into cues: inout [Int: [(start: Int, end: Int?, text: String)]]) {
-        guard let stream = wanted[block.track],
+                        wanted: [Int: VideoSubtitleStream], into cues: inout [Int: [(start: Int, end: Int?, payload: Data)]]) {
+        guard wanted[block.track] != nil,
               let start = VideoSubtitleExtractor.milliseconds(clusterTime &+ block.relative, scale: timestampScale) else { return }
         let end = duration.flatMap { VideoSubtitleExtractor.milliseconds(clusterTime &+ block.relative &+ $0, scale: timestampScale) }
-        cues[block.track, default: []].append((start, end, VideoSubtitleExtractor.text(block.payload, format: stream.format)))
+        cues[block.track, default: []].append((start, end, block.payload))
     }
 }
 
@@ -656,6 +686,8 @@ private nonisolated enum MPEG4Subtitles {
                 return VideoSubtitleExtractor.text(Data(utf16.utf8), format: .plain)
             }
             return VideoSubtitleExtractor.text(text, format: .plain)
+        case .pgs:
+            return ""   // an MP4 track is never a PGS track
         }
     }
 }
