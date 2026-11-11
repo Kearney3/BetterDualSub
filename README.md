@@ -178,7 +178,7 @@ Play, pause and seeking control the followed player, or the manual clock when no
 - **Network**: BetterDualSub contacts Apple's TV website only when you look up or download subtitles, and GitHub at most once a day for the latest version number (turn this off under **General**). Nothing else is sent.
 - **Account**: requests are anonymous. The optional DSID field is used only after an eligible request fails and is kept in memory only.
 - **Translation** runs on device with the macOS translator or a language model on this Mac. With an online language model service, the subtitle text is sent to that service, as the translation card and **Settings** › **Translation** point out. API keys are stored in the login keychain. Glossaries are stored in `~/Library/Application Support/BetterDualSub/Glossaries/`.
-- **Files**: downloaded and extracted subtitles are kept in `~/Library/Application Support/BetterDualSub/Subtitles/`; **General** can move this folder to the Trash. Files you export yourself are never touched. Settings and timing are stored in the app's preferences. Self-contained recent subtitles, translations and configuration are stored in `~/Library/Application Support/BetterDualSub/RecentWatching.json`; clear these using Recent Watching. Clearing the download cache keeps recent-session copies.
+- **Files**: downloaded and extracted subtitles are kept in `~/Library/Application Support/BetterDualSub/Subtitles/`; **General** can move this folder to the Trash. Files you export yourself are never touched. Settings and timing are stored in the app's preferences. Self-contained recent subtitles, translations and configuration are stored in `~/Library/Application Support/BetterDualSub/RecentWatching/` (one file per session and an index); clear these using Recent Watching. Clearing the download cache keeps recent-session copies.
 
 To remove everything installed with Homebrew, run `brew uninstall --zap --cask betterdualsub`.
 
@@ -253,8 +253,10 @@ If more than one Xcode is installed, prefix the commands with `DEVELOPER_DIR=/Ap
 | --- | --- |
 | `BetterDualSub/Core/SubtitleDocument.swift` | Subtitle model, SRT/WebVTT/ASS parsing, timing math |
 | `BetterDualSub/Core/PlaybackTracking.swift` | Now Playing tracking, sync status, saved timing |
+| `BetterDualSub/Core/DualTrackTiming.swift`, `SubtitleDrift.swift` | Delays, drift correction and the track link of the two tracks, as plain tested arithmetic |
+| `BetterDualSub/Core/ViewingSession.swift`, `ViewingHistory.swift` | Recent sessions: the on-disk store (a folder with an index and a file per session) and the interface-facing history |
 | `BetterDualSub/Core/MovieSubtitleDownloader.swift`, `MovpkgSubtitleExtractor.swift`, `VideoSubtitleExtractor.swift` | Apple TV download, `.movpkg` extraction, and Matroska / MP4 embedded subtitle extraction |
-| `BetterDualSub/SubtitleManager.swift`, `Core/PlaybackCoordinator.swift` | Subtitle sessions, playback coordination and listener recovery |
+| `BetterDualSub/SubtitleManager.swift`, `Core/PlaybackCoordinator.swift` | Loaded subtitles and the observable state the interface reads; playback coordination and listener recovery. `SubtitleTimers.swift` and `SyncSettings.swift` hold its timers and sync-source settings |
 | `BetterDualSub/ContentView.swift` | Subtitle rendering and overlay interaction |
 | `BetterDualSub/*View.swift` | Control window pages |
 | `Tests/` | Unit tests for the core package |

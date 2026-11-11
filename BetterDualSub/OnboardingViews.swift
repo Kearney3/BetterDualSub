@@ -17,7 +17,7 @@ enum ViewingGuide {
     /// Someone who used an earlier version (finished the setup or has watch history) is not greeted as new.
     static var isReturningUser: Bool {
         UserDefaults.standard.bool(forKey: completedKey) || FileManager.default.fileExists(
-            atPath: URL.applicationSupportDirectory.appendingPathComponent("BetterDualSub/RecentWatching.json").path)
+            atPath: URL.applicationSupportDirectory.appendingPathComponent("BetterDualSub/RecentWatching/index.json").path)
     }
 
     /// Opens the welcome sheet without resetting the checklist (Help menu).

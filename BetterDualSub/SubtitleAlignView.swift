@@ -4,7 +4,7 @@ import SwiftUI
 /// the delay becomes +2:00. Subtitle time runs 1:1 with video time, at whatever speed the video plays.
 struct SubtitleAlignView: View {
     @Environment(SubtitleManager.self) private var manager
-    @State private var track = "primary"
+    @State private var track = Track.primary
     @State private var search = ""
     @State private var selected: SubtitleItem?
     @State private var result = ""
@@ -38,10 +38,10 @@ struct SubtitleAlignView: View {
                             Text(AppLocalization.format("playback.speed", ManualControlBar.speedLabel(manager.playbackSpeed)))
                                 .monospacedDigit().foregroundStyle(.secondary)
                             Spacer()
-                            if manager.cues(track: "secondary").isEmpty == false {
+                            if manager.cues(track: .secondary).isEmpty == false {
                                 Picker("align.track", selection: $track) {
-                                    Text("manual.offset.primary").tag("primary")
-                                    Text("manual.offset.secondary").tag("secondary")
+                                    Text("manual.offset.primary").tag(Track.primary)
+                                    Text("manual.offset.secondary").tag(Track.secondary)
                                 }
                                 .pickerStyle(.segmented).labelsHidden().fixedSize()
                             }
@@ -92,7 +92,7 @@ struct SubtitleAlignView: View {
 
     /// The second step for a file made for another frame rate: a later line fits the speed as well as the delay.
     private var driftSection: some View {
-        let scale = track == "secondary" ? manager.secondaryScale : manager.primaryScale
+        let scale = manager.timing.scale(track)
         return VStack(alignment: .leading, spacing: 8) {
             Divider()
             HStack {
@@ -104,7 +104,7 @@ struct SubtitleAlignView: View {
                 if !driftResult.isEmpty { Text(verbatim: driftResult).foregroundStyle(.secondary) }
                 Spacer()
                 if scale != 1 {
-                    Text(AppLocalization.format("align.drift.status", SubtitleManager.scaleLabel(scale))).monospacedDigit().foregroundStyle(.secondary)
+                    Text(AppLocalization.format("align.drift.status", DualTrackTiming.scaleLabel(scale))).monospacedDigit().foregroundStyle(.secondary)
                     Button("align.drift.reset") { manager.resetDrift(track: track); driftResult = "" }
                 }
             }
@@ -117,7 +117,7 @@ struct SubtitleAlignView: View {
         case nil: AppLocalization.string("align.drift.needFirst")
         case .tooClose: AppLocalization.string("align.drift.tooClose")
         case .implausible(let scale): AppLocalization.format("align.drift.implausible", String(format: "%.4f", scale))
-        case .fitted(let scale, _): AppLocalization.format("align.drift.result", SubtitleManager.scaleLabel(scale))
+        case .fitted(let scale, _): AppLocalization.format("align.drift.result", DualTrackTiming.scaleLabel(scale))
         }
     }
 

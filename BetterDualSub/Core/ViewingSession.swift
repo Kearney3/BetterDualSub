@@ -28,13 +28,18 @@ nonisolated struct ViewingSession: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
-/// Serial, atomic writes; a damaged history is reported instead of silently overwritten.
+/// Recent sessions kept in a folder: `index.json` lists the session ids, newest first, and each session is its own
+/// `<id>.json`. Recording one session writes that file (when it changed) and the small index, not the whole history.
+/// Writes are serial and atomic; a damaged or newer history is reported instead of silently overwritten, and only
+/// clearing everything removes it.
 actor ViewingSessionStore {
+    /// The folder holding the index and the session files.
     let url: URL
     static let limit = 10
+    static let formatVersion = 2
     private let maximumBytes: Int
     private var cached: [ViewingSession]?
-    private var cachedSignature: FileSignature?
+    private var cachedSignature: [FileSignature?]?
 
     private struct FileSignature: Equatable {
         let modified: Date?
@@ -42,70 +47,101 @@ actor ViewingSessionStore {
         let inode: UInt64?
     }
 
-    private struct Archive: Codable {
-        var version = 1
-        let sessions: [ViewingSession]
+    private struct Index: Codable {
+        var version = ViewingSessionStore.formatVersion
+        var order: [String]
     }
 
+    /// `maximumBytes` bounds the session files together, and each one on its own.
     init(url: URL, maximumBytes: Int = 100 * 1024 * 1024) {
         self.url = url
         self.maximumBytes = maximumBytes
     }
 
-    private func signature() throws -> FileSignature? {
-        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+    private var indexURL: URL { url.appendingPathComponent("index.json") }
+    private func fileURL(_ id: String) -> URL { url.appendingPathComponent(id + ".json") }
+
+    private func signature(of file: URL) throws -> FileSignature? {
+        guard FileManager.default.fileExists(atPath: file.path) else { return nil }
+        let attributes = try FileManager.default.attributesOfItem(atPath: file.path)
         return FileSignature(modified: attributes[.modificationDate] as? Date,
                              size: attributes[.size] as? Int, inode: attributes[.systemFileNumber] as? UInt64)
     }
 
+    private func signatures(ids: [String]) throws -> [FileSignature?] {
+        try [signature(of: indexURL)] + ids.map { try signature(of: fileURL($0)) }
+    }
+
     func load() throws -> [ViewingSession] {
-        let current = try signature()
-        if let cached, current == cachedSignature { return cached }
-        guard let current else { cached = []; cachedSignature = nil; return [] }
-        guard (current.size ?? 0) <= maximumBytes else { throw SubtitleError.message("error.history.tooLarge") }
-        let file = try FileHandle(forReadingFrom: url)
-        defer { try? file.close() }
-        let data = try file.read(upToCount: maximumBytes + 1) ?? Data()
-        guard data.count <= maximumBytes else { throw SubtitleError.message("error.history.tooLarge") }
-        let decoder = JSONDecoder()
-        let sessions: [ViewingSession]
-        if data.first(where: { ![9, 10, 13, 32].contains($0) }) == 91 {
-            sessions = try decoder.decode([ViewingSession].self, from: data)
-        } else {
-            let archive = try decoder.decode(Archive.self, from: data)
-            guard archive.version == 1 else { throw SubtitleError.message("error.history.unsupportedVersion") }
-            sessions = archive.sessions
+        if let cached, let cachedSignature, try signatures(ids: cached.map(\.id)) == cachedSignature { return cached }
+        guard let indexSignature = try signature(of: indexURL) else {
+            cached = []
+            cachedSignature = try signatures(ids: [])
+            return []
         }
-        cached = Array(sessions.prefix(Self.limit))
-        cachedSignature = current
-        return cached ?? []
+        guard (indexSignature.size ?? 0) <= 1_000_000 else { throw SubtitleError.message("error.history.invalid") }
+        let index = try JSONDecoder().decode(Index.self, from: Data(contentsOf: indexURL))
+        guard index.version == Self.formatVersion else { throw SubtitleError.message("error.history.unsupportedVersion") }
+        let decoder = JSONDecoder()
+        var sessions: [ViewingSession] = []
+        for id in index.order.prefix(Self.limit) {
+            // The id names a file, so it must be what a session's id is: a hash in hexadecimal.
+            guard !id.isEmpty, id.allSatisfy(\.isHexDigit), let file = try signature(of: fileURL(id)) else {
+                throw SubtitleError.message("error.history.invalid")
+            }
+            guard (file.size ?? 0) <= maximumBytes else { throw SubtitleError.message("error.history.tooLarge") }
+            let session = try decoder.decode(ViewingSession.self, from: Data(contentsOf: fileURL(id)))
+            guard session.id == id else { throw SubtitleError.message("error.history.invalid") }
+            sessions.append(session)
+        }
+        cached = sessions
+        cachedSignature = try signatures(ids: sessions.map(\.id))
+        return sessions
     }
 
     func record(_ session: ViewingSession) throws -> [ViewingSession] {
-        var sessions = try load().filter { $0.id != session.id }
+        let current = try load()
+        if current.first == session { return current }
+        var sessions = current.filter { $0.id != session.id }
         sessions.insert(session, at: 0)
-        return try write(Array(sessions.prefix(Self.limit)))
+        return try write(sessions, changed: session)
     }
 
+    /// Removes one session, or all of them (also when the history is damaged) for a nil `id`.
     func remove(id: String?) throws -> [ViewingSession] {
-        guard let id else { return try write([]) }
-        return try write(load().filter { $0.id != id })
+        guard let id else {
+            try? FileManager.default.removeItem(at: url)
+            cached = []
+            cachedSignature = try signatures(ids: [])
+            return []
+        }
+        return try write(load().filter { $0.id != id }, changed: nil)
     }
 
-    private func write(_ sessions: [ViewingSession]) throws -> [ViewingSession] {
-        if sessions == cached, try signature() == cachedSignature { return sessions }
-        var retained = sessions
-        var data = try JSONEncoder().encode(Archive(sessions: retained))
-        while data.count > maximumBytes, retained.count > 1 {
-            retained.removeLast()
-            data = try JSONEncoder().encode(Archive(sessions: retained))
+    private func write(_ sessions: [ViewingSession], changed: ViewingSession?) throws -> [ViewingSession] {
+        let previous = cached ?? []
+        let data = try changed.map { try JSONEncoder().encode($0) }
+        if let data, data.count > maximumBytes { throw SubtitleError.message("error.history.tooLarge") }
+        func size(of id: String) throws -> Int {
+            if id == changed?.id, let data { return data.count }
+            return try signature(of: fileURL(id))?.size ?? 0
         }
-        guard data.count <= maximumBytes else { throw SubtitleError.message("error.history.tooLarge") }
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+        var retained = Array(sessions.prefix(Self.limit))
+        var total = try retained.reduce(0) { try $0 + size(of: $1.id) }
+        while total > maximumBytes, retained.count > 1, let oldest = retained.popLast() { total -= try size(of: oldest.id) }
+
+        try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
+        if let changed, let data, previous.first(where: { $0.id == changed.id }) != changed || !FileManager.default.fileExists(atPath: fileURL(changed.id).path) {
+            try data.write(to: fileURL(changed.id), options: .atomic)
+        }
+        if retained.map(\.id) != previous.map(\.id) || !FileManager.default.fileExists(atPath: indexURL.path) {
+            try JSONEncoder().encode(Index(order: retained.map(\.id))).write(to: indexURL, options: .atomic)
+        }
+        // Files of sessions that left the history go last, so a failure above never loses a listed session.
+        let kept = Set(retained.map(\.id))
+        for old in previous where !kept.contains(old.id) { try? FileManager.default.removeItem(at: fileURL(old.id)) }
         cached = retained
-        cachedSignature = try signature()
+        cachedSignature = try signatures(ids: retained.map(\.id))
         return retained
     }
 }

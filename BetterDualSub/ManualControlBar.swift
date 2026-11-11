@@ -78,14 +78,14 @@ struct ManualControlBar: View {
                 SyncStatusIndicator(status: manager.syncStatus)
                     .barTip(text: manager.syncStatus.help ?? manager.syncStatus.title, $tip)
                 offsetControl(title: hasSecondTrack && manager.linkSecondaryDelay ? "manual.offset.both" : "manual.offset.primary",
-                              value: manager.timeOffsetMs, track: "primary")
+                              value: manager.timeOffsetMs, track: .primary)
                 if hasSecondTrack {
                     Button { manager.setLink(!manager.linkSecondaryDelay) } label: {
                         Image(systemName: "link").opacity(manager.linkSecondaryDelay ? 1 : 0.4)
                     }
                     .barTip("manual.offset.linkHint", $tip)
                     if !manager.linkSecondaryDelay {
-                        offsetControl(title: "manual.offset.secondary", value: manager.secondaryOffsetMs, track: "secondary")
+                        offsetControl(title: "manual.offset.secondary", value: manager.secondaryOffsetMs, track: .secondary)
                     }
                 }
                 Button { overlay.isAligning.toggle() } label: {
@@ -125,7 +125,7 @@ struct ManualControlBar: View {
         .environment(\.colorScheme, .dark)
     }
 
-    private func offsetControl(title: LocalizedStringKey, value: Int, track: String) -> some View {
+    private func offsetControl(title: LocalizedStringKey, value: Int, track: Track) -> some View {
         HStack(spacing: 6) {
             Text(title).foregroundStyle(.secondary).lineLimit(1).fixedSize()
             stepButton(track: track, delta: -SubtitleDelayStep.largeMilliseconds, symbol: "chevron.backward.2")
@@ -141,7 +141,7 @@ struct ManualControlBar: View {
         }
     }
 
-    private func stepButton(track: String, delta: Int, symbol: String) -> some View {
+    private func stepButton(track: Track, delta: Int, symbol: String) -> some View {
         Button { manager.adjustDelay(track: track, delta: delta) } label: { Image(systemName: symbol) }
             .barTip(text: AppLocalization.format(delta < 0 ? "bar.delay.earlier" : "bar.delay.later", "\(abs(delta)) ms"), $tip)
     }
@@ -201,7 +201,7 @@ private struct HoverArea: NSViewRepresentable {
 private struct OverlayAlignPanel: View {
     var manager: SubtitleManager
     @Binding var tip: String?
-    @State private var track = "primary"
+    @State private var track = Track.primary
     @State private var search = ""
     @State private var selected: SubtitleItem?
     @State private var result = ""
@@ -213,10 +213,10 @@ private struct OverlayAlignPanel: View {
             HStack(spacing: 8) {
                 Text("align.now").foregroundStyle(.secondary)
                 Text(verbatim: ManualControlBar.format(manager.positionMs)).monospacedDigit().fontWeight(.semibold)
-                if !manager.cues(track: "secondary").isEmpty {
+                if !manager.cues(track: .secondary).isEmpty {
                     // Drawn by hand: the system segmented control turns dark-on-dark while another app is active.
                     HStack(spacing: 2) {
-                        ForEach([("primary", "manual.offset.primary"), ("secondary", "manual.offset.secondary")], id: \.0) { tag, title in
+                        ForEach([(Track.primary, "manual.offset.primary"), (Track.secondary, "manual.offset.secondary")], id: \.0) { tag, title in
                             Button { track = tag } label: {
                                 Text(LocalizedStringKey(title))
                                     .foregroundStyle(track == tag ? Color.white : Color.white.opacity(0.6))
@@ -268,7 +268,7 @@ private struct OverlayAlignPanel: View {
                 }
                 .disabled(selected == nil)
                 .barTip("align.hint", $tip)
-                if manager.driftAnchors[track] != nil {
+                if manager.timing.anchor(track) != nil {
                     Button {
                         guard let selected else { return }
                         result = SubtitleAlignView.driftMessage(manager.correctDrift(track: track, to: selected))

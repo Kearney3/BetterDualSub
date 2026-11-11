@@ -178,7 +178,7 @@ Homebrew 只安装你信任的第三方 tap 中的 cask；`brew trust` 只放行
 - **网络**：只有在你查找或下载字幕时才会访问 Apple TV 网站；每天最多一次向 GitHub 查询最新版本号（可在 **通用** 中关闭）。除此之外不发送任何内容。
 - **账号**：请求默认匿名。可选的 DSID 字段仅在符合条件的请求失败后使用，且只保存在内存中。
 - **翻译**：使用 macOS 端侧翻译或本机语言模型时在本机完成。使用在线语言模型服务时，字幕文本会发送到该服务，翻译卡片和 **设置** › **翻译** 中都会提示。API 密钥保存在登录钥匙串中；术语表保存在 `~/Library/Application Support/BetterDualSub/Glossaries/`。
-- **文件**：下载和提取的字幕保存在 `~/Library/Application Support/BetterDualSub/Subtitles/`，可在 **通用** 中移到废纸篓；你自己导出的文件不会被改动。设置和校准存放在应用的偏好设置中；最近观看的字幕副本、译文和配置保存在 `~/Library/Application Support/BetterDualSub/RecentWatching.json`，需从「最近观看」清空，清理下载缓存不会删除这些副本。
+- **文件**：下载和提取的字幕保存在 `~/Library/Application Support/BetterDualSub/Subtitles/`，可在 **通用** 中移到废纸篓；你自己导出的文件不会被改动。设置和校准存放在应用的偏好设置中；最近观看的字幕副本、译文和配置保存在 `~/Library/Application Support/BetterDualSub/RecentWatching/`（每个会话一个文件，外加一个索引），需从「最近观看」清空，清理下载缓存不会删除这些副本。
 
 通过 Homebrew 安装的，运行 `brew uninstall --zap --cask betterdualsub` 可移除全部内容。
 
@@ -253,8 +253,10 @@ BETTERDUALSUB_LIVE_MOVIE_URL='https://tv.apple.com/hk/movie/spider-man-into-the-
 | --- | --- |
 | `BetterDualSub/Core/SubtitleDocument.swift` | 字幕模型、SRT/WebVTT/ASS 解析、时间计算 |
 | `BetterDualSub/Core/PlaybackTracking.swift` | “正在播放”跟踪、同步状态、校准保存 |
+| `BetterDualSub/Core/DualTrackTiming.swift`、`SubtitleDrift.swift` | 两轨的延迟、漂移校正和两轨关联，是可测试的纯计算 |
+| `BetterDualSub/Core/ViewingSession.swift`、`ViewingHistory.swift` | 最近观看：磁盘存储（一个含索引和每会话一个文件的目录）与面向界面的历史 |
 | `BetterDualSub/Core/MovieSubtitleDownloader.swift`、`MovpkgSubtitleExtractor.swift`、`VideoSubtitleExtractor.swift` | Apple TV 下载、`.movpkg` 提取，以及 Matroska / MP4 内嵌字幕提取 |
-| `BetterDualSub/SubtitleManager.swift`、`Core/PlaybackCoordinator.swift` | 字幕会话、播放协调与监听器恢复 |
+| `BetterDualSub/SubtitleManager.swift`、`Core/PlaybackCoordinator.swift` | 已加载的字幕和界面读取的可观察状态；播放协调与监听器恢复。其定时器和同步源设置分别在 `SubtitleTimers.swift`、`SyncSettings.swift` |
 | `BetterDualSub/ContentView.swift` | 字幕渲染与浮层交互 |
 | `BetterDualSub/*View.swift` | 控制窗口各页面 |
 | `Tests/` | 核心包的单元测试 |

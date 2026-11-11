@@ -250,7 +250,7 @@ struct ContentView: View {
         .onChange(of: hasCue) { _, value in overlay.needsDwell = !value }
         .onChange(of: displayID) { _, _ in placeOverlay() }
         .onReceive(NotificationCenter.default.publisher(for: .adjustSubtitleDelay)) { note in
-            guard let track = note.userInfo?["track"] as? String, let delta = note.userInfo?["delta"] as? Int else { return }
+            guard let track = note.userInfo?["track"] as? Track, let delta = note.userInfo?["delta"] as? Int else { return }
             subManager.adjustDelay(track: track, delta: delta)
         }
         .onReceive(NotificationCenter.default.publisher(for: .manualPlaybackCommand)) { note in

@@ -46,10 +46,10 @@ enum SubtitleShortcutAction: Int, CaseIterable, Identifiable {
     var modifiers: UInt32 {
         if self == .toggleLock { return UInt32(controlKey | optionKey) }
         if isManualPlayback { return UInt32(controlKey | optionKey | cmdKey) }
-        return UInt32(controlKey | optionKey) | (track == "secondary" ? UInt32(shiftKey) : 0)
+        return UInt32(controlKey | optionKey) | (track.isSecondary ? UInt32(shiftKey) : 0)
     }
 
-    var track: String { [.secondaryEarlier, .secondaryLater, .secondaryReset].contains(self) ? "secondary" : "primary" }
+    var track: Track { [.secondaryEarlier, .secondaryLater, .secondaryReset].contains(self) ? .secondary : .primary }
     var isReset: Bool { self == .primaryReset || self == .secondaryReset }
     var delta: Int {
         if isReset { return Int.min }
@@ -231,7 +231,7 @@ struct ShortcutSettingsView: View {
         HStack(spacing: 16) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(LocalizedStringKey(action.titleKey)).font(.body.weight(.medium))
-                Text(LocalizedStringKey(action.track == "primary" ? "shortcuts.track.primary" : "shortcuts.track.secondary"))
+                Text(LocalizedStringKey(action.track.isSecondary ? "shortcuts.track.secondary" : "shortcuts.track.primary"))
                     .font(.caption).foregroundStyle(.secondary)
             }
             Spacer()
@@ -312,7 +312,7 @@ struct ShortcutSettingsView: View {
     }
 
     private func resetBothTracks() {
-        for track in ["primary", "secondary"] {
+        for track in Track.allCases {
             NotificationCenter.default.post(name: .adjustSubtitleDelay, object: nil,
                                             userInfo: ["track": track, "delta": Int.min])
         }

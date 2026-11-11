@@ -128,9 +128,9 @@ struct SubtitleTimingCard: View {
             }
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 delayRow(hasSecondTrack && manager.linkSecondaryDelay ? "timing.both" : "nowPlaying.track.primary",
-                         value: Bindable(manager).timeOffsetMs, track: "primary")
+                         value: Bindable(manager).timeOffsetMs, track: .primary)
                 if hasSecondTrack && !manager.linkSecondaryDelay {
-                    delayRow("nowPlaying.track.secondary", value: Bindable(manager).secondaryOffsetMs, track: "secondary")
+                    delayRow("nowPlaying.track.secondary", value: Bindable(manager).secondaryOffsetMs, track: .secondary)
                 }
             }
             if hasSecondTrack {
@@ -168,7 +168,7 @@ struct SubtitleTimingCard: View {
     }
 
     /// Label, earlier / later steps around the typed value, and a reset; the steps follow the shortcut step.
-    private func delayRow(_ title: LocalizedStringKey, value: Binding<Int>, track: String) -> some View {
+    private func delayRow(_ title: LocalizedStringKey, value: Binding<Int>, track: Track) -> some View {
         let step = SubtitleDelayStep.milliseconds
         return GridRow {
             Text(title).foregroundStyle(.secondary)

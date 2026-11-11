@@ -403,7 +403,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func adjustDelay(_ sender: NSMenuItem) {
         guard let values = sender.representedObject as? [String: Any],
-              let track = values["track"] as? String,
+              let track = values["track"] as? Track,
               let delta = values["delta"] as? Int else { return }
         NotificationCenter.default.post(
             name: .adjustSubtitleDelay,

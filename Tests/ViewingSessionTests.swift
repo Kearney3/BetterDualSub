@@ -2,71 +2,107 @@ import XCTest
 @testable import BetterDualSubCore
 
 final class ViewingSessionTests: XCTestCase {
-    func testUnchangedSnapshotsDoNotRewriteTheArchive() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).json")
+    private func folder() -> URL { FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString)") }
+
+    private func contents(of folder: URL) throws -> [String: Data] {
+        let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+        return try Dictionary(uniqueKeysWithValues: names.map { ($0, try Data(contentsOf: folder.appendingPathComponent($0))) })
+    }
+
+    func testUnchangedSnapshotsDoNotRewriteAnyFile() async throws {
+        let url = folder()
         defer { try? FileManager.default.removeItem(at: url) }
         let store = ViewingSessionStore(url: url)
         let session = ViewingSession(primary: try document(), secondary: nil, title: "Movie", names: ["en"], sourceID: "file")
         _ = try await store.record(session)
-        let before = try FileManager.default.attributesOfItem(atPath: url.path)
+        let files = [url.appendingPathComponent("index.json"), url.appendingPathComponent(session.id + ".json")]
+        let before = try files.map { try FileManager.default.attributesOfItem(atPath: $0.path) }
         _ = try await store.record(session)
-        let after = try FileManager.default.attributesOfItem(atPath: url.path)
-        XCTAssertEqual(before[.systemFileNumber] as? NSNumber, after[.systemFileNumber] as? NSNumber)
-        XCTAssertEqual(before[.modificationDate] as? Date, after[.modificationDate] as? Date)
+        let after = try files.map { try FileManager.default.attributesOfItem(atPath: $0.path) }
+        for (old, new) in zip(before, after) {
+            XCTAssertEqual(old[.systemFileNumber] as? NSNumber, new[.systemFileNumber] as? NSNumber)
+            XCTAssertEqual(old[.modificationDate] as? Date, new[.modificationDate] as? Date)
+        }
     }
 
-    func testLegacyHistoryUpgradesWithoutLosingSubtitleCopies() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).json")
+    func testRecordingOneSessionLeavesTheOthersFilesAlone() async throws {
+        let url = folder()
         defer { try? FileManager.default.removeItem(at: url) }
-        var session = ViewingSession(primary: try document(), secondary: nil, title: "Movie", names: ["en"], sourceID: "file")
-        try JSONEncoder().encode([session]).write(to: url)
         let store = ViewingSessionStore(url: url)
-        let legacy = try await store.load()
-        XCTAssertEqual(legacy, [session])
-        session.timing.primaryOffsetMs = 1250
-        _ = try await store.record(session)
-        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
-        XCTAssertEqual(object["version"] as? Int, 1)
-        let restored = try await ViewingSessionStore(url: url).load()
-        XCTAssertEqual(restored, [session])
+        let first = ViewingSession(primary: try document("One"), secondary: nil, title: "One", names: ["en"], sourceID: "a")
+        var second = ViewingSession(primary: try document("Two"), secondary: nil, title: "Two", names: ["en"], sourceID: "b")
+        _ = try await store.record(first)
+        _ = try await store.record(second)
+        let before = try contents(of: url)
+        XCTAssertEqual(Set(before.keys), ["index.json", first.id + ".json", second.id + ".json"])
+        second.timing.primaryOffsetMs = 900
+        _ = try await store.record(second)
+        let after = try contents(of: url)
+        XCTAssertEqual(after[first.id + ".json"], before[first.id + ".json"])
+        XCTAssertNotEqual(after[second.id + ".json"], before[second.id + ".json"])
+        XCTAssertEqual(after["index.json"], before["index.json"], "the order did not change")
+        // Reopening a session moves it to the front by rewriting only the index.
+        _ = try await store.record(first)
+        let moved = try contents(of: url)
+        XCTAssertEqual(moved[first.id + ".json"], before[first.id + ".json"])
+        XCTAssertNotEqual(moved["index.json"], before["index.json"])
+        let reloaded = try await ViewingSessionStore(url: url).load()
+        XCTAssertEqual(reloaded.map(\.title), ["One", "Two"])
     }
 
     func testHistoryBudgetEvictsOldestAndRejectsAnOversizedSessionWithoutChangingDisk() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).json")
+        let url = folder()
         defer { try? FileManager.default.removeItem(at: url) }
         let first = ViewingSession(primary: try document(String(repeating: "A", count: 400)), secondary: nil,
                                    title: "First", names: ["en"], sourceID: "a")
         let second = ViewingSession(primary: try document(String(repeating: "B", count: 400)), secondary: nil,
                                 title: "Second", names: ["en"], sourceID: "b")
+        let size = try JSONEncoder().encode(first).count
         // A single record fits, but the pair does not.
-        let store = ViewingSessionStore(url: url, maximumBytes: 1100)
+        let store = ViewingSessionStore(url: url, maximumBytes: size + size / 2)
         _ = try await store.record(first)
         let retained = try await store.record(second)
         XCTAssertEqual(retained.map(\.title), ["Second"])
-        let previous = try Data(contentsOf: url)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.appendingPathComponent(first.id + ".json").path), "the evicted file is deleted")
+        let previous = try contents(of: url)
         var oversized = second
         oversized.secondarySRT = String(repeating: "大", count: 1000)
         do { _ = try await store.record(oversized); XCTFail("Expected size rejection") }
-        catch { XCTAssertEqual(try Data(contentsOf: url), previous) }
+        catch { XCTAssertEqual(try contents(of: url), previous) }
         let restored = try await store.load()
         XCTAssertEqual(restored, [second])
     }
 
-    func testCachedHistoryNoticesExternalDamageAndPreservesUnknownVersions() async throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("history-\(UUID().uuidString).json")
+    func testDamagedHistoryIsReportedAndPreservedUntilExplicitClear() async throws {
+        let url = folder()
         defer { try? FileManager.default.removeItem(at: url) }
         let session = ViewingSession(primary: try document(), secondary: nil, title: "Movie", names: ["en"], sourceID: "file")
         let store = ViewingSessionStore(url: url)
         _ = try await store.record(session)
-        let future = Data("{\"version\":999,\"sessions\":[]}".utf8)
-        try future.write(to: url, options: .atomic)
+        let index = url.appendingPathComponent("index.json")
+
+        let future = Data("{\"version\":999,\"order\":[]}".utf8)
+        try future.write(to: index, options: .atomic)
         do { _ = try await store.record(session); XCTFail("Expected unsupported version") }
-        catch { XCTAssertEqual(try Data(contentsOf: url), future) }
+        catch { XCTAssertEqual(try Data(contentsOf: index), future) }
+
         let broken = Data("broken".utf8)
-        try broken.write(to: url, options: .atomic)
+        try broken.write(to: index, options: .atomic)
         do { _ = try await store.record(session); XCTFail("Expected damaged history") }
-        catch { XCTAssertEqual(try Data(contentsOf: url), broken) }
-        let empty = try await store.remove(id: nil)
+        catch { XCTAssertEqual(try Data(contentsOf: index), broken) }
+
+        // A listed session whose file is gone, or an id that is not a hash (a path), is damage too.
+        for order in [[session.id, String(repeating: "0", count: 64)], ["../../escape"]] {
+            let data = Data("{\"version\":2,\"order\":[\(order.map { "\"\($0)\"" }.joined(separator: ","))]}".utf8)
+            try data.write(to: index, options: .atomic)
+            do { _ = try await ViewingSessionStore(url: url).load(); XCTFail("Expected damaged history for \(order)") }
+            catch { XCTAssertEqual(try Data(contentsOf: index), data) }
+        }
+
+        let cleared = try await store.remove(id: nil)
+        XCTAssertTrue(cleared.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: url.path))
+        let empty = try await ViewingSessionStore(url: url).load()
         XCTAssertTrue(empty.isEmpty)
     }
 
@@ -127,22 +163,6 @@ final class ViewingSessionTests: XCTestCase {
         XCTAssertFalse(remaining.contains { $0.id == session.id })
         let empty = try await store.remove(id: nil)
         XCTAssertTrue(empty.isEmpty)
-    }
-
-    func testCorruptedHistoryIsPreservedUntilExplicitClear() async throws {
-        let folder = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-        defer { try? FileManager.default.removeItem(at: folder) }
-        let url = folder.appendingPathComponent("history.json")
-        let broken = Data("damaged history".utf8)
-        try broken.write(to: url)
-        let store = ViewingSessionStore(url: url)
-        do {
-            _ = try await store.record(ViewingSession(primary: document(), secondary: nil, title: "Movie", names: ["en"], sourceID: "file"))
-            XCTFail("Must report damaged history")
-        } catch { XCTAssertEqual(try Data(contentsOf: url), broken) }
-        let cleared = try await store.remove(id: nil)
-        XCTAssertTrue(cleared.isEmpty)
     }
 
     func testDisplaySnapshotCannotRestoreUnrelatedPreferences() throws {

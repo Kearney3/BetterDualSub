@@ -11,7 +11,7 @@ enum SubtitleAppearanceLimits {
 enum SubtitleAppearanceDefaults {
     static let referenceWidth = 1600.0
     static func fontSize(secondary: Bool, defaults: UserDefaults = .standard) -> Double {
-        let prefix = secondary ? "secondary" : "primary"
+        let prefix = Track(secondary: secondary).rawValue
         if let size = defaults.object(forKey: prefix + "FontSize") as? Double { return size }
         let oldRatio = defaults.object(forKey: prefix + "FontSizeRatio") as? Double
             ?? (secondary ? nil : defaults.object(forKey: "fontSizeRatio") as? Double)
@@ -20,7 +20,7 @@ enum SubtitleAppearanceDefaults {
     }
 
     static func outlinePixels(secondary: Bool, defaults: UserDefaults = .standard) -> Double {
-        let prefix = secondary ? "secondary" : "primary"
+        let prefix = Track(secondary: secondary).rawValue
         if let pixels = defaults.object(forKey: prefix + "OutlinePixels") as? Double { return pixels }
         let oldPercent = defaults.object(forKey: prefix + "OutlineWidth") as? Double ?? 3.5
         return oldPercent * fontSize(secondary: secondary, defaults: defaults) / 100
@@ -34,7 +34,7 @@ enum SubtitleAppearanceDefaults {
     static let backgroundRadius = 8.0
 
     static func trackValues(secondary: Bool) -> [String: Any] {
-        let prefix = secondary ? "secondary" : "primary"
+        let prefix = Track(secondary: secondary).rawValue
         return [prefix + "FontFamily": "Helvetica Neue", prefix + "FontWeight": secondary ? "Regular" : "Bold",
                 prefix + "FontSize": secondary ? 28.8 : 32.0, prefix + "TextColor": "#FFFFFF",
                 prefix + "OutlineColor": "#000000", prefix + "OutlinePixels": 1.0,
@@ -275,7 +275,7 @@ private struct SubtitleTrackStyleEditor: View {
 
     init(secondary: Bool) {
         self.secondary = secondary
-        let prefix = secondary ? "secondary" : "primary"
+        let prefix = Track(secondary: secondary).rawValue
         let defaults = UserDefaults.standard
         _family = AppStorage(wrappedValue: defaults.string(forKey: prefix + "FontFamily") ?? (secondary ? "Helvetica Neue" : defaults.string(forKey: "selectedFontFamily") ?? "Helvetica Neue"), prefix + "FontFamily")
         _weight = AppStorage(wrappedValue: defaults.string(forKey: prefix + "FontWeight") ?? (secondary ? "Regular" : defaults.string(forKey: "selectedFontWeight") ?? "Bold"), prefix + "FontWeight")
