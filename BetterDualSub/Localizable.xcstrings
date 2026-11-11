@@ -4203,6 +4203,57 @@
         }
       }
     },
+    "llm.extra" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extra request parameters (JSON)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "额外请求参数（JSON）"
+          }
+        }
+      }
+    },
+    "llm.extra.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fields added to every request, for options your service documents beyond the common API: for example {\"reasoning_effort\": \"low\"} to speed up a reasoning model, or {\"chat_template_kwargs\": {\"enable_thinking\": false}} on some local servers. The model, messages and stream fields cannot be changed. A service that does not know a field may refuse the request; leave this empty if translation fails."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加到每个请求里的字段，用于你的服务在通用接口之外提供的选项：例如 {\"reasoning_effort\": \"low\"} 可加快推理模型，某些本地服务可用 {\"chat_template_kwargs\": {\"enable_thinking\": false}}。模型、消息和 stream 字段不能被修改。服务不认识某个字段时可能拒绝请求；翻译失败时请清空。"
+          }
+        }
+      }
+    },
+    "llm.extra.invalid" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This is not a JSON object, so it is not sent. Requests fail until it is fixed or emptied."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这不是 JSON 对象，因此不会发送。修正或清空之前，请求会失败。"
+          }
+        }
+      }
+    },
     "llm.batchSize" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -4233,6 +4284,57 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "作为上下文的前文句数：%d"
+          }
+        }
+      }
+    },
+    "llm.parallel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parallel requests"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "并行请求数"
+          }
+        }
+      }
+    },
+    "llm.parallel.auto" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatic (%d)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动（%d）"
+          }
+        }
+      }
+    },
+    "llm.parallel.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sends several batches at once, which translates a long file much faster on an online service. A model on this Mac usually handles one request at a time, so Automatic uses one there. Batches sent together see less of the translation before them as context, and a service with a low rate limit may answer slower or refuse; lower this if translations get worse or requests fail."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同时发送多个批次，在线服务上翻译长字幕会快很多。本机模型通常一次只处理一个请求，所以“自动”在本机用 1。同时发送的批次能看到的前文译文会变少；如果服务的频率限制很低，可能变慢或被拒绝。翻译质量下降或请求失败时请调低。"
           }
         }
       }
@@ -4284,6 +4386,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "无法读取翻译服务的回复，请检查 API 地址和模型。"
+          }
+        }
+      }
+    },
+    "llm.error.extraParameters" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The extra request parameters in Settings › Translation are not a valid JSON object."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“设置 › 翻译”中的额外请求参数不是有效的 JSON 对象。"
           }
         }
       }

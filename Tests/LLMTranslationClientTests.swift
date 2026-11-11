@@ -86,6 +86,43 @@ final class LLMTranslationClientTests: XCTestCase {
         XCTAssertEqual((body["response_format"] as? [String: String])?["type"], "json_object")
     }
 
+    func testExtraParametersAreAddedToTheRequestButCannotChangeWhatTheTranslationDependsOn() async throws {
+        var configuration = self.configuration
+        configuration.extraParameters = #"{"reasoning_effort":"low","chat_template_kwargs":{"enable_thinking":false},"model":"other","messages":[],"stream":true,"temperature":0.9}"#
+        var client = LLMTranslationClient(configuration: configuration, apiKey: nil, session: StubURLProtocol.session([(200, chat("ok"))]))
+        client.retryDelays = [.zero]
+        _ = try await client.complete([.user("Hello")], jsonMode: true)
+        let body = StubURLProtocol.body(0)
+        XCTAssertEqual(body["reasoning_effort"] as? String, "low")
+        XCTAssertEqual((body["chat_template_kwargs"] as? [String: Bool])?["enable_thinking"], false)
+        XCTAssertEqual(body["model"] as? String, "test-model", "protected")
+        XCTAssertEqual((body["messages"] as? [[String: String]])?.count, 1, "protected")
+        XCTAssertEqual(body["stream"] as? Bool, false, "protected")
+        XCTAssertEqual(body["temperature"] as? Double, 0.9, "other fields may be replaced")
+        XCTAssertEqual((body["response_format"] as? [String: String])?["type"], "json_object")
+    }
+
+    func testEmptyOrInvalidExtraParameters() async throws {
+        var configuration = self.configuration
+        XCTAssertNil(configuration.extraFields)
+        XCTAssertFalse(configuration.hasInvalidExtraParameters)
+        configuration.extraParameters = "  \n "
+        XCTAssertFalse(configuration.hasInvalidExtraParameters)
+        for invalid in ["reasoning_effort=low", "[1,2]", #"{"a":"#, "\"text\""] {
+            configuration.extraParameters = invalid
+            XCTAssertTrue(configuration.hasInvalidExtraParameters, invalid)
+            let client = LLMTranslationClient(configuration: configuration, apiKey: nil, session: StubURLProtocol.session([(200, chat("x"))]))
+            do { _ = try await client.complete([.user("x")], jsonMode: false); XCTFail("Expected an error for \(invalid)") }
+            catch let error as LLMError { XCTAssertEqual(error, .invalidExtraParameters) }
+            XCTAssertTrue(StubURLProtocol.requests.isEmpty, "nothing is sent without the fields the user asked for")
+        }
+        // Saved with the configuration, and absent from one saved before the setting existed.
+        configuration.extraParameters = #"{"a":1}"#
+        let decoded = try JSONDecoder().decode(LLMConfiguration.self, from: JSONEncoder().encode(configuration))
+        XCTAssertEqual(decoded.extraParameters, configuration.extraParameters)
+        XCTAssertEqual(try JSONDecoder().decode(LLMConfiguration.self, from: Data(#"{"model":"m"}"#.utf8)).extraParameters, "")
+    }
+
     func testRateLimitsAndServerErrorsAreRetriedButOtherErrorsAreNot() async throws {
         let reply = try await client([(429, "{}"), (503, "{}"), (200, chat("ok"))]).complete([.user("x")], jsonMode: false)
         XCTAssertEqual(reply, "ok")

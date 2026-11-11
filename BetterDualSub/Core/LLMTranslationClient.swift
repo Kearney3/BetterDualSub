@@ -33,6 +33,9 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
     static let storageKey = "llmConfiguration"
     static let batchSizes = 5...60
     static let contextSizes = 0...30
+    static let parallelLimits = 1...4
+    /// Requests in flight at once when `parallelRequests` is automatic and the service is not on this Mac.
+    static let automaticOnlineRequests = 3
 
     var preset = LLMPreset.ollama
     var baseURL = LLMPreset.ollama.baseURL
@@ -53,6 +56,13 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
     var softenProfanity = false
     /// The `LLMPromptTemplate` that sets the translator's role and style.
     var promptID = LLMPromptTemplate.standard.id
+    /// Batches sent at the same time; nil picks one for a model on this Mac, which handles a request at a time, and
+    /// several for an online service. A batch started while an earlier one is still out sees less of its translation
+    /// as context.
+    var parallelRequests: Int?
+    /// A JSON object whose fields are added to every chat request, for what a service offers beyond the common API,
+    /// such as `{"reasoning_effort": "low"}` to speed up a reasoning model. Empty adds nothing.
+    var extraParameters = ""
 
     init() {}
 
@@ -71,6 +81,8 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
         keepHonorifics = try container.decodeIfPresent(Bool.self, forKey: .keepHonorifics) ?? defaults.keepHonorifics
         softenProfanity = try container.decodeIfPresent(Bool.self, forKey: .softenProfanity) ?? defaults.softenProfanity
         promptID = try container.decodeIfPresent(String.self, forKey: .promptID) ?? defaults.promptID
+        parallelRequests = try container.decodeIfPresent(Int.self, forKey: .parallelRequests)
+        extraParameters = try container.decodeIfPresent(String.self, forKey: .extraParameters) ?? defaults.extraParameters
     }
 
     static func load(from defaults: UserDefaults = .standard) -> LLMConfiguration {
@@ -91,6 +103,29 @@ nonisolated struct LLMConfiguration: Codable, Equatable, Sendable {
     /// Kinds of glossary entry left untranslated, whose entries found by the model are not used.
     var untranslatedKinds: Set<GlossaryEntry.Kind> {
         Set([translateNames ? nil : GlossaryEntry.Kind.person, translatePlaces ? nil : .place].compactMap { $0 })
+    }
+
+    /// Fields the extra parameters cannot change, because the translation depends on them.
+    static let protectedFields: Set<String> = ["model", "messages", "stream"]
+
+    /// The fields of `extraParameters`, without the protected ones; nil when it is empty or not a JSON object.
+    var extraFields: [String: Any]? {
+        let text = extraParameters.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty, let object = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any] else { return nil }
+        return object.filter { !Self.protectedFields.contains($0.key) }
+    }
+
+    /// `extraParameters` is filled in but is not a JSON object, so requests would silently go without it.
+    var hasInvalidExtraParameters: Bool {
+        !extraParameters.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && extraFields == nil
+    }
+
+    /// What "automatic" means for this service.
+    var automaticParallelRequests: Int { isOnThisMac ? 1 : Self.automaticOnlineRequests }
+
+    /// How many batches are sent at the same time.
+    var effectiveParallelRequests: Int {
+        min(max(parallelRequests ?? automaticParallelRequests, Self.parallelLimits.lowerBound), Self.parallelLimits.upperBound)
     }
 
     var isComplete: Bool { endpoint != nil && !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -122,6 +157,7 @@ nonisolated enum LLMError: LocalizedError, Equatable {
     case notConfigured
     case http(status: Int, message: String)
     case invalidResponse
+    case invalidExtraParameters
 
     var errorDescription: String? {
         switch self {
@@ -129,6 +165,7 @@ nonisolated enum LLMError: LocalizedError, Equatable {
         case .http(let status, let message):
             subtitleLocalizedFormat("llm.error.http", status, message.isEmpty ? HTTPURLResponse.localizedString(forStatusCode: status) : message)
         case .invalidResponse: subtitleLocalizedString("llm.error.invalidResponse")
+        case .invalidExtraParameters: subtitleLocalizedString("llm.error.extraParameters")
         }
     }
 
@@ -178,16 +215,26 @@ nonisolated struct LLMTranslationClient: Sendable {
     /// The reply to `messages`. `jsonMode` asks the service for a JSON object, where it supports that.
     func complete(_ messages: [LLMChatMessage], jsonMode: Bool) async throws -> String {
         guard let endpoint = configuration.endpoint, configuration.isComplete else { throw LLMError.notConfigured }
+        guard !configuration.hasInvalidExtraParameters else { throw LLMError.invalidExtraParameters }
         var request = makeRequest(endpoint.appendingPathComponent("chat/completions"))
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(ChatRequest(
+        let body = try JSONEncoder().encode(ChatRequest(
             model: configuration.model.trimmingCharacters(in: .whitespacesAndNewlines), messages: messages,
             temperature: configuration.temperature, response_format: jsonMode ? .init(type: "json_object") : nil))
+        request.httpBody = try Self.adding(configuration.extraFields ?? [:], to: body)
         let data = try await send(request)
         guard let content = try? JSONDecoder().decode(ChatResponse.self, from: data).choices.first?.message.content,
               !content.isEmpty else { throw LLMError.invalidResponse }
         return content
+    }
+
+    /// `body` (a JSON object) with `fields` added; a field of the same name is replaced.
+    static func adding(_ fields: [String: Any], to body: Data) throws -> Data {
+        guard !fields.isEmpty else { return body }
+        guard var object = try JSONSerialization.jsonObject(with: body) as? [String: Any] else { throw LLMError.invalidResponse }
+        for (key, value) in fields { object[key] = value }
+        return try JSONSerialization.data(withJSONObject: object)
     }
 
     /// Model identifiers the service offers, for the settings page.

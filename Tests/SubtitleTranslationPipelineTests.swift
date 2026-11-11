@@ -40,6 +40,33 @@ private final class ContextSessionStub: SubtitleTranslationSession {
     func cancel() {}
 }
 
+/// A language model whose requests take a moment, so batches sent at the same time overlap, and which can fail one.
+@MainActor
+private final class SlowSessionStub: SubtitleTranslationSession {
+    var understandsContext: Bool { true }
+    var inFlight = 0, maxInFlight = 0, started = 0, completed = 0
+    var translated: [Int] = []
+    var failingFirstIndex: Int?
+
+    func translate(_ inputs: [SubtitleTranslationInput], context: SubtitleTranslationContext,
+                   receive: (SubtitleTranslationOutput) throws -> Void) async throws {
+        started += 1
+        inFlight += 1
+        maxInFlight = max(maxInFlight, inFlight)
+        defer { inFlight -= 1 }
+        if let failingFirstIndex, inputs.first?.index == failingFirstIndex { throw SubtitleError.message("error.translation.incomplete") }
+        try await Task.sleep(for: .milliseconds(60))
+        for input in inputs {
+            translated.append(input.index)
+            try receive(SubtitleTranslationOutput(identifier: String(input.index), text: "T:" + input.text, segments: input.segments.map { "T:" + $0 }))
+        }
+        completed += 1
+    }
+
+    func extractTerms(_ lines: [String], known: [GlossaryEntry]) async throws -> [GlossaryEntry] { [] }
+    func cancel() {}
+}
+
 /// A translator that sees whole sentences only, as the on-device one does.
 @MainActor
 private final class SentenceSessionStub: SubtitleTranslationSession {
@@ -221,6 +248,104 @@ final class SubtitleTranslationPipelineTests: XCTestCase {
         }
         XCTFail("Translation event did not complete")
     }
+
+    // MARK: Parallel requests
+
+    /// Like `settle`, for requests that take real time: polls for up to ten seconds.
+    private func eventually(_ condition: () -> Bool) async {
+        for _ in 0..<1000 {
+            if condition() { return }
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+        XCTFail("Translation event did not complete")
+    }
+
+    private func onlineModel(parallel: Int?) -> LLMConfiguration {
+        var configuration = model
+        configuration.baseURL = "https://api.example.com/v1"
+        configuration.parallelRequests = parallel
+        return configuration
+    }
+
+    private func numberedLines(_ count: Int) -> [String] { (0..<count).map { "Line \($0)." } }
+
+    func testOnlineModelSendsBatchesInParallelUpToTheLimitAndTranslatesEachLineOnce() async throws {
+        let session = SlowSessionStub(), manager = PipelineTarget()
+        let translator = translator(session)
+        let options = SubtitleTranslationOptions(engine: .llm(onlineModel(parallel: 3)), glossary: glossary(), subdivide: false)
+        _ = await translator.start(plan: try plan(numberedLines(30)), source: source, target: target, manager: manager, options: options)
+        await eventually { !translator.isBusy }
+        guard case .finished(let lines, _) = translator.phase else { return XCTFail("Expected a finished translation, got \(translator.phase)") }
+        XCTAssertEqual(lines, 30)
+        XCTAssertEqual(session.started, 6)
+        XCTAssertEqual(session.maxInFlight, 3)
+        XCTAssertEqual(session.translated.sorted(), Array(0..<30), "every line exactly once")
+        let document = try XCTUnwrap(manager.replacements.last)
+        XCTAssertEqual(document.items.map(\.text), numberedLines(30).map { "T:" + $0 })
+    }
+
+    func testAModelOnThisMacStaysSequentialUnlessAskedOtherwise() async throws {
+        for (parallel, expected) in [(nil, 1), (2, 2)] as [(Int?, Int)] {
+            var configuration = model
+            configuration.parallelRequests = parallel
+            let session = SlowSessionStub(), manager = PipelineTarget()
+            let translator = translator(session)
+            let options = SubtitleTranslationOptions(engine: .llm(configuration), glossary: glossary(), subdivide: false)
+            _ = await translator.start(plan: try plan(numberedLines(20)), source: source, target: target, manager: manager, options: options)
+            await eventually { !translator.isBusy }
+            XCTAssertEqual(session.maxInFlight, expected, "parallel requests \(String(describing: parallel))")
+            XCTAssertEqual(session.translated.sorted(), Array(0..<20))
+        }
+    }
+
+    func testAFailedBatchStopsTheOthersAndReportsTheError() async throws {
+        let session = SlowSessionStub(), manager = PipelineTarget()
+        session.failingFirstIndex = 5
+        let translator = translator(session)
+        let options = SubtitleTranslationOptions(engine: .llm(onlineModel(parallel: 3)), glossary: glossary(), subdivide: false)
+        _ = await translator.start(plan: try plan(numberedLines(60)), source: source, target: target, manager: manager, options: options)
+        await eventually { !translator.isBusy }
+        guard case .failed(let message) = translator.phase else { return XCTFail("Expected a failure, got \(translator.phase)") }
+        XCTAssertFalse(message.isEmpty)
+        let started = session.started
+        XCTAssertLessThanOrEqual(started, 3, "only the batches already out when it failed were started")
+        XCTAssertEqual(session.completed, 0, "the requests still out are cancelled")
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertEqual(session.started, started, "no batch is started after the failure")
+        XCTAssertLessThan(session.translated.count, 60)
+    }
+
+    func testCancellingStopsEveryRequestInFlight() async throws {
+        let session = SlowSessionStub(), manager = PipelineTarget()
+        let translator = translator(session)
+        let options = SubtitleTranslationOptions(engine: .llm(onlineModel(parallel: 3)), glossary: glossary(), subdivide: false)
+        _ = await translator.start(plan: try plan(numberedLines(60)), source: source, target: target, manager: manager, options: options)
+        await eventually { session.inFlight == 3 }
+        translator.cancel()
+        await eventually { !translator.isBusy && session.inFlight == 0 }
+        XCTAssertEqual(session.completed, 0)
+        XCTAssertEqual(session.started, 3)
+        XCTAssertTrue(session.translated.isEmpty)
+        XCTAssertEqual(translator.phase, .cancelled)
+    }
+
+    func testParallelRequestsAreAutomaticByWhereTheModelRunsAndBounded() throws {
+        var configuration = LLMConfiguration()
+        XCTAssertEqual(configuration.effectiveParallelRequests, 1, "a model on this Mac handles one request at a time")
+        configuration.baseURL = "https://api.example.com/v1"
+        XCTAssertEqual(configuration.effectiveParallelRequests, LLMConfiguration.automaticOnlineRequests)
+        configuration.parallelRequests = 9
+        XCTAssertEqual(configuration.effectiveParallelRequests, 4)
+        configuration.parallelRequests = 0
+        XCTAssertEqual(configuration.effectiveParallelRequests, 1)
+        configuration.parallelRequests = 2
+        let decoded = try JSONDecoder().decode(LLMConfiguration.self, from: JSONEncoder().encode(configuration))
+        XCTAssertEqual(decoded.parallelRequests, 2)
+        // A configuration saved before the setting existed is automatic.
+        let old = try JSONDecoder().decode(LLMConfiguration.self, from: Data(#"{"model":"m","baseURL":"https://x.test/v1"}"#.utf8))
+        XCTAssertNil(old.parallelRequests)
+    }
+
 }
 
 @MainActor

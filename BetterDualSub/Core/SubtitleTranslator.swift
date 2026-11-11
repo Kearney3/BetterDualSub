@@ -279,20 +279,42 @@ final class SubtitleTranslator: ObservableObject {
         phase = .failed(message)
     }
 
+    /// What the batches of one translation share, as an object so batches running at the same time use one copy.
+    @MainActor
+    private final class RunState {
+        var translations: [[String]?]
+        var claimed = Set<Int>()
+        var doneCount = 0
+        var published = false
+        var lastPublished = ContinuousClock.now
+        var workers: [Task<Void, Never>] = []
+        var failure: Error?
+        init(count: Int) { translations = [[String]?](repeating: nil, count: count) }
+
+        func cancelWorkers() { for worker in workers { worker.cancel() } }
+
+        func store(_ index: Int, _ lines: [String]) {
+            if translations[index] == nil { doneCount += 1 }
+            translations[index] = lines
+        }
+    }
+
     private func run(_ request: Request, manager: any SubtitleTranslationTarget) {
         guard request.token == generation, request.loadID == manager.loadID else { return }
         let session = makeSession(request.options.engine, request.source, request.target)
         self.session = session
         let units = request.plan.units
-        let batchSize: Int, contextLines: Int, untranslated: Set<GlossaryEntry.Kind>
+        let batchSize: Int, contextLines: Int, untranslated: Set<GlossaryEntry.Kind>, parallel: Int
         if case .llm(let configuration) = request.options.engine {
             batchSize = min(max(configuration.batchSize, LLMConfiguration.batchSizes.lowerBound), LLMConfiguration.batchSizes.upperBound)
             contextLines = min(max(configuration.contextLines, 0), LLMConfiguration.contextSizes.upperBound)
             untranslated = configuration.untranslatedKinds
+            parallel = configuration.effectiveParallelRequests
         } else {
             batchSize = Self.batchSize
             contextLines = 0
             untranslated = []
+            parallel = 1
         }
         task = Task { [weak self] in
             defer { session.cancel() }
@@ -327,47 +349,73 @@ final class SubtitleTranslator: ObservableObject {
                 }
                 // Found names of kinds left untranslated stay in the saved glossary for later runs but are not used.
                 let applied = glossary.excludingAutomatic(untranslated)
-                var translations = [[String]?](repeating: nil, count: units.count)
+                let state = RunState(count: units.count)
                 let trackName = AppLocalization.format("translate.trackName", Self.displayName(request.target))
-                var published = false
-                var lastPublished = ContinuousClock.now
                 // Track 2 grows as lines come back, so it can be watched while the rest is translated.
                 @MainActor func publish(_ document: SubtitleDocument) {
-                    lastPublished = .now
-                    if published { manager.updateSecondary(document) } else { manager.setSecondary(document, name: trackName) }
-                    published = true
+                    state.lastPublished = .now
+                    if state.published { manager.updateSecondary(document) } else { manager.setSecondary(document, name: trackName) }
+                    state.published = true
                 }
                 @MainActor func publishPartial(force: Bool) {
-                    guard !request.preview, force || !published || ContinuousClock.now - lastPublished >= Self.publishInterval,
-                          let document = try? Self.finished(request.plan.partialDocument(translations: translations), request: request)
+                    guard !request.preview, force || !state.published || ContinuousClock.now - state.lastPublished >= Self.publishInterval,
+                          let document = try? Self.finished(request.plan.partialDocument(translations: state.translations), request: request)
                     else { return }
                     publish(document)
                 }
                 self?.phase = .translating(done: 0, total: units.count)
-                // Each batch is a run of untranslated sentences from the next one spoken where Track 1 is being watched,
-                // so a seek moves the work along with it; batches also let a cancel or a new subtitle load stop it early.
-                while let first = request.plan.unitOrder(from: manager.translationPositionMs).first(where: { translations[$0] == nil }) {
-                    let indices = Array((first..<units.count).prefix { translations[$0] == nil }.prefix(batchSize))
-                    let last = indices[indices.count - 1]
+                // Each batch is a run of untranslated sentences, not already out in another batch, from the next one
+                // spoken where Track 1 is being watched, so a seek moves the work along with it; batches also let a
+                // cancel or a new subtitle load stop it early.
+                @MainActor func nextBatch() -> [Int]? {
+                    guard let first = request.plan.unitOrder(from: manager.translationPositionMs)
+                        .first(where: { state.translations[$0] == nil && !state.claimed.contains($0) }) else { return nil }
+                    return Array((first..<units.count).prefix { state.translations[$0] == nil && !state.claimed.contains($0) }.prefix(batchSize))
+                }
+                @MainActor func translateBatch(_ indices: [Int]) async throws {
+                    let first = indices[0], last = indices[indices.count - 1]
                     var context = SubtitleTranslationContext()
                     if session.understandsContext {
+                        // Lines of a batch still out when this one starts are missing here.
                         context.preceding = (max(0, first - contextLines)..<first).compactMap { index in
-                            translations[index].map { (source: units[index].text, translation: Self.joined($0)) }
+                            state.translations[index].map { (source: units[index].text, translation: Self.joined($0)) }
                         }
                         context.following = units[last + 1..<min(units.count, last + 1 + Self.followingContext)].map(\.text)
                         context.glossary = applied.matches(in: indices.map { units[$0].text }.joined(separator: "\n"))
                     }
-                    let done = translations.filter { $0 != nil }.count
                     let batch = try await Self.translate(indices, of: units, session: session, context: context,
-                                                         glossary: applied, requireAll: true, ensureCurrent: ensureCurrent) { received, index, lines in
-                        translations[index] = lines
-                        self?.phase = .translating(done: done + received, total: units.count)
+                                                         glossary: applied, requireAll: true, ensureCurrent: ensureCurrent) { _, index, lines in
+                        state.store(index, lines)
+                        self?.phase = .translating(done: state.doneCount, total: units.count)
                         publishPartial(force: false)
                     }
-                    for (index, lines) in batch { translations[index] = lines }
-                    self?.phase = .translating(done: done + indices.count, total: units.count)
+                    for (index, lines) in batch { state.store(index, lines) }
+                    state.claimed.subtract(indices)
+                    self?.phase = .translating(done: state.doneCount, total: units.count)
                     publishPartial(force: true)
                 }
+                // Up to `parallel` workers each take the next batch until none is left. The first failure stops the others.
+                state.workers = (0..<parallel).map { _ in
+                    Task { @MainActor in
+                        while state.failure == nil, !Task.isCancelled, let indices = nextBatch() {
+                            state.claimed.formUnion(indices)
+                            do { try await translateBatch(indices) } catch {
+                                if state.failure == nil { state.failure = error }
+                                state.cancelWorkers()
+                                return
+                            }
+                        }
+                    }
+                }
+                await withTaskCancellationHandler {
+                    for worker in state.workers { await worker.value }
+                } onCancel: {
+                    Task { @MainActor in state.cancelWorkers() }
+                }
+                if let failure = state.failure { throw failure }
+                try ensureCurrent()
+                // Every batch is done; the checks below work on their own copy.
+                var translations = state.translations
                 var violating = units.indices.filter { index in
                     translations[index].map { !applied.violations(source: units[index].text, translation: Self.joined($0)).isEmpty } ?? false
                 }
