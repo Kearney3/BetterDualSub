@@ -43,6 +43,23 @@ nonisolated enum VideoSubtitleExtractor {
         return LocalSubtitleTrack.sortedForPicking(tracks)
     }
 
+    /// What a video file offers when it is chosen for import: its subtitle tracks, and whether its speech can be
+    /// transcribed. A file with no subtitle track is fine when it can be transcribed; one with neither fails with the
+    /// reason it has no tracks.
+    struct Inspection: Sendable {
+        let tracks: [LocalSubtitleTrack]
+        let canTranscribe: Bool
+    }
+
+    @concurrent static func inspectForImport(_ url: URL) async throws -> Inspection {
+        var tracks: [LocalSubtitleTrack] = []
+        var failure: Error?
+        do { tracks = try await inspect(url) } catch { failure = error }
+        let canTranscribe = SpeechTranscription.canTranscribe(url)
+        if tracks.isEmpty && !canTranscribe { throw failure ?? SubtitleError.message("error.video.noTracks") }
+        return Inspection(tracks: tracks, canTranscribe: canTranscribe)
+    }
+
     /// Extracts `tracks`, which all come from one file; tracks without any cue are left out. A Matroska file is read
     /// once for all of them. Picture tracks are read by text recognition, which takes minutes for a film; `progress`
     /// reports the track and how many of its distinct pictures are done.
@@ -139,7 +156,7 @@ nonisolated enum VideoSubtitleExtractor {
 
 // MARK: Matroska
 
-private nonisolated struct MatroskaTrack {
+nonisolated struct MatroskaTrack {
     var number = 0
     var type = 0
     var codec = ""
@@ -148,9 +165,14 @@ private nonisolated struct MatroskaTrack {
     var languageBCP47: String?
     var forced = false
     var hearingImpaired = false
+    var codecPrivate: Data?
+    /// Audio: the sampling frequency and number of channels.
+    var samplingFrequency = 8000.0
+    var channels = 1
     var encodings: [(order: UInt64, scope: UInt64, type: UInt64, algorithm: UInt64, settings: Data)] = []
 
     static let subtitleType = 0x11
+    static let audioType = 2
 
     var format: VideoSubtitleStream.Format? {
         switch codec {
@@ -177,7 +199,7 @@ private nonisolated struct MatroskaTrack {
     }
 }
 
-private nonisolated final class MatroskaFile {
+nonisolated final class MatroskaFile {
     private enum ID {
         static let ebml: UInt32 = 0x1A45_DFA3, docType: UInt32 = 0x4282
         static let segment: UInt32 = 0x1853_8067, seekHead: UInt32 = 0x114D_9B74, seek: UInt32 = 0x4DBB
@@ -187,6 +209,7 @@ private nonisolated final class MatroskaFile {
         static let trackNumber: UInt32 = 0xD7, trackType: UInt32 = 0x83, codecID: UInt32 = 0x86, name: UInt32 = 0x536E
         static let language: UInt32 = 0x22_B59C, languageBCP47: UInt32 = 0x22_B59D
         static let flagForced: UInt32 = 0x55AA, flagHearingImpaired: UInt32 = 0x55AB
+        static let codecPrivate: UInt32 = 0x63A2, audio: UInt32 = 0xE1, samplingFrequency: UInt32 = 0xB5, channels: UInt32 = 0x9F
         static let contentEncodings: UInt32 = 0x6D80, contentEncoding: UInt32 = 0x6240
         static let encodingOrder: UInt32 = 0x5031, encodingScope: UInt32 = 0x5032, encodingType: UInt32 = 0x5033
         static let compression: UInt32 = 0x5034, compressionAlgorithm: UInt32 = 0x4254, compressionSettings: UInt32 = 0x4255
@@ -211,6 +234,9 @@ private nonisolated final class MatroskaFile {
         catch is EBMLReader.Failure { throw SubtitleError.message("error.video.invalid") }
     }
 
+    /// The audio tracks of the file, in file order.
+    var audioTracks: [MatroskaTrack] { tracks.filter { $0.type == MatroskaTrack.audioType } }
+
     func subtitleTracks() throws -> [LocalSubtitleTrack] {
         let subtitles = tracks.filter { $0.type == MatroskaTrack.subtitleType }
         let readable = subtitles.compactMap { track -> LocalSubtitleTrack? in
@@ -234,24 +260,34 @@ private nonisolated final class MatroskaFile {
     /// lasts if the file says, and its data with the track's content encodings undone. A file cut short (still
     /// downloading, say) gives the blocks up to where it ends.
     func blocks(for streams: [VideoSubtitleStream]) throws -> [Int: [(start: Int, end: Int?, payload: Data)]] {
-        let wanted = Dictionary(streams.map { ($0.trackNumber, $0) }, uniquingKeysWith: { first, _ in first })
         var blocks: [Int: [(start: Int, end: Int?, payload: Data)]] = [:]
-        if let firstCluster {
-            reader.seek(to: firstCluster)
-            do {
-                while reader.position < segmentEnd {
-                    try Task.checkCancellation()
-                    guard let element = try reader.element() else { break }
-                    if element.id == ID.cluster {
-                        try readCluster(element, wanted: wanted, into: &blocks)
-                    } else {
-                        guard let end = element.end else { break }
-                        reader.seek(to: end)
-                    }
-                }
-            } catch is EBMLReader.Failure {}
+        let sources = streams.map {
+            // A text frame is small; a picture subtitle's display set can be a few hundred kilobytes.
+            MatroskaBlockSource(trackNumber: $0.trackNumber, encodings: $0.encodings, maximumLength: $0.format == .pgs ? 16_000_000 : 1_000_000)
         }
+        try forEachBlock(of: sources) { track, start, end, payload in blocks[track, default: []].append((start, end, payload)) }
         return blocks
+    }
+
+    /// Calls `handle` for every block of `sources` in file order, reading the Clusters once. A file cut short gives the
+    /// blocks up to where it ends.
+    func forEachBlock(of sources: [MatroskaBlockSource],
+                      _ handle: (_ track: Int, _ start: Int, _ end: Int?, _ payload: Data) throws -> Void) throws {
+        let wanted = Dictionary(sources.map { ($0.trackNumber, $0) }, uniquingKeysWith: { first, _ in first })
+        guard let firstCluster else { return }
+        reader.seek(to: firstCluster)
+        do {
+            while reader.position < segmentEnd {
+                try Task.checkCancellation()
+                guard let element = try reader.element() else { break }
+                if element.id == ID.cluster {
+                    try readCluster(element, wanted: wanted, handle: handle)
+                } else {
+                    guard let end = element.end else { break }
+                    reader.seek(to: end)
+                }
+            }
+        } catch is EBMLReader.Failure {}
     }
 
     /// Cues of each of `streams` that are text, by track number.
@@ -349,6 +385,15 @@ private nonisolated final class MatroskaFile {
                 case ID.flagForced: track.forced = try reader.unsigned(field) != 0
                 case ID.flagHearingImpaired: track.hearingImpaired = try reader.unsigned(field) != 0
                 case ID.contentEncodings: try readEncodings(field, into: &track)
+                case ID.codecPrivate: track.codecPrivate = try reader.data(field)
+                case ID.audio:
+                    try reader.children(of: field) { audio in
+                        switch audio.id {
+                        case ID.samplingFrequency: track.samplingFrequency = try reader.float(audio)
+                        case ID.channels: track.channels = Int(clamping: try reader.unsigned(audio))
+                        default: break
+                        }
+                    }
                 default: break
                 }
             }
@@ -380,10 +425,15 @@ private nonisolated final class MatroskaFile {
         }
     }
 
-    private func readCluster(_ cluster: EBMLReader.Element, wanted: [Int: VideoSubtitleStream],
-                             into cues: inout [Int: [(start: Int, end: Int?, payload: Data)]]) throws {
+    private func readCluster(_ cluster: EBMLReader.Element, wanted: [Int: MatroskaBlockSource],
+                             handle: (Int, Int, Int?, Data) throws -> Void) throws {
         let end = cluster.end.map { min($0, segmentEnd) } ?? segmentEnd
         var clusterTime: Int64 = 0
+        func deliver(_ block: (track: Int, relative: Int64, payload: Data), duration: Int64?) throws {
+            guard let start = VideoSubtitleExtractor.milliseconds(clusterTime &+ block.relative, scale: timestampScale) else { return }
+            let stop = duration.flatMap { VideoSubtitleExtractor.milliseconds(clusterTime &+ block.relative &+ $0, scale: timestampScale) }
+            try handle(block.track, start, stop, block.payload)
+        }
         while reader.position < end {
             let start = reader.position
             guard let element = try reader.element() else { return }
@@ -393,9 +443,7 @@ private nonisolated final class MatroskaFile {
             switch element.id {
             case ID.timestamp: clusterTime = Int64(clamping: try reader.unsigned(element))
             case ID.simpleBlock:
-                if let block = try readBlock(until: elementEnd, wanted: wanted) {
-                    append(block, duration: nil, clusterTime: clusterTime, wanted: wanted, into: &cues)
-                }
+                if let block = try readBlock(until: elementEnd, wanted: wanted) { try deliver(block, duration: nil) }
             case ID.blockGroup:
                 var block: (track: Int, relative: Int64, payload: Data)?
                 var duration: Int64?
@@ -406,25 +454,24 @@ private nonisolated final class MatroskaFile {
                     default: break
                     }
                 }
-                if let block { append(block, duration: duration, clusterTime: clusterTime, wanted: wanted, into: &cues) }
+                if let block { try deliver(block, duration: duration) }
             default: break
             }
             reader.seek(to: elementEnd)
         }
     }
 
-    /// Reads a Block of a wanted track; other tracks' blocks (all the video and audio) are skipped unread.
-    private func readBlock(until end: Int64, wanted: [Int: VideoSubtitleStream]) throws -> (track: Int, relative: Int64, payload: Data)? {
-        guard let number = try reader.vint(), let stream = wanted[Int(clamping: number)] else { return nil }
+    /// Reads a Block of a wanted track; other tracks' blocks (all the video and the rest of the audio) are skipped unread.
+    private func readBlock(until end: Int64, wanted: [Int: MatroskaBlockSource]) throws -> (track: Int, relative: Int64, payload: Data)? {
+        guard let number = try reader.vint(), let source = wanted[Int(clamping: number)] else { return nil }
         let timecode = try reader.bytes(2)
         let relative = Int64(Int16(bitPattern: UInt16(timecode[0]) << 8 | UInt16(timecode[1])))
         let flags = try reader.byte()
-        // Subtitle frames are not laced in practice; a laced block would need splitting first.
+        // Subtitle and AAC frames are not laced in practice; a laced block would need splitting first.
         let length = end - reader.position
-        // A text frame is small; a picture subtitle's display set can be a few hundred kilobytes.
-        guard flags & 0x06 == 0, (0...(stream.format == .pgs ? 16_000_000 : 1_000_000)).contains(length) else { return nil }
+        guard flags & 0x06 == 0, (0...Int64(source.maximumLength)).contains(length) else { return nil }
         var payload = Data(try reader.bytes(Int(length)))
-        for encoding in stream.encodings {
+        for encoding in source.encodings {
             switch encoding.kind {
             case .zlib:
                 // Matroska stores zlib streams; the Compression framework reads the raw deflate data after the header.
@@ -434,20 +481,19 @@ private nonisolated final class MatroskaFile {
             case .headerStripping(let header): payload = header + payload
             }
         }
-        return (stream.trackNumber, relative, payload)
-    }
-
-    private func append(_ block: (track: Int, relative: Int64, payload: Data), duration: Int64?, clusterTime: Int64,
-                        wanted: [Int: VideoSubtitleStream], into cues: inout [Int: [(start: Int, end: Int?, payload: Data)]]) {
-        guard wanted[block.track] != nil,
-              let start = VideoSubtitleExtractor.milliseconds(clusterTime &+ block.relative, scale: timestampScale) else { return }
-        let end = duration.flatMap { VideoSubtitleExtractor.milliseconds(clusterTime &+ block.relative &+ $0, scale: timestampScale) }
-        cues[block.track, default: []].append((start, end, block.payload))
+        return (source.trackNumber, relative, payload)
     }
 }
 
+/// A track whose blocks are wanted: its number, the content encodings to undo and the largest block to accept.
+nonisolated struct MatroskaBlockSource: Sendable {
+    let trackNumber: Int
+    let encodings: [MatroskaContentEncoding]
+    let maximumLength: Int
+}
+
 /// Buffered reading of EBML elements, so skipping a large video frame costs a seek rather than a read.
-private nonisolated final class EBMLReader {
+nonisolated final class EBMLReader {
     enum Failure: Error { case endOfFile, invalid }
 
     struct Element {
@@ -543,6 +589,16 @@ private nonisolated final class EBMLReader {
             guard let childEnd = child.end, childEnd <= end else { throw Failure.invalid }
             try body(child)
             seek(to: childEnd)
+        }
+    }
+
+    /// A 4- or 8-byte big-endian float.
+    func float(_ element: Element) throws -> Double {
+        let data = try payload(element, limit: 8)
+        switch data.count {
+        case 4: return Double(Float(bitPattern: data.reduce(UInt32(0)) { $0 << 8 | UInt32($1) }))
+        case 8: return Double(bitPattern: data.reduce(UInt64(0)) { $0 << 8 | UInt64($1) })
+        default: return 0
         }
     }
 

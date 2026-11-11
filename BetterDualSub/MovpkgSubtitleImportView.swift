@@ -25,6 +25,11 @@ struct MovpkgSubtitleImportView: View {
     @AppStorage(SubtitleTranslator.translateSecondaryKey) private var translateSecondary = false
     /// Folder of the last package or video chosen, where the next panel opens.
     @AppStorage("localVideoFolder") private var lastFolder = ""
+    /// The file has audio the system can read, so its speech can be transcribed instead of (or besides) its subtitles.
+    @State private var canTranscribe = false
+    @State private var transcribeLanguages: [SpeechTranscription.Language] = []
+    @State private var transcribeLanguageID = ""
+    @AppStorage("transcribeLanguage") private var preferredTranscribeLanguage = ""
 
     private static let translateTag = SubtitleTranslator.translateTag
 
@@ -51,6 +56,7 @@ struct MovpkgSubtitleImportView: View {
                 }
                 if tracks.isEmpty { SettingsHint(key: "movpkg.shortcutHint") }
             }
+            if canTranscribe { transcribeCard }
             if !tracks.isEmpty {
                 SettingsCard {
                     Text(AppLocalization.format("movpkg.tracksAvailable", tracks.count)).font(.headline)
@@ -111,6 +117,7 @@ struct MovpkgSubtitleImportView: View {
             status = packageURL == nil ? AppLocalization.string("movpkg.panelMessage") : readStatus
         }
         .onDisappear(perform: cancel)
+        .task(id: packageURL) { await loadTranscribeLanguages() }
         .onAppear(perform: consumeInput)
         .onChange(of: inputURLs) { _, _ in consumeInput() }
     }
@@ -187,13 +194,27 @@ struct MovpkgSubtitleImportView: View {
         tracks = []
         primaryID = ""
         secondaryID = ""
+        canTranscribe = false
         run {
             status = AppLocalization.string("movpkg.status.inspecting")
-            let available = VideoSubtitleExtractor.fileExtensions.contains(url.pathExtension.lowercased())
-                ? try await VideoSubtitleExtractor.inspect(url)
-                : try await background { try MovpkgSubtitleExtractor.inspect(url) }
+            let available: [LocalSubtitleTrack]
+            let transcribable: Bool
+            if VideoSubtitleExtractor.fileExtensions.contains(url.pathExtension.lowercased()) {
+                // A video with no subtitle track is still useful: its speech can be transcribed.
+                let inspection = try await VideoSubtitleExtractor.inspectForImport(url)
+                (available, transcribable) = (inspection.tracks, inspection.canTranscribe)
+            } else {
+                (available, transcribable) = (try await background { try MovpkgSubtitleExtractor.inspect(url) }, false)
+            }
             packageURL = url
+            canTranscribe = transcribable
             tracks = available
+            guard !available.isEmpty else {
+                status = AppLocalization.string("transcribe.status.noTracks")
+                error = ""
+                outputFolder = nil
+                return
+            }
             primaryID = available.first(where: { !$0.forced && !$0.sdh && SubtitleLanguagePreference.matches($0.language, preferredPrimary) })?.id
                 ?? available.first(where: { !$0.forced && SubtitleLanguagePreference.matches($0.language, preferredPrimary) })?.id
                 ?? available.first(where: { !$0.forced && !$0.sdh })?.id ?? available.first(where: { !$0.forced })?.id ?? available[0].id
@@ -284,6 +305,79 @@ extension MovpkgSubtitleImportView {
             }
             outputFolder = folder
             status = AppLocalization.format("movpkg.status.exported", selected.count)
+        }
+    }
+}
+
+extension MovpkgSubtitleImportView {
+    fileprivate var transcribeCard: some View {
+        SettingsCard(titleKey: "transcribe.title") {
+            Picker("transcribe.language", selection: $transcribeLanguageID) {
+                ForEach(transcribeLanguages) { language in
+                    Text(language.installed ? language.name : AppLocalization.format("transcribe.language.download", language.name)).tag(language.id)
+                }
+            }
+            .disabled(busy || transcribeLanguages.isEmpty)
+            HStack {
+                Button("transcribe.start") { transcribe(export: false) }
+                    .buttonStyle(.borderedProminent)
+                Button("transcribe.export") { transcribe(export: true) }
+            }
+            .disabled(busy || transcribeLanguageID.isEmpty)
+            SettingsHint(key: "transcribe.help")
+        }
+    }
+
+    fileprivate func loadTranscribeLanguages() async {
+        guard canTranscribe, let packageURL else { transcribeLanguages = []; return }
+        let languages = await SpeechTranscription.languages()
+        let tags = await SpeechTranscription.audioLanguageTags(of: packageURL)
+        transcribeLanguages = languages
+        let remembered = languages.first { $0.id == preferredTranscribeLanguage && audioMatches($0, tags) }
+        transcribeLanguageID = (remembered ?? SpeechTranscription.preferred(among: languages, audioTags: tags,
+                                                                              preferred: [preferredTranscribeLanguage] + Locale.preferredLanguages)
+                                ?? languages.first)?.id ?? ""
+    }
+
+    /// The remembered language is only kept when the file does not name a different one.
+    private func audioMatches(_ language: SpeechTranscription.Language, _ tags: [String]) -> Bool {
+        tags.isEmpty || tags.contains { Locale.Language(identifier: $0).languageCode == language.locale.language.languageCode }
+    }
+
+    fileprivate func transcribe(export: Bool) {
+        guard let packageURL, let language = transcribeLanguages.first(where: { $0.id == transcribeLanguageID }) else { return }
+        var destination: URL?
+        if export {
+            let panel = NSSavePanel()
+            panel.allowedContentTypes = [UTType(filenameExtension: "srt") ?? .plainText]
+            panel.nameFieldStringValue = packageURL.deletingPathExtension().lastPathComponent + "-\(language.id).srt"
+            panel.directoryURL = LocalSubtitleCache.defaultFolder
+            guard panel.runModal() == .OK, let url = panel.url else { return }
+            destination = url
+        }
+        preferredTranscribeLanguage = language.id
+        let translate = translateSecondary
+        run {
+            status = AppLocalization.string("transcribe.status.working0")
+            let document = try await SpeechTranscription.document(from: packageURL, locale: language.locale) { phase in
+                Task { @MainActor in
+                    switch phase {
+                    case .downloading(let fraction): status = AppLocalization.format("transcribe.status.downloading", Int(fraction * 100))
+                    case .reading: status = AppLocalization.string("transcribe.status.reading")
+                    case .transcribing(let fraction): status = AppLocalization.format("transcribe.status.working", Int(fraction * 100))
+                    }
+                }
+            }
+            if let destination {
+                try await background { try Data(document.srt.utf8).write(to: destination, options: .atomic) }
+                status = AppLocalization.format("transcribe.status.exported", document.items.count)
+                return
+            }
+            manager.load(primary: document, secondary: nil, title: packageURL.deletingPathExtension().lastPathComponent,
+                         names: [AppLocalization.format("transcribe.trackName", language.name)],
+                         sourceID: "transcribe:\(packageURL.lastPathComponent):\(language.id)")
+            if translate { SubtitleTranslator.shared.requestAutomaticStart(loadID: manager.loadID) }
+            status = AppLocalization.format(translate ? "transcribe.status.doneTranslating" : "transcribe.status.done", document.items.count)
         }
     }
 }

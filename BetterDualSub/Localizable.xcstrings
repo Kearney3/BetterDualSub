@@ -7057,6 +7057,346 @@
         }
       }
     },
+    "transcribe.title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribe speech"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转写语音"
+          }
+        }
+      }
+    },
+    "transcribe.language" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spoken language"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "说话的语言"
+          }
+        }
+      }
+    },
+    "transcribe.language.download" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ (download needed)"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@（需要下载）"
+          }
+        }
+      }
+    },
+    "transcribe.start" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribe and Load"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转写并加载"
+          }
+        }
+      }
+    },
+    "transcribe.export" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribe and Export SRT…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转写并导出 SRT…"
+          }
+        }
+      }
+    },
+    "transcribe.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Makes subtitles from the speech in the video, on this Mac: nothing is uploaded. A language’s speech model is downloaded once, with the system’s speech recognition. It takes a fraction of the video’s length, and the result is as good as speech recognition is: expect mistakes in names, noisy scenes and music, and no speaker labels. Only the first audio track is read, and in a Matroska file only if it is AAC. You can translate the result as a second language afterwards."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在本机根据视频中的语音生成字幕，不会上传任何内容。每种语言的语音模型只需通过系统的语音识别下载一次。耗时约为视频时长的一小部分，效果取决于语音识别本身：人名、嘈杂场景和音乐处容易出错，也没有说话人标注。只读取第一条音轨，Matroska 文件里的音轨必须是 AAC。之后可以把结果翻译成第二语言。"
+          }
+        }
+      }
+    },
+    "transcribe.status.noTracks" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No subtitle tracks in this file. You can transcribe its speech instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个文件里没有字幕轨道，可以改为转写它的语音。"
+          }
+        }
+      }
+    },
+    "transcribe.status.working0" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Starting speech recognition…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在启动语音识别…"
+          }
+        }
+      }
+    },
+    "transcribe.status.downloading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloading the speech model: %d%%"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在下载语音模型：%d%%"
+          }
+        }
+      }
+    },
+    "transcribe.status.working" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recognizing speech: %d%%"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在识别语音：%d%%"
+          }
+        }
+      }
+    },
+    "transcribe.status.done" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribed %d lines and loaded them as Track 1."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已转写 %d 行并加载为轨道 1。"
+          }
+        }
+      }
+    },
+    "transcribe.status.doneTranslating" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribed %d lines. Translating them as Track 2."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已转写 %d 行，正在翻译为轨道 2。"
+          }
+        }
+      }
+    },
+    "transcribe.status.exported" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribed %d lines and saved them."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已转写 %d 行并保存。"
+          }
+        }
+      }
+    },
+    "transcribe.trackName" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transcribed speech [%@]"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "转写的语音 [%@]"
+          }
+        }
+      }
+    },
+    "error.transcribe.unreadable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The system cannot read audio from this file."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "系统无法读取这个文件的音频。"
+          }
+        }
+      }
+    },
+    "error.transcribe.unsupportedAudio" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The audio of this file is in a format that cannot be transcribed yet. In Matroska files (.mkv, .webm) only AAC audio can; MP4, M4V and MOV files work with the usual audio formats."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这个文件的音频格式暂不支持转写。Matroska 文件（.mkv、.webm）只支持 AAC 音频；MP4、M4V、MOV 文件支持常见的音频格式。"
+          }
+        }
+      }
+    },
+    "error.transcribe.audioExtraction" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The audio could not be read out of this file."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法从这个文件中读出音频。"
+          }
+        }
+      }
+    },
+    "transcribe.status.reading" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reading the audio from the file…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在从文件中读取音频…"
+          }
+        }
+      }
+    },
+    "error.transcribe.unsupportedLanguage" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Speech recognition does not support this language on this Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 的语音识别不支持这种语言。"
+          }
+        }
+      }
+    },
+    "error.transcribe.noSpeech" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No speech was recognized. Check the spoken language, or whether the first audio track has the dialogue."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "没有识别到语音。请检查所选语言，以及第一条音轨是否包含对白。"
+          }
+        }
+      }
+    },
     "movpkg.timeline.episode" : {
       "localizations" : {
         "en" : {

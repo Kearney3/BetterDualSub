@@ -10,7 +10,7 @@ The Apple TV app on the Mac shows one subtitle language at a time and cannot loa
 
 ## Features
 
-- **Three subtitle sources**: download tracks from an Apple TV movie link, extract them from an episode downloaded in the TV app (`.movpkg`) or from a video file's embedded text tracks (`.mkv`, `.webm`, `.mp4`, `.m4v`, `.mov`), or open your own `.srt`, `.vtt`, `.ass` or `.ssa` files.
+- **Three subtitle sources** (plus transcribing speech): download tracks from an Apple TV movie link, extract them from an episode downloaded in the TV app (`.movpkg`) or from a video file's embedded text tracks (`.mkv`, `.webm`, `.mp4`, `.m4v`, `.mov`), or open your own `.srt`, `.vtt`, `.ass` or `.ssa` files.
 - **Two tracks at once**, each with its own font, color, outline and line layout.
 - **Follows playback** of the Apple TV app, or of any other player that reports Now Playing (IINA, VLC, QuickTime Player, browsers…), including pauses, seeks and playback speed. A manual clock takes over when nothing is playing.
 - **Visible sync status** in the menu bar, on the overlay and in the app, with a one-click fix when subtitles are not following the right player.
@@ -75,10 +75,15 @@ The menu bar icon offers the same loading, timing and display commands.
 | Source | What you provide | Notes |
 | --- | --- | --- |
 | Movie link | An Apple TV movie page link | Lists the subtitle tracks of the chosen version. **Download only…** saves SRT files without showing them. |
-| Local video | A video file with embedded text subtitles (`.mkv`, `.webm`, `.mp4`, `.m4v`, `.mov`: SRT, ASS/SSA, WebVTT or tx3g tracks), or a `.movpkg` package downloaded by the TV app, usually in `~/Movies/Videos/Media.localized/TV Shows` | For a `.movpkg`, choose the episode timeline or the whole package's. A video file is read once for all its tracks, so switching tracks on Now Playing is instant; image-based subtitles (PGS, VobSub) are not supported. For Track 2, pick another track, none, or **Translate from Track 1** to extract only Track 1 and translate the second language right away on Now Playing. **Export SRT files…** saves copies without showing them. |
+| Local video | A video file with embedded text subtitles (`.mkv`, `.webm`, `.mp4`, `.m4v`, `.mov`: SRT, ASS/SSA, WebVTT or tx3g tracks), or a `.movpkg` package downloaded by the TV app, usually in `~/Movies/Videos/Media.localized/TV Shows` | For a `.movpkg`, choose the episode timeline or the whole package's. A video file is read once for all its text tracks, so switching tracks on Now Playing is instant. Blu-ray picture subtitles (PGS, in `.mkv`) are listed as **OCR** tracks: their text is read from the pictures on this Mac, only for the tracks you choose, which takes a few minutes for a film (VobSub and other picture formats are not supported). A video with no subtitle track, or any video, can have its speech transcribed instead (see below). For Track 2, pick another track, none, or **Translate from Track 1** to extract only Track 1 and translate the second language right away on Now Playing. **Export SRT files…** saves copies without showing them. |
 | Subtitle file | One or two `.srt`, `.vtt`, `.ass` or `.ssa` files | UTF-8, UTF-16 and common legacy encodings (GB18030, Big5, Shift JIS, EUC-KR) are detected. ASS/SSA styling is ignored; bold, italic, underline and colors written in the cue text (HTML-style tags, WebVTT classes, `{\i1}`-style overrides) are shown. A file name ending in `(-1500ms)` sets the delay. |
 
 After a successful load the window switches to **Now Playing**. Movie downloads and local extraction remember your chosen languages. Unsupported links offer local file and local episode alternatives.
+
+### Picture subtitles and speech
+
+- **Picture subtitles (OCR)**: Blu-ray rips carry subtitles as pictures (PGS). A track marked **OCR** is read with the system's text recognition: names and unusual words can be misread, so look over the result. Identical pictures are read once, so a long film is mostly a matter of a few minutes.
+- **Transcribe speech**: for a video file (`.mp4`, `.m4v`, `.mov`, and `.mkv`/`.webm` with AAC audio), **Local video** offers **Transcribe and Load**, or **Transcribe and Export SRT…**. The speech is recognized on this Mac with the system speech analyzer, in the language you pick (the file's own audio language is offered first). A language's speech model is downloaded once. Only the first audio track is read. Expect mistakes with names, noise and music, and no speaker labels; the lines are cut at sentences and pauses. When **Translate from Track 1** is chosen as Track 2, the transcript is translated right away.
 
 ### Recent Watching
 
@@ -170,6 +175,7 @@ Play, pause and seeking control the followed player, or the manual clock when no
 
 ## Limitations
 
+- Picture subtitles are read only for PGS in Matroska files, and speech transcription needs AAC audio in a Matroska file (AC-3, DTS, Opus and others are not read yet). Both are limited by how well the system recognizes text and speech.
 - Online downloading supports Apple TV **movie pages with iTunes offers**. Apple TV+ subscription titles and show, season or episode links are not supported; for episodes downloaded in the TV app, use **Local video**.
 - Available languages depend on the page's country and the movie version. Only external text subtitle tracks are listed; captions embedded in the video cannot be downloaded. Forced tracks usually contain only selected dialogue.
 - Encrypted, discontinuous, byte-range and initialization-map subtitle playlists are rejected with an error.
@@ -179,6 +185,7 @@ Play, pause and seeking control the followed player, or the manual clock when no
 
 - **Network**: BetterDualSub contacts Apple's TV website only when you look up or download subtitles, and GitHub at most once a day for the latest version number (turn this off under **General**). Nothing else is sent.
 - **Account**: requests are anonymous. The optional DSID field is used only after an eligible request fails and is kept in memory only.
+- **Picture subtitles and speech** are read on this Mac. Downloading a language for speech recognition is done by the system.
 - **Translation** runs on device with the macOS translator or a language model on this Mac. With an online language model service, the subtitle text is sent to that service, as the translation card and **Settings** › **Translation** point out. API keys are stored in the login keychain. Glossaries are stored in `~/Library/Application Support/BetterDualSub/Glossaries/`.
 - **Files**: downloaded and extracted subtitles are kept in `~/Library/Application Support/BetterDualSub/Subtitles/`; **General** can move this folder to the Trash. Files you export yourself are never touched. Settings and timing are stored in the app's preferences. Self-contained recent subtitles, translations and configuration are stored in `~/Library/Application Support/BetterDualSub/RecentWatching/` (one file per session and an index); clear these using Recent Watching. Clearing the download cache keeps recent-session copies.
 

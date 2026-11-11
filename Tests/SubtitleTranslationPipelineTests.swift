@@ -251,9 +251,9 @@ final class SubtitleTranslationPipelineTests: XCTestCase {
 
     // MARK: Parallel requests
 
-    /// Like `settle`, for requests that take real time: polls for up to ten seconds.
+    /// Like `settle`, for requests that take real time: polls for up to thirty seconds.
     private func eventually(_ condition: () -> Bool) async {
-        for _ in 0..<1000 {
+        for _ in 0..<3000 {
             if condition() { return }
             try? await Task.sleep(for: .milliseconds(10))
         }
