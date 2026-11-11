@@ -115,7 +115,7 @@ func showControlCenterPage(_ page: String) {
 
 /// Delay and linking of the loaded tracks, on Now Playing.
 struct SubtitleTimingCard: View {
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @AppStorage(SubtitleManager.trackSnapToleranceKey) private var snapTolerance = SubtitleManager.defaultTrackSnapToleranceMs
 
     private var hasSecondTrack: Bool { manager.trackNames.count > 1 }
@@ -128,9 +128,9 @@ struct SubtitleTimingCard: View {
             }
             Grid(alignment: .leading, horizontalSpacing: 10, verticalSpacing: 10) {
                 delayRow(hasSecondTrack && manager.linkSecondaryDelay ? "timing.both" : "nowPlaying.track.primary",
-                         value: $manager.timeOffsetMs, track: "primary")
+                         value: Bindable(manager).timeOffsetMs, track: "primary")
                 if hasSecondTrack && !manager.linkSecondaryDelay {
-                    delayRow("nowPlaying.track.secondary", value: $manager.secondaryOffsetMs, track: "secondary")
+                    delayRow("nowPlaying.track.secondary", value: Bindable(manager).secondaryOffsetMs, track: "secondary")
                 }
             }
             if hasSecondTrack {

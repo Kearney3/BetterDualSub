@@ -3,7 +3,7 @@ import SwiftUI
 /// Home page of the control center: getting started while nothing is loaded, then everything about the loaded
 /// subtitles (tracks, sync, timing, translation) in one place.
 struct NowPlayingView: View {
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @AppStorage(OverlayController.visibleKey) private var showWindow = true
     @AppStorage(ViewingGuide.completedKey) private var guideCompleted = false
 

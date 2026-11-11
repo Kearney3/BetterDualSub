@@ -7,7 +7,7 @@ struct MovpkgSubtitleImportView: View {
     @Binding var inputURLs: [URL]
 
     init(inputURLs: Binding<[URL]> = .constant([])) { self._inputURLs = inputURLs }
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @State fileprivate var packageURL: URL?
     @State fileprivate var tracks: [LocalSubtitleTrack] = []
     @State fileprivate var primaryID = ""

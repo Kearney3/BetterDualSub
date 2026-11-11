@@ -56,7 +56,7 @@ extension Bundle {
 
 @main
 struct BetterDualSubApp: App {
-    @StateObject private var subManager = SubtitleManager.shared
+    private let subManager = SubtitleManager.shared
     @Environment(\.openWindow) private var openWindow
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @AppStorage(AppLocalization.languagePreferenceKey) private var language = AppLocalization.defaultLanguage
@@ -66,7 +66,7 @@ struct BetterDualSubApp: App {
         let _ = { AppDelegate.openControlCenterAction = { openWindow(id: "control-center") } }()
         WindowGroup("BetterDualSub", id: "control-center") {
             ControlCenterView()
-                .environmentObject(subManager)
+                .environment(subManager)
                 .environment(\.locale, Locale(identifier: language))
         }
         .defaultSize(width: 1120, height: 760)
@@ -99,7 +99,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hotKeyHandler: EventHandlerRef?
     private var hotKeys: [EventHotKeyRef] = []
     private var observers: [NSObjectProtocol] = []
-    private var syncStatusObserver: AnyCancellable?
+    private var statusObservation: Task<Void, Never>?
     private var updateObserver: AnyCancellable?
     /// `NSApp.delegate` is SwiftUI's wrapper, so `as? AppDelegate` always fails; reach the real instance through this.
     nonisolated(unsafe) static weak var shared: AppDelegate?
@@ -136,10 +136,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let manager = SubtitleManager.shared
-        syncStatusObserver = manager.$syncStatus.combineLatest(manager.$trackNames.map(\.isEmpty))
-            .removeDuplicates { $0 == $1 }
-            .receive(on: RunLoop.main)
-            .sink { [weak self] _ in self?.refreshStatusMenu() }
+        // The menu bar icon and menu follow the sync status and whether anything is loaded.
+        statusObservation = Task { [weak self] in
+            for await _ in Observations({ (manager.syncStatus, manager.trackNames.isEmpty) }) {
+                self?.refreshStatusMenu()
+            }
+        }
         updateObserver = UpdateChecker.shared.$state.removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshStatusMenu() }

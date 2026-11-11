@@ -5,7 +5,7 @@ import UniformTypeIdentifiers
 
 /// Creates or replaces Track 2 with a translation of Track 1, by the on-device translator or a language model.
 struct SubtitleTranslationCard: View {
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @ObservedObject private var translator = SubtitleTranslator.shared
     @StateObject private var settings = TranslationOptionsModel()
     /// Track 2 was to be translated right after loading, but a language or the model still has to be chosen.

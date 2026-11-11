@@ -113,7 +113,7 @@ struct WelcomeView: View {
 /// The steps to a first working viewing, checked off live: subtitles loaded, a player followed, the overlay seen.
 /// The first open step shows its explanation and fix; the card goes away once the user is done with it.
 struct GettingStartedCard: View {
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @AppStorage(OverlayController.visibleKey) private var overlayVisible = true
     @AppStorage(ViewingGuide.completedKey) private var completed = false
     @AppStorage(ViewingGuide.visibilityConfirmedKey) private var confirmed = false

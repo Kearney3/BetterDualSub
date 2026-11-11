@@ -2,7 +2,7 @@ import SwiftUI
 
 struct RecentWatchingCard: View {
     var limit: Int? = nil
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @State private var confirmingClear = false
     @State private var removingID: String?
     private var sessions: [ViewingSession] { Array(manager.recentSessions.prefix(limit ?? manager.recentSessions.count)) }

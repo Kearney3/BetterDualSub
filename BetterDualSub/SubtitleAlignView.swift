@@ -3,7 +3,7 @@ import SwiftUI
 /// Aligns a track by picking a cue: if the line that appeared at 8:00 in the file is being spoken now (10:00),
 /// the delay becomes +2:00. Subtitle time runs 1:1 with video time, at whatever speed the video plays.
 struct SubtitleAlignView: View {
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @State private var track = "primary"
     @State private var search = ""
     @State private var selected: SubtitleItem?

@@ -8,7 +8,7 @@ import AppKit
 
 /// Playback controls shown over the subtitles while the manual clock is driving them.
 struct ManualControlBar: View {
-    @ObservedObject var manager: SubtitleManager
+    var manager: SubtitleManager
     @ObservedObject private var overlay = OverlayController.shared
     @State private var scrubbing = false
     @State private var scrubValue = 0.0
@@ -199,7 +199,7 @@ private struct HoverArea: NSViewRepresentable {
 
 /// Line alignment inside the overlay, so a track can be lined up without leaving the video.
 private struct OverlayAlignPanel: View {
-    @ObservedObject var manager: SubtitleManager
+    var manager: SubtitleManager
     @Binding var tip: String?
     @State private var track = "primary"
     @State private var search = ""

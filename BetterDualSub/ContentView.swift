@@ -171,7 +171,7 @@ final class SubtitleTextNSView: NSView {
 
 // MARK: - 3. Transparent SwiftUI overlay
 struct ContentView: View {
-    @EnvironmentObject var subManager: SubtitleManager
+    @Environment(SubtitleManager.self) var subManager
     @AppStorage("primaryFontSize") private var primaryFontSize = SubtitleAppearanceDefaults.fontSize(secondary: false)
     @AppStorage("secondaryFontSize") private var secondaryFontSize = SubtitleAppearanceDefaults.fontSize(secondary: true)
     @AppStorage("primaryFontFamily") private var primaryFontFamily = UserDefaults.standard.string(forKey: "selectedFontFamily") ?? "Helvetica Neue"
@@ -473,7 +473,7 @@ private struct OverlayRootView: View {
 
     var body: some View {
         ContentView()
-            .environmentObject(SubtitleManager.shared)
+            .environment(SubtitleManager.shared)
             .environment(\.locale, Locale(identifier: language))
     }
 }

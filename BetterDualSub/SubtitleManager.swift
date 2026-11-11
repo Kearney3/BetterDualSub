@@ -82,27 +82,28 @@ extension SyncStatus {
 }
 
 // Both subtitle tracks are driven by one clock: the Apple TV playback clock, or a manual one when TV is unavailable.
-@MainActor
-class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
+@MainActor @Observable
+final class SubtitleManager: SubtitleTranslationTarget {
     /// Shared with the overlay panel, which lives outside the SwiftUI scene graph.
     static let shared = SubtitleManager()
     static let manualSpeeds: [Double] = [0.5, 0.75, 1, 1.25, 1.5, 2]
-    @Published var currentText = ""
-    @Published var secondaryText = ""
-    @Published var isPlaying = false
-    @Published var timeOffsetMs = 0 {
+    var currentText = ""
+    var secondaryText = ""
+    var isPlaying = false
+    var timeOffsetMs = 0 {
         didSet {
             let bounded = max(-86_400_000, min(86_400_000, timeOffsetMs))
-            if timeOffsetMs != bounded { timeOffsetMs = bounded }
+            // Assigning inside the observer runs it again with the bounded value, which does the rest.
+            if timeOffsetMs != bounded { timeOffsetMs = bounded; return }
             if linkSecondaryDelay && secondaryOffsetMs != timeOffsetMs { secondaryOffsetMs = timeOffsetMs }
             saveOffsets()
             updateSub()
         }
     }
-    @Published var secondaryOffsetMs = 0 {
+    var secondaryOffsetMs = 0 {
         didSet {
             let bounded = max(-86_400_000, min(86_400_000, secondaryOffsetMs))
-            if secondaryOffsetMs != bounded { secondaryOffsetMs = bounded }
+            if secondaryOffsetMs != bounded { secondaryOffsetMs = bounded; return }
             if linkSecondaryDelay && timeOffsetMs != secondaryOffsetMs { timeOffsetMs = secondaryOffsetMs }
             saveOffsets()
             updateSub()
@@ -110,57 +111,59 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
     }
     /// Drift correction of each track (`SubtitleDrift`): 1 runs the file 1:1 with the video. Changed only by
     /// `correctDrift` and `resetDrift`, never by a delay, and linked like the delays.
-    @Published private(set) var primaryScale = 1.0
-    @Published private(set) var secondaryScale = 1.0
+    private(set) var primaryScale = 1.0
+    private(set) var secondaryScale = 1.0
     /// The last line aligned on each track, as the first point for `correctDrift`.
-    @Published private(set) var driftAnchors: [String: SubtitleDrift.Point] = [:]
+    private(set) var driftAnchors: [String: SubtitleDrift.Point] = [:]
     /// The timing saved for this title was restored when it was loaded.
-    @Published private(set) var restoredTiming = false
+    private(set) var restoredTiming = false
     /// While on, Track B always has the same delay as Track A (changing either changes both). Persisted by `setLink`.
-    @Published var linkSecondaryDelay = UserDefaults.standard.object(forKey: "linkSecondaryDelay") as? Bool ?? true
-    @Published var debugTimeStr = "00:00"
-    @Published var loadedTitle = ""
-    @Published var trackNames: [String] = []
+    var linkSecondaryDelay = UserDefaults.standard.object(forKey: "linkSecondaryDelay") as? Bool ?? true
+    var debugTimeStr = "00:00"
+    var loadedTitle = ""
+    var trackNames: [String] = []
     /// Playback position (without subtitle offsets) and timeline length, for the manual progress bar.
-    @Published var positionMs = 0
-    @Published var durationMs = 0
-    @Published var activeSource: SyncSource = .manual
-    @Published var manualSpeed = 1.0
-    @Published var manualPlaying = false
+    var positionMs = 0
+    var durationMs = 0
+    var activeSource: SyncSource = .manual
+    var manualSpeed = 1.0
+    var manualPlaying = false
     /// Name of the app whose clock is currently followed, if any.
-    @Published var syncedAppName: String?
-    @Published private(set) var syncStatus: SyncStatus = .waiting(otherApp: nil)
+    var syncedAppName: String?
+    private(set) var syncStatus: SyncStatus = .waiting(otherApp: nil)
     /// Speed the subtitles run at: the followed player's playback speed, or the manual clock's.
-    @Published private(set) var playbackSpeed = 1.0
+    private(set) var playbackSpeed = 1.0
     /// Changes on every load, so work started for one set of subtitles is not applied to the next.
-    @Published private(set) var loadID = UUID()
-    @Published private(set) var recentSessions: [ViewingSession] = []
-    @Published private(set) var historyError: String?
-    @Published private(set) var canUndoSecondary = false
+    private(set) var loadID = UUID()
+    private(set) var recentSessions: [ViewingSession] = []
+    private(set) var historyError: String?
+    private(set) var canUndoSecondary = false
     /// Set when the subtitles were extracted from a package, whose other tracks can then replace them.
-    @Published private(set) var packageTracks: PackageTrackChoice?
-    @Published private(set) var switchingTracks = false
-    @Published private(set) var trackSwitchError: String?
-    private var trackSwitchTask: Task<Void, Never>?
-    private var currentSession: ViewingSession?
-    private var previousSecondary: (document: SubtitleDocument?, name: String?, trackID: String?, offset: Int, scale: Double, linked: Bool)?
-    private let sessionStore = ViewingSessionStore(url: URL.applicationSupportDirectory
+    private(set) var packageTracks: PackageTrackChoice?
+    private(set) var switchingTracks = false
+    private(set) var trackSwitchError: String?
+    @ObservationIgnored private var trackSwitchTask: Task<Void, Never>?
+    @ObservationIgnored private var currentSession: ViewingSession?
+    @ObservationIgnored private var previousSecondary: (document: SubtitleDocument?, name: String?, trackID: String?, offset: Int, scale: Double, linked: Bool)?
+    @ObservationIgnored private let sessionStore = ViewingSessionStore(url: URL.applicationSupportDirectory
         .appendingPathComponent("BetterDualSub/RecentWatching.json"))
-    private var sessionSaveTask: Task<Void, Never>?
-    private var historyWriteTask: Task<Void, Never>?
-    private var historyRestoreTask: Task<Void, Never>?
-    private var historyRestoreID = UUID()
-    private var preferenceObserver: AnyCancellable?
-    private var diagnosticEvents: [[String: String]] = []
+    @ObservationIgnored private var sessionSaveTask: Task<Void, Never>?
+    @ObservationIgnored private var historyWriteTask: Task<Void, Never>?
+    @ObservationIgnored private var historyRestoreTask: Task<Void, Never>?
+    @ObservationIgnored private var historyRestoreID = UUID()
+    /// What `preferenceSnapshot` returned when the display was last brought up to date.
+    @ObservationIgnored private var observedPreferences = PreferenceSnapshot()
+    @ObservationIgnored private var preferenceObserver: AnyCancellable?
+    @ObservationIgnored private var diagnosticEvents: [[String: String]] = []
     /// Brief confirmation shown over the subtitles after an offset change.
-    @Published var delayToast: String?
-    private var toastTask: Task<Void, Never>?
+    var delayToast: String?
+    @ObservationIgnored private var toastTask: Task<Void, Never>?
     /// Pending "playback lost" notice; brief gaps (between episodes, a seek) cancel it.
-    private var lossTask: Task<Void, Never>?
+    @ObservationIgnored private var lossTask: Task<Void, Never>?
     private var primary: SubtitleDocument? { didSet { shownSecondaryCache = nil } }
     private var secondary: SubtitleDocument? { didSet { shownSecondaryCache = nil } }
     /// Track 2 as shown, for the delay difference and tolerance it was snapped with (`shownSecondary`).
-    private var shownSecondaryCache: (shiftMs: Int, tolerance: Int, document: SubtitleDocument?)?
+    @ObservationIgnored private var shownSecondaryCache: (shiftMs: Int, tolerance: Int, document: SubtitleDocument?)?
 
     /// Position in a track's own file time: the video position less the delay, over the drift correction.
     func fileTimeMs(track: String, atVideo videoMs: Int? = nil) -> Int {
@@ -184,17 +187,17 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         return min(max(value, trackSnapTolerances.lowerBound), trackSnapTolerances.upperBound)
     }
     /// The followed player's clock (called the TV clock, as Apple TV is the default player).
-    private let playback = PlaybackCoordinator(client: MediaRemotePlaybackClient(), target: SyncTarget.current, mode: SyncMode.current)
-    private let timingStore = SubtitleTimingStore(defaults: .standard)
+    @ObservationIgnored private let playback = PlaybackCoordinator(client: MediaRemotePlaybackClient(), target: SyncTarget.current, mode: SyncMode.current)
+    @ObservationIgnored private let timingStore = SubtitleTimingStore(defaults: .standard)
     /// Title the timing is saved under, once loading has restored it.
-    private var timingTitle: String?
-    private var internalTimer: Timer?
-    private var subtitleTimerInterval: TimeInterval?
+    @ObservationIgnored private var timingTitle: String?
+    @ObservationIgnored private var internalTimer: Timer?
+    @ObservationIgnored private var subtitleTimerInterval: TimeInterval?
     /// Fires at the next cue start or end, so lines change on time instead of on the next periodic tick.
-    private var cueTimer: Timer?
-    private var cueFireUptime: TimeInterval?
-    private var appNapActivityToken: NSObjectProtocol?
-    private var workspaceObservers: [NSObjectProtocol] = []
+    @ObservationIgnored private var cueTimer: Timer?
+    @ObservationIgnored private var cueFireUptime: TimeInterval?
+    @ObservationIgnored private var appNapActivityToken: NSObjectProtocol?
+    @ObservationIgnored private var workspaceObservers: [NSObjectProtocol] = []
 
     init() {
         playback.onChange = { [weak self] in
@@ -211,13 +214,38 @@ class SubtitleManager: ObservableObject, SubtitleTranslationTarget {
         workspaceObservers.append(workspace.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor [weak self] in self?.playback.start() }
         })
+        // Any preference write posts this notification, delays and window moves included; only a change in what the
+        // subtitles are built from (below) is worth redoing the display and the history snapshot for.
+        observedPreferences = Self.preferenceSnapshot()
         preferenceObserver = NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
-            .sink { [weak self] _ in self?.updateSub(); self?.queueSessionSave() }
+            .sink { [weak self] _ in
+                guard let self else { return }
+                let snapshot = Self.preferenceSnapshot()
+                guard snapshot != self.observedPreferences else { return }
+                self.observedPreferences = snapshot
+                self.updateSub()
+                self.queueSessionSave()
+            }
         Task {
             do { recentSessions = try await sessionStore.load() }
             catch { historyError = error.localizedDescription }
         }
+    }
+
+    /// The preferences the display and the saved history depend on: whether the overlay is shown, the snap tolerance
+    /// and the appearance saved with a session.
+    private struct PreferenceSnapshot: Equatable {
+        var overlayVisible = true
+        var snapToleranceMs = SubtitleManager.defaultTrackSnapToleranceMs
+        var appearance: NSDictionary = [:]
+    }
+
+    private static func preferenceSnapshot() -> PreferenceSnapshot {
+        let keys = Set(ViewingDisplaySettings.keys)
+        return PreferenceSnapshot(
+            overlayVisible: OverlayController.isVisible, snapToleranceMs: trackSnapToleranceMs,
+            appearance: UserDefaults.standard.dictionaryRepresentation().filter { keys.contains($0.key) } as NSDictionary)
     }
 
     func reconnect() { playback.start() }

@@ -6,7 +6,7 @@ struct LocalSubtitleFileView: View {
     @Binding var inputURLs: [URL]
 
     init(inputURLs: Binding<[URL]> = .constant([])) { self._inputURLs = inputURLs }
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @State private var primaryURL: URL?
     @State private var secondaryURL: URL?
     @State private var primaryDelay = 0

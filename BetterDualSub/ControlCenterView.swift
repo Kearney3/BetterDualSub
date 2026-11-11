@@ -56,7 +56,7 @@ struct ControlCenterView: View {
     @AppStorage(AppLocalization.languagePreferenceKey) private var language = AppLocalization.defaultLanguage
     @SceneStorage("controlCenter.selectedPage") private var selectedPageValue = ControlCenterPage.nowPlaying.rawValue
     @AppStorage(LoadSource.storageKey) private var loadSource = LoadSource.file
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @State private var searchText = ""
     @AppStorage(ViewingGuide.welcomeShownKey) private var welcomeShown = false
     @State private var showingWelcome = false
@@ -217,7 +217,7 @@ private struct GeneralSettingsView: View {
     @AppStorage(SyncMode.storageKey) private var syncMode = SyncMode.auto.rawValue
     @AppStorage(SyncTarget.key) private var syncTarget = SyncTarget.tvBundleID
     @AppStorage(UpdateChecker.autoCheckKey) private var checkForUpdates = true
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @State private var showingCacheConfirmation = false
     @State private var cacheMessage = ""
     @State private var cacheError = false

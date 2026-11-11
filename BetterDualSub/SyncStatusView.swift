@@ -39,7 +39,7 @@ struct SyncStatusIndicator: View {
 struct SyncStatusDetail: View {
     /// Diagnostics are for troubleshooting, so they stay on the settings page.
     var showsDiagnostics = false
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
 
     var body: some View {
         let status = manager.syncStatus

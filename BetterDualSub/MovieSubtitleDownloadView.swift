@@ -5,7 +5,7 @@ struct MovieSubtitleDownloadView: View {
     @Binding var inputURLs: [URL]
 
     init(inputURLs: Binding<[URL]> = .constant([])) { self._inputURLs = inputURLs }
-    @EnvironmentObject private var manager: SubtitleManager
+    @Environment(SubtitleManager.self) private var manager
     @State private var link = ""
     @State private var dsid = ""
     @State private var versions: [MovieVersion] = []
