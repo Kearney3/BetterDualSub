@@ -145,7 +145,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateObserver = UpdateChecker.shared.$state.removeDuplicates()
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.refreshStatusMenu() }
-        UpdateChecker.shared.checkIfDue()
+        UpdateChecker.shared.startAutomaticChecks()
 
         observers.append(NotificationCenter.default.addObserver(
             forName: .subtitleShortcutsChanged, object: nil, queue: .main

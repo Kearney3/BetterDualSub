@@ -48,7 +48,7 @@ Homebrew only installs casks from third-party taps that you trust; `brew trust` 
 
 The Homebrew cask does the equivalent for you.
 
-When a new version is out, **Settings** › **General** offers **Install Update…**, which downloads it, checks its signature and relaunches the app. This works the same for Homebrew installs.
+When a new version is out, **Settings** › **General** offers **Install Update…**, which downloads it, checks its signature and relaunches the app. This works the same for Homebrew installs. The same place sets how often the app checks (every day, week or month) and has **Install updates automatically**, which downloads a new version in the background and installs it when you quit the app.
 
 ## Quick start
 

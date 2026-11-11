@@ -10952,6 +10952,57 @@
         }
       }
     },
+    "update.autoInstall" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Install updates automatically"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "自动安装更新"
+          }
+        }
+      }
+    },
+    "update.autoInstall.help" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Downloads a new version in the background and installs it when you quit the app."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在后台下载新版本，并在退出应用时安装。"
+          }
+        }
+      }
+    },
+    "update.autoInstall.unavailable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "This build cannot install updates itself; it opens the download page instead."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此构建无法自行安装更新，会改为打开下载页面。"
+          }
+        }
+      }
+    },
     "update.available" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11037,6 +11088,74 @@
         }
       }
     },
+    "update.error.rateLimited" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub is limiting requests from this network. Try again later."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 正在限制此网络的请求，请稍后再试。"
+          }
+        }
+      }
+    },
+    "update.error.rateLimitedUntil" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub is limiting requests from this network. Try again after %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 正在限制此网络的请求，请在 %@ 之后再试。"
+          }
+        }
+      }
+    },
+    "update.error.status" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub answered with status %d."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub 返回了状态码 %d。"
+          }
+        }
+      }
+    },
+    "update.error.unreadable" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "GitHub’s answer could not be read."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法读取 GitHub 的响应。"
+          }
+        }
+      }
+    },
     "update.failed" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -11054,19 +11173,87 @@
         }
       }
     },
+    "update.frequency" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Check every"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "检查频率"
+          }
+        }
+      }
+    },
+    "update.frequency.daily" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Day"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每日"
+          }
+        }
+      }
+    },
+    "update.frequency.monthly" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Month"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每月"
+          }
+        }
+      }
+    },
+    "update.frequency.weekly" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Week"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "每周"
+          }
+        }
+      }
+    },
     "update.help" : {
       "extractionState" : "manual",
       "localizations" : {
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "At most once a day, asks GitHub for the latest version number. Nothing else is sent. An update is downloaded only when you install it, and its signature is checked first."
+            "value" : "Asks GitHub for the latest version number and sends nothing else. An update is downloaded only when you install it, or when automatic installation is on, and its signature is checked first."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "每天最多一次向 GitHub 查询最新版本号，不发送其他信息。只有在你选择安装时才会下载更新，并先校验签名。"
+            "value" : "向 GitHub 查询最新版本号，不发送其他信息。只有在你选择安装或开启自动安装时才会下载更新，并先校验签名。"
           }
         }
       }
@@ -11084,6 +11271,40 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "安装更新…"
+          }
+        }
+      }
+    },
+    "update.lastChecked" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Last checked %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "上次检查：%@"
+          }
+        }
+      }
+    },
+    "update.lastChecked.now" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "just now"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刚刚"
           }
         }
       }

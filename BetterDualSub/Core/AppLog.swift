@@ -7,4 +7,5 @@ nonisolated enum AppLog {
     static let playback = Logger(subsystem: subsystem, category: "playback")
     static let translation = Logger(subsystem: subsystem, category: "translation")
     static let download = Logger(subsystem: subsystem, category: "download")
+    static let updates = Logger(subsystem: subsystem, category: "updates")
 }

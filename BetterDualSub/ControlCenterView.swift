@@ -60,6 +60,7 @@ struct ControlCenterView: View {
     @State private var searchText = ""
     @AppStorage(ViewingGuide.welcomeShownKey) private var welcomeShown = false
     @State private var showingWelcome = false
+    @ObservedObject private var updater = UpdateChecker.shared
 
     private var selectedPage: ControlCenterPage {
         ControlCenterPage.resolve(selectedPageValue)?.page ?? .nowPlaying
@@ -199,6 +200,12 @@ struct ControlCenterView: View {
             } else if page == .recent, !manager.recentSessions.isEmpty {
                 Text(verbatim: "\(manager.recentSessions.count)")
                     .font(.caption).monospacedDigit().foregroundStyle(.secondary)
+            } else if page == .general, let release = updater.available {
+                // A new version is installed from General, which is otherwise rarely opened.
+                let label = AppLocalization.format("menu.update", release.version.description)
+                Image(systemName: "arrow.down.circle.fill").foregroundStyle(.tint)
+                    .help(label)
+                    .accessibilityLabel(Text(verbatim: label))
             }
         }
         .tag(page)
@@ -217,6 +224,8 @@ private struct GeneralSettingsView: View {
     @AppStorage(SyncMode.storageKey) private var syncMode = SyncMode.auto.rawValue
     @AppStorage(SyncTarget.key) private var syncTarget = SyncTarget.tvBundleID
     @AppStorage(UpdateChecker.autoCheckKey) private var checkForUpdates = true
+    @AppStorage(UpdateChecker.frequencyKey) private var updateFrequency = UpdateChecker.Frequency.daily.rawValue
+    @ObservedObject private var updater = UpdateChecker.shared
     @Environment(SubtitleManager.self) private var manager
     @State private var showingCacheConfirmation = false
     @State private var cacheMessage = ""
@@ -276,8 +285,29 @@ private struct GeneralSettingsView: View {
             SettingsCard(titleKey: "general.section.maintenance") {
                 SettingsRow(symbol: "arrow.down.app", tint: .blue, titleKey: "update.auto", subtitleKey: "update.help") {
                     Toggle("update.auto", isOn: $checkForUpdates).labelsHidden().toggleStyle(.switch)
+                        .onChange(of: checkForUpdates) { _, enabled in if enabled { UpdateChecker.shared.checkIfDue() } }
+                        // A shorter interval may make a check due now.
+                        .onChange(of: updateFrequency) { _, _ in UpdateChecker.shared.checkIfDue() }
                 }
-                UpdateStatusView().padding(.leading, 44)
+                VStack(alignment: .leading, spacing: 12) {
+                    SettingsField("update.frequency") {
+                        Picker("update.frequency", selection: $updateFrequency) {
+                            ForEach(UpdateChecker.Frequency.allCases) { Text(LocalizedStringKey($0.titleKey)).tag($0.rawValue) }
+                        }
+                        .labelsHidden().fixedSize()
+                    }
+                    .disabled(!checkForUpdates)
+                    SettingsField("update.autoInstall", subtitleKey: UpdateChecker.canInstallInApp
+                                  ? "update.autoInstall.help" : "update.autoInstall.unavailable") {
+                        Toggle("update.autoInstall", isOn: $updater.installsAutomatically)
+                            .labelsHidden().toggleStyle(.switch).controlSize(.small)
+                    }
+                    // Found updates come from the automatic checks, and only a release build can install them.
+                    .disabled(!checkForUpdates || !UpdateChecker.canInstallInApp)
+                    Divider()
+                    UpdateStatusView()
+                }
+                .padding(.leading, 44)
                 Divider()
                 SettingsRow(symbol: "folder", tint: .indigo, titleKey: "general.cache.title",
                             subtitleKey: "general.cache.help") {
@@ -363,9 +393,18 @@ private struct UpdateStatusView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 8) {
-                status
-                Spacer()
+            HStack(alignment: .top, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) { status }
+                    if let lastChecked = updater.lastChecked, updater.state != .checking {
+                        // Redrawn every minute, so "5 minutes ago" stays true while the page is open.
+                        TimelineView(.periodic(from: .now, by: 60)) { _ in
+                            Text(AppLocalization.format("update.lastChecked", Self.relative(lastChecked)))
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                Spacer(minLength: 12)
                 Button("update.check") { Task { await updater.check() } }
                     .disabled(updater.state == .checking)
             }
@@ -384,6 +423,14 @@ private struct UpdateStatusView: View {
         }
     }
 
+    /// "5 minutes ago", in the app's language; anything under a minute is "just now".
+    private static func relative(_ date: Date) -> String {
+        guard Date().timeIntervalSince(date) >= 60 else { return AppLocalization.string("update.lastChecked.now") }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.locale = AppLocalization.locale
+        return formatter.localizedString(for: date, relativeTo: Date())
+    }
+
     @ViewBuilder
     private var status: some View {
         switch updater.state {
@@ -397,7 +444,7 @@ private struct UpdateStatusView: View {
         case .available(let release):
             Label(AppLocalization.format("update.available", release.version.description, current),
                   systemImage: "arrow.down.circle.fill")
-                .foregroundStyle(.blue)
+                .foregroundStyle(.tint)
         case .failed(let message):
             StatusLine(text: AppLocalization.format("update.failed", message), isError: true)
         }
