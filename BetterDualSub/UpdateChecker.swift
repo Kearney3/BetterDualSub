@@ -6,6 +6,13 @@ import Sparkle
 /// Looks up the latest GitHub release and tells the user when it is newer than the running app. Nothing is downloaded
 /// until the user asks, and then Sparkle installs it in the app. The Homebrew cask is marked `auto_updates`, so `brew`
 /// leaves such upgrades to the app.
+/// Sparkle's standard window, minus the "Unable to Check For Updates" alert: a failed check stays silent.
+private final class QuietUserDriver: SPUStandardUserDriver {
+    override func showUpdaterError(_ error: any Error, acknowledgement: @escaping () -> Void) {
+        acknowledgement()
+    }
+}
+
 @MainActor
 final class UpdateChecker: ObservableObject {
     static let shared = UpdateChecker()
@@ -60,14 +67,18 @@ final class UpdateChecker: ObservableObject {
     @Published var installsAutomatically = false {
         didSet {
             guard installsAutomatically != oldValue, Self.canInstallInApp else { return }
-            sparkle.updater.automaticallyDownloadsUpdates = installsAutomatically
+            sparkle.automaticallyDownloadsUpdates = installsAutomatically
             installIfAutomatic()
         }
     }
 
     /// Sparkle installs updates, when the user asks or automatically; its own scheduled checks are off in Info.plist.
-    private let sparkle = SPUStandardUpdaterController(startingUpdater: UpdateChecker.canInstallInApp,
-                                                       updaterDelegate: nil, userDriverDelegate: nil)
+    private let sparkle: SPUUpdater = {
+        let updater = SPUUpdater(hostBundle: .main, applicationBundle: .main,
+                                 userDriver: QuietUserDriver(hostBundle: .main, delegate: nil), delegate: nil)
+        if UpdateChecker.canInstallInApp { try? updater.start() }
+        return updater
+    }()
     private var schedule: Timer?
     private var wakeObserver: NSObjectProtocol?
 
@@ -85,19 +96,19 @@ final class UpdateChecker: ObservableObject {
     /// Shows Sparkle's update window, which downloads, verifies and installs the update, then relaunches.
     func installUpdate() {
         guard Self.canInstallInApp else { return }
-        sparkle.checkForUpdates(nil)
+        sparkle.checkForUpdates()
     }
 
     private init() {
         if let saved = Self.savedRelease, Self.isNewer(saved.version) { state = .available(saved) }
-        if Self.canInstallInApp { installsAutomatically = sparkle.updater.automaticallyDownloadsUpdates }
+        if Self.canInstallInApp { installsAutomatically = sparkle.automaticallyDownloadsUpdates }
     }
 
     /// With automatic installation on, hands a found update to Sparkle, which downloads and verifies it without a
     /// window and installs it when the app quits.
     private func installIfAutomatic() {
-        guard Self.canInstallInApp, installsAutomatically, available != nil, !sparkle.updater.sessionInProgress else { return }
-        sparkle.updater.checkForUpdatesInBackground()
+        guard Self.canInstallInApp, installsAutomatically, available != nil, !sparkle.sessionInProgress else { return }
+        sparkle.checkForUpdatesInBackground()
     }
 
     private static var savedRelease: Release? {
